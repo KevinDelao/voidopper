@@ -475,8 +475,9 @@ const Game = () => {
         return;
       }
 
-      // If paused, route to mouse handler for Main Menu button
+      // If paused, route to mouse handler for Resume/Main Menu buttons
       if (isPausedRef.current) {
+        touchStartTime = 0; // prevent touchEnd from launching bird after resume
         handleMouseDown({ clientX: touch.clientX, clientY: touch.clientY });
         return;
       }
@@ -543,9 +544,12 @@ const Game = () => {
         menuDragRef.current.active = false;
       }
 
-      if (!gameStarted || isGameOver || gameOverTimeRef.current) return;
+      if (!gameStarted || isGameOver || gameOverTimeRef.current || isPausedRef.current) return;
 
       const player = gameStateRef.current.player;
+
+      // Ignore touch end if it started during a pause (resume tap shouldn't launch bird)
+      if (touchStartTime === 0) return;
 
       if (isTouchAiming && player && player.isAiming) {
         // Release aim — launch bird
