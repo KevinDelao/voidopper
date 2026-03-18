@@ -415,6 +415,8 @@ const Game = () => {
             am.startMenuMusic();
           }
         })();
+        // Consume this tap — don't let it hit menu buttons behind the overlay
+        return;
       }
       const touch = e.touches[0];
       if (!touch) return;
