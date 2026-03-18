@@ -4992,6 +4992,18 @@ const Game = () => {
         gameStateRef.current._difficultyButtons = difficulties;
         curY += diffBtnH + menuPad;
 
+        // --- Audio resume hint (iOS requires tap after background) ---
+        const am = audioManagerRef.current;
+        if (am && am._needsResume && !isMutedRef.current) {
+          const pulse = 0.5 + Math.sin(Date.now() / 400) * 0.5;
+          ctx.save();
+          ctx.font = `bold ${isSmallScreen ? 12 : 14}px Orbitron, Arial`;
+          ctx.textAlign = 'center';
+          ctx.fillStyle = `rgba(170, 136, 255, ${0.4 + pulse * 0.4})`;
+          ctx.fillText('Tap anywhere to resume audio', width / 2, curY - 4);
+          ctx.restore();
+        }
+
         // --- PLAY button ---
         const playBtnW = Math.min(width - 30, 340);
         const playBtnH = isSmallScreen ? 48 : 54;
