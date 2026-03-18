@@ -3249,6 +3249,29 @@ const Game = () => {
       }
       renderMenuBackground(ctx, width, height, dt);
       drawUI(ctx, width, height);
+
+      // Blurred overlay + "tap to resume" when audio needs recovery (iOS background return)
+      const am = audioManagerRef.current;
+      if (am && am._needsResume && !isMutedRef.current) {
+        // Dim overlay to simulate blur
+        ctx.fillStyle = 'rgba(18, 14, 41, 0.7)';
+        ctx.fillRect(0, 0, width, height);
+        // Pulsing message
+        const pulse = 0.5 + Math.sin(Date.now() / 400) * 0.5;
+        const safeTop = state.safeTop || 0;
+        ctx.save();
+        ctx.textAlign = 'center';
+        // Icon
+        ctx.font = `${width < 420 ? 36 : 48}px Arial`;
+        ctx.fillStyle = `rgba(170, 136, 255, ${0.6 + pulse * 0.4})`;
+        ctx.fillText('\u266B', width / 2, height / 2 - 20);
+        // Text
+        ctx.font = `bold ${width < 420 ? 16 : 20}px Orbitron, Arial`;
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.7 + pulse * 0.3})`;
+        ctx.fillText('Tap to resume audio', width / 2, height / 2 + 20);
+        ctx.restore();
+      }
+
       return;
     }
 
@@ -4991,18 +5014,6 @@ const Game = () => {
         });
         gameStateRef.current._difficultyButtons = difficulties;
         curY += diffBtnH + menuPad;
-
-        // --- Audio resume hint (iOS requires tap after background) ---
-        const am = audioManagerRef.current;
-        if (am && am._needsResume && !isMutedRef.current) {
-          const pulse = 0.5 + Math.sin(Date.now() / 400) * 0.5;
-          ctx.save();
-          ctx.font = `bold ${isSmallScreen ? 12 : 14}px Orbitron, Arial`;
-          ctx.textAlign = 'center';
-          ctx.fillStyle = `rgba(170, 136, 255, ${0.4 + pulse * 0.4})`;
-          ctx.fillText('Tap anywhere to resume audio', width / 2, curY - 4);
-          ctx.restore();
-        }
 
         // --- PLAY button ---
         const playBtnW = Math.min(width - 30, 340);
