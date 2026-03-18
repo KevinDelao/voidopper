@@ -398,34 +398,23 @@ const Game = () => {
     const handleTouchStart = (e) => {
       e.preventDefault();
       // iOS requires user gesture to resume AudioContext after background/phone sleep.
-      // Check both the _needsResume flag AND the actual context state, because the
-      // context can go silent without the flag being set (e.g. iOS audio interruption).
+      // We fully reinitialize the audio context inside this gesture so iOS allows playback.
       const am = audioManagerRef.current;
-      if (am && am.audioContext && am.audioContext.state !== 'running') {
+      if (am && am._needsResume) {
+        const wasGame = am._wasGameMusicPlaying;
+        const wasMenu = am._wasMenuMusicPlaying;
+        const diff = am._savedDifficulty || difficultyRef.current;
+        am._needsResume = false;
+        am._wasGameMusicPlaying = false;
+        am._wasMenuMusicPlaying = false;
         (async () => {
-          try { await am.audioContext.resume(); } catch (_e) { /* reinit below */ }
-          if (am.audioContext.state !== 'running') {
-            await am.initialize();
-          }
-          am._needsResume = false;
-          if (am._wasGameMusicPlaying) {
-            am.startMusic(am._savedDifficulty || difficultyRef.current);
-            am._wasGameMusicPlaying = false;
-          } else if (am._wasMenuMusicPlaying) {
+          await am.forceReinitialize();
+          if (wasGame) {
+            am.startMusic(diff);
+          } else if (wasMenu) {
             am.startMenuMusic();
-            am._wasMenuMusicPlaying = false;
           }
         })();
-      } else if (am && am._needsResume) {
-        // Context is running but flag is still set — clear it and restore music
-        am._needsResume = false;
-        if (am._wasGameMusicPlaying) {
-          am.startMusic(am._savedDifficulty || difficultyRef.current);
-          am._wasGameMusicPlaying = false;
-        } else if (am._wasMenuMusicPlaying) {
-          am.startMenuMusic();
-          am._wasMenuMusicPlaying = false;
-        }
       }
       const touch = e.touches[0];
       if (!touch) return;
@@ -1080,46 +1069,45 @@ const Game = () => {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
 
-    // Pause audio when app goes to background, restart on return
+    // Pause game and audio when app goes to background, restart on return
     let _audioSuspended = false; // guard against double suspend/resume from both listeners
     const suspendAudio = () => {
-      if (_audioSuspended) return; // already handled by the other listener
+      if (_audioSuspended) return;
       _audioSuspended = true;
+      // Auto-pause the game if in an active level
+      if (gameStarted && !isGameOver) {
+        isPausedRef.current = true;
+        setIsPaused(true);
+      }
       const am = audioManagerRef.current;
-      if (!am || !am.audioContext) return;
+      if (!am) return;
+      // Remember what was playing so we can restart after reinit
       am._wasGameMusicPlaying = am.isMusicPlaying;
       am._wasMenuMusicPlaying = am.isMenuMusicPlaying;
       am._savedDifficulty = am.currentDifficulty;
-      if (am.isMusicPlaying) am.stopMusic();
-      if (am.isMenuMusicPlaying) am.stopMenuMusic();
-      am.audioContext.suspend();
+      // Mark that the next touch needs to reinitialize audio from scratch
+      am._needsResume = true;
     };
     const resumeAudio = async () => {
-      if (!_audioSuspended) return; // already handled by the other listener
+      if (!_audioSuspended) return;
       _audioSuspended = false;
       const am = audioManagerRef.current;
-      if (!am || !am.audioContext) return;
-      // iOS WebKit suspends AudioContext when app backgrounds or phone sleeps.
-      // The context may be 'suspended' or 'interrupted'. On iOS, resume() often
-      // fails without a user gesture after extended sleep, so we set _needsResume
-      // and let the touch handler do the actual recovery.
-      am._needsResume = true;
+      if (!am) return;
+      // Try immediate reinit — works for short backgrounds on some iOS versions.
+      // If iOS blocks it (no user gesture), _needsResume stays true for touch handler.
       try {
-        await am.audioContext.resume();
-      } catch (e) { /* touch handler will retry */ }
-      // If resume worked immediately (short background), restore music now
-      if (am.audioContext.state === 'running') {
-        am._needsResume = false;
-        if (am._wasGameMusicPlaying) {
-          am.startMusic(am._savedDifficulty || difficultyRef.current);
-          am._wasGameMusicPlaying = false;
-        } else if (am._wasMenuMusicPlaying) {
-          am.startMenuMusic();
-          am._wasMenuMusicPlaying = false;
+        await am.forceReinitialize();
+        if (am.audioContext && am.audioContext.state === 'running') {
+          am._needsResume = false;
+          if (am._wasGameMusicPlaying) {
+            am.startMusic(am._savedDifficulty || difficultyRef.current);
+            am._wasGameMusicPlaying = false;
+          } else if (am._wasMenuMusicPlaying) {
+            am.startMenuMusic();
+            am._wasMenuMusicPlaying = false;
+          }
         }
-      }
-      // If still not running, _needsResume stays true — the next touch
-      // will call resume() within a user gesture (required by iOS WebKit)
+      } catch (e) { /* touch handler will recover */ }
     };
     const handleVisibility = () => {
       if (document.hidden) suspendAudio(); else resumeAudio();

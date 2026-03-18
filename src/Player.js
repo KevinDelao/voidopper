@@ -1251,17 +1251,26 @@ class Player {
     ctx.fill();
     ctx.stroke();
 
-    // Hooked beak (eagle characteristic) — protruding from right side of head
-    ctx.fillStyle = c.beak;
-    ctx.strokeStyle = c.bodyStroke || '#333333';
-    ctx.lineWidth = 1;
+    // Hooked beak (eagle characteristic) — sharp downward hook, side profile
+    ctx.fillStyle = '#ff9900';
+    ctx.strokeStyle = '#cc7700';
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(7, -8);
-    ctx.quadraticCurveTo(14, -9, 13, -12);
-    ctx.quadraticCurveTo(10, -11, 7, -10.5);
-    ctx.closePath();
+    ctx.moveTo(6, -10);
+    ctx.quadraticCurveTo(9, -13, 13, -11.5);
+    ctx.quadraticCurveTo(14, -10, 12, -7.5);
+    ctx.lineTo(10, -7);
+    ctx.quadraticCurveTo(8, -8, 6, -10);
     ctx.fill();
     ctx.stroke();
+    // Lower mandible
+    ctx.fillStyle = '#dd8800';
+    ctx.beginPath();
+    ctx.moveTo(6, -8.5);
+    ctx.lineTo(10, -7);
+    ctx.lineTo(7, -6.5);
+    ctx.closePath();
+    ctx.fill();
 
     // Eye patch (white, side view) — left of beak, clearly separate
     ctx.fillStyle = '#ffffff';
@@ -1367,17 +1376,24 @@ class Player {
     ctx.arc(0, -5, 8, 0.3, Math.PI - 0.3);
     ctx.stroke();
 
-    // Beak — pointed, protruding from right side of head
-    ctx.fillStyle = c.beak;
-    ctx.strokeStyle = c.bodyStroke || '#333333';
-    ctx.lineWidth = 1;
+    // Beak — pointed bird beak, side profile
+    ctx.fillStyle = '#ff9900';
+    ctx.strokeStyle = '#cc7700';
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(6, -7.5);
-    ctx.lineTo(12, -9);
-    ctx.lineTo(6, -10.5);
-    ctx.closePath();
+    ctx.moveTo(6, -8);
+    ctx.quadraticCurveTo(10, -11, 13, -9);
+    ctx.quadraticCurveTo(10, -7.5, 6, -8);
     ctx.fill();
     ctx.stroke();
+    // Lower mandible
+    ctx.fillStyle = '#dd8800';
+    ctx.beginPath();
+    ctx.moveTo(6, -7.5);
+    ctx.lineTo(11, -8);
+    ctx.lineTo(7, -6.5);
+    ctx.closePath();
+    ctx.fill();
 
     // Eye patch (white, side view) — left of beak, clearly separate
     ctx.fillStyle = '#ffffff';
@@ -1458,25 +1474,25 @@ class Player {
       ctx.fill();
     }
 
-    // Curved beak (parrot characteristic) — protruding from right side of head
-    // Upper mandible: bulbous, rounded top with a sharp downward hook
-    ctx.fillStyle = c.beak;
-    ctx.strokeStyle = c.bodyStroke || '#333333';
-    ctx.lineWidth = 1;
+    // Curved parrot beak — classic hooked shape, side profile
+    ctx.fillStyle = '#ff8800';
+    ctx.strokeStyle = '#cc6600';
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(6, -9);
-    ctx.quadraticCurveTo(10, -14, 14, -12);
-    ctx.quadraticCurveTo(15, -10, 12, -8);
-    ctx.lineTo(10, -7.5);
-    ctx.quadraticCurveTo(8, -8.5, 6, -9);
+    // Upper mandible: round top curving down into a hook
+    ctx.moveTo(6, -10);
+    ctx.quadraticCurveTo(8, -13.5, 13, -12);
+    ctx.quadraticCurveTo(14.5, -11, 13, -8.5);
+    ctx.lineTo(11, -7);
+    ctx.quadraticCurveTo(8, -8, 6, -10);
     ctx.fill();
     ctx.stroke();
-    // Lower mandible: smaller, tucked underneath
-    ctx.fillStyle = '#555555';
+    // Lower mandible: small wedge tucked under
+    ctx.fillStyle = '#dd7700';
     ctx.beginPath();
-    ctx.moveTo(6, -8);
-    ctx.quadraticCurveTo(9, -7, 10, -7.5);
-    ctx.quadraticCurveTo(8, -6, 6, -6.5);
+    ctx.moveTo(6, -8.5);
+    ctx.lineTo(10, -7);
+    ctx.lineTo(7, -6);
     ctx.closePath();
     ctx.fill();
 
@@ -2166,17 +2182,24 @@ class Player {
       p.beginPath();
       p.arc(0, -7.5, 3, 0, Math.PI * 2);
       p.fill();
-      // Hooked beak protruding right (separated from eye)
-      p.fillStyle = skin.beak;
-      p.strokeStyle = skin.bodyStroke || '#333333';
+      // Hooked eagle beak protruding right
+      p.fillStyle = '#ff9900';
+      p.strokeStyle = '#cc7700';
       p.lineWidth = 0.8;
       p.beginPath();
-      p.moveTo(5, -6);
-      p.quadraticCurveTo(10, -7, 9, -9.5);
-      p.quadraticCurveTo(7, -8.5, 5, -8);
-      p.closePath();
+      p.moveTo(4, -8);
+      p.quadraticCurveTo(7, -10.5, 10, -9);
+      p.quadraticCurveTo(10.5, -7.5, 8, -6);
+      p.quadraticCurveTo(6, -6.5, 4, -8);
       p.fill();
       p.stroke();
+      p.fillStyle = '#dd8800';
+      p.beginPath();
+      p.moveTo(4, -6.5);
+      p.lineTo(8, -6);
+      p.lineTo(5, -5.5);
+      p.closePath();
+      p.fill();
       // Single pupil
       p.fillStyle = '#000000';
       p.beginPath();
@@ -2197,17 +2220,23 @@ class Player {
       p.beginPath();
       p.arc(0, -7, 3, 0, Math.PI * 2);
       p.fill();
-      // Beak protruding right (separated from eye)
-      p.fillStyle = skin.beak;
-      p.strokeStyle = skin.bodyStroke || '#333333';
+      // Pointed bird beak protruding right
+      p.fillStyle = '#ff9900';
+      p.strokeStyle = '#cc7700';
       p.lineWidth = 0.8;
       p.beginPath();
-      p.moveTo(5, -5.5);
-      p.lineTo(9, -7);
-      p.lineTo(5, -8.5);
-      p.closePath();
+      p.moveTo(4, -6.5);
+      p.quadraticCurveTo(7, -9, 10, -7);
+      p.quadraticCurveTo(7, -5.5, 4, -6.5);
       p.fill();
       p.stroke();
+      p.fillStyle = '#dd8800';
+      p.beginPath();
+      p.moveTo(4, -6);
+      p.lineTo(8, -6.5);
+      p.lineTo(5, -5);
+      p.closePath();
+      p.fill();
       // Single pupil
       p.fillStyle = '#000000';
       p.beginPath();
@@ -2223,20 +2252,23 @@ class Player {
       p.moveTo(-1, -11); p.quadraticCurveTo(0, -17, 2, -15);
       p.quadraticCurveTo(1, -12, -1, -11);
       p.fill();
-      // Curved parrot beak protruding right
-      p.fillStyle = skin.beak;
+      // Curved parrot beak — orange, hooked
+      p.fillStyle = '#ff8800';
+      p.strokeStyle = '#cc6600';
+      p.lineWidth = 0.8;
+      p.beginPath();
+      p.moveTo(4, -8);
+      p.quadraticCurveTo(6, -11, 10, -9.5);
+      p.quadraticCurveTo(11, -8, 9.5, -6.5);
+      p.lineTo(8, -5.5);
+      p.quadraticCurveTo(6, -6.5, 4, -8);
+      p.fill();
+      p.stroke();
+      p.fillStyle = '#dd7700';
       p.beginPath();
       p.moveTo(4, -6.5);
-      p.quadraticCurveTo(7, -10, 10, -8.5);
-      p.quadraticCurveTo(10.5, -7, 8, -5.5);
-      p.lineTo(7, -5.5);
-      p.quadraticCurveTo(5.5, -6, 4, -6.5);
-      p.fill();
-      p.fillStyle = '#555555';
-      p.beginPath();
-      p.moveTo(4, -5.5);
-      p.quadraticCurveTo(6.5, -5, 7, -5.5);
-      p.quadraticCurveTo(5.5, -4.5, 4, -4.8);
+      p.lineTo(8, -5.5);
+      p.lineTo(5, -5);
       p.closePath();
       p.fill();
       // White eye patch

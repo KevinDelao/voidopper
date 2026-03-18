@@ -56,12 +56,38 @@ class AudioManager {
 
       this.isInitialized = true;
     } catch (error) {
-      console.error('Failed to initialize audio:', error);
       if (this.audioContext) {
         try { this.audioContext.close(); } catch (e) {}
         this.audioContext = null;
       }
     }
+  }
+
+  // Nuclear option for iOS: tear down everything and rebuild from scratch.
+  // Called inside a user gesture (touchstart) so the new AudioContext is allowed to play.
+  async forceReinitialize() {
+    // Kill all running oscillators and intervals
+    if (this.musicIntervalId) { clearInterval(this.musicIntervalId); this.musicIntervalId = null; }
+    if (this.menuMusicIntervalId) { clearInterval(this.menuMusicIntervalId); this.menuMusicIntervalId = null; }
+    this.musicTimeouts.forEach(t => clearTimeout(t));
+    this.musicTimeouts = [];
+    [...this.musicOscillators, ...this.menuMusicOscillators].forEach(({ osc, gain }) => {
+      try { osc.stop(); } catch (e) {}
+      try { osc.disconnect(); } catch (e) {}
+      try { gain.disconnect(); } catch (e) {}
+    });
+    this.musicOscillators = [];
+    this.menuMusicOscillators = [];
+    this.isMusicPlaying = false;
+    this.isMenuMusicPlaying = false;
+    // Close the old context entirely
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      try { this.audioContext.close(); } catch (e) {}
+    }
+    this.audioContext = null;
+    this.isInitialized = false;
+    // Create a brand new context (inside user gesture = iOS allows it)
+    await this.initialize();
   }
 
   // ── GAMEPLAY MUSIC — difficulty-specific ──────────────
@@ -90,7 +116,7 @@ class AudioManager {
     if (!this.isInitialized) return;
     if (this.isMusicPlaying) return;
 
-    if (this.audioContext.state === 'suspended') {
+    if (this.audioContext.state === 'suspended' || this.audioContext.state === 'interrupted') {
       try { await this.audioContext.resume(); } catch (e) { return; }
     }
 
@@ -567,7 +593,7 @@ class AudioManager {
     if (!this.isInitialized) return;
     if (this.isMenuMusicPlaying) return;
 
-    if (this.audioContext.state === 'suspended') {
+    if (this.audioContext.state === 'suspended' || this.audioContext.state === 'interrupted') {
       try { await this.audioContext.resume(); } catch (e) { return; }
     }
 
@@ -748,17 +774,9 @@ class AudioManager {
 
   ensureContextRunning() {
     if (!this.audioContext) return false;
-    if (this.audioContext.state === 'suspended' || this.audioContext.state === 'interrupted') {
-      this.audioContext.resume().then(() => {
-        if (this.audioContext.state !== 'running') {
-          // Context is stuck (iOS audio interruption) — reinitialize
-          this.initialize().then(() => this._restartActiveMusic());
-          return;
-        }
-        this._restartActiveMusic();
-      }).catch(() => {});
-    }
-    return this.audioContext.state !== 'closed';
+    // Don't try to auto-resume on iOS — it won't work without a user gesture.
+    // Just report whether the context is usable. The touch handler handles recovery.
+    return this.audioContext.state === 'running';
   }
 
   _restartActiveMusic() {
