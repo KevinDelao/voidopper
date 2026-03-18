@@ -3324,6 +3324,11 @@ const Game = () => {
       state.voidStorm.draw(ctx, renderCam, width, height);
     }
 
+    // Reset shadow state before drawing entities (prevents leaked shadowBlur
+    // from prior frames causing circular glow on drawImage-blitted sprites)
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+
     // Draw only on-screen entities (cull off-screen)
     const cullTop = renderCam - 200;
     const cullBottom = renderCam + height + 200;
