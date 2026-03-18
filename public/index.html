@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Void Hopper - A vertical climbing space game" />
+    <!-- iOS PWA / Add to Home Screen -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Void Hopper" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
+    <!-- Android PWA orientation hint -->
+    <meta name="screen-orientation" content="portrait" />
+    <title>Void Hopper</title>
+    <style>
+      @font-face {
+        font-family: 'Orbitron';
+        font-style: normal;
+        font-weight: 400 900;
+        font-display: swap;
+        src: url(fonts/orbitron.woff2) format('woff2');
+      }
+    </style>
+    <link rel="manifest" href="manifest.json" />
+    <style>
+      * {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      /* Loading screen */
+      #loading-screen {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 99998;
+        background: #120e29;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        transition: opacity 0.6s ease-out;
+      }
+      #loading-screen.fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .loading-stars {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background:
+          radial-gradient(1px 1px at 20% 15%, #ffffff55, transparent),
+          radial-gradient(1px 1px at 50% 30%, #ffffff44, transparent),
+          radial-gradient(1px 1px at 80% 20%, #ffffff33, transparent),
+          radial-gradient(1.5px 1.5px at 10% 60%, #ffffff55, transparent),
+          radial-gradient(1px 1px at 70% 70%, #ffffff44, transparent),
+          radial-gradient(1px 1px at 35% 85%, #ffffff33, transparent),
+          radial-gradient(1.5px 1.5px at 90% 50%, #ffffff55, transparent),
+          radial-gradient(1px 1px at 60% 90%, #ffffff44, transparent),
+          radial-gradient(1px 1px at 15% 40%, #ffffff22, transparent),
+          radial-gradient(1px 1px at 45% 55%, #ffffff33, transparent),
+          radial-gradient(1.5px 1.5px at 85% 85%, #ffffff44, transparent),
+          radial-gradient(1px 1px at 25% 95%, #ffffff22, transparent);
+        animation: twinkle 3s ease-in-out infinite alternate;
+      }
+      @keyframes twinkle {
+        0% { opacity: 0.6; }
+        100% { opacity: 1; }
+      }
+      .loading-content {
+        position: relative;
+        text-align: center;
+      }
+      .loading-bird {
+        animation: birdFloat 2s ease-in-out infinite;
+        margin-bottom: 20px;
+      }
+      @keyframes birdFloat {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+      }
+      .loading-title {
+        font-family: 'Orbitron', Arial, sans-serif;
+        font-weight: 900;
+        font-size: 36px;
+        background: linear-gradient(90deg, #cc66ff, #ffffff, #ee88ff, #ffffff, #aa44dd);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin: 0 0 24px 0;
+        letter-spacing: 2px;
+      }
+      .loading-bar-container {
+        width: 180px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+        margin: 0 auto 16px;
+        overflow: hidden;
+      }
+      .loading-bar {
+        height: 100%;
+        width: 30%;
+        background: linear-gradient(90deg, #9944ff, #dd88ff);
+        border-radius: 2px;
+        animation: loadSlide 1.2s ease-in-out infinite;
+      }
+      @keyframes loadSlide {
+        0% { transform: translateX(-100%); width: 30%; }
+        50% { width: 60%; }
+        100% { transform: translateX(400%); width: 30%; }
+      }
+      .loading-tip {
+        font-family: 'Orbitron', Arial, sans-serif;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.4);
+        margin: 0;
+      }
+      :root {
+        --sat: env(safe-area-inset-top, 0px);
+        --sab: env(safe-area-inset-bottom, 0px);
+      }
+      html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: none;
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        background-color: #120e29;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+          'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        touch-action: none;
+      }
+      #root {
+        width: 100%;
+        height: 100%;
+        /* Safe area insets are handled in the canvas rendering layer */
+      }
+      /* Landscape rotation warning overlay */
+      #landscape-warning {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 99999;
+        background: #120e29;
+        color: #ffffff;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Orbitron', Arial, sans-serif;
+        text-align: center;
+        padding: 40px;
+      }
+      #landscape-warning .rotate-icon {
+        width: 80px;
+        height: 120px;
+        border: 4px solid #9944ff;
+        border-radius: 14px;
+        margin-bottom: 30px;
+        position: relative;
+        animation: rotatePhone 2s ease-in-out infinite;
+      }
+      #landscape-warning .rotate-icon::after {
+        content: '';
+        position: absolute;
+        bottom: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 20px;
+        height: 4px;
+        border-radius: 2px;
+        background: #9944ff;
+      }
+      @keyframes rotatePhone {
+        0%, 100% { transform: rotate(90deg); }
+        30%, 70% { transform: rotate(0deg); }
+      }
+      #landscape-warning h2 {
+        font-size: 22px;
+        margin-bottom: 12px;
+        color: #cc66ff;
+        text-shadow: 0 0 15px rgba(153, 68, 255, 0.5);
+      }
+      #landscape-warning p {
+        font-size: 14px;
+        color: #aaaacc;
+        line-height: 1.6;
+      }
+      @media (orientation: landscape) and (max-height: 500px) {
+        #landscape-warning {
+          display: flex !important;
+        }
+        #root {
+          display: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <!-- Loading screen — visible immediately, dismissed by Game.js -->
+    <div id="loading-screen">
+      <div class="loading-stars"></div>
+      <div class="loading-content">
+        <div class="loading-bird">
+          <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+            <!-- Bird body -->
+            <ellipse cx="40" cy="42" rx="18" ry="15" fill="#ba55d3" stroke="#9370db" stroke-width="2"/>
+            <!-- Head -->
+            <circle cx="40" cy="28" r="10" fill="#da70d6"/>
+            <!-- Wing -->
+            <ellipse cx="28" cy="42" rx="12" ry="8" fill="#9370db" stroke="#7b68ee" stroke-width="1.5" transform="rotate(-15 28 42)"/>
+            <!-- Beak -->
+            <polygon points="50,28 58,30 50,32" fill="#ffd700"/>
+            <!-- Eye -->
+            <circle cx="44" cy="26" r="3" fill="white"/>
+            <circle cx="45" cy="26" r="1.5" fill="#1a0a2a"/>
+            <!-- Antenna -->
+            <line x1="40" y1="18" x2="36" y2="8" stroke="#7b68ee" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="36" cy="8" r="3" fill="#4dccff" opacity="0.8"/>
+            <!-- Tail -->
+            <polygon points="22,48 12,44 14,52 22,52" fill="#9370db" stroke="#7b68ee" stroke-width="1"/>
+          </svg>
+        </div>
+        <h1 class="loading-title">VOID HOPPER</h1>
+        <div class="loading-bar-container">
+          <div class="loading-bar"></div>
+        </div>
+        <p class="loading-tip">Preparing the void...</p>
+      </div>
+    </div>
+    <div id="landscape-warning">
+      <div class="rotate-icon"></div>
+      <h2>ROTATE YOUR DEVICE</h2>
+      <p>Void Hopper is best played in portrait mode.<br/>Please rotate your phone vertically.</p>
+    </div>
+    <div id="root"></div>
+    <script>
+      // Try to lock orientation to portrait
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('portrait').catch(function() {});
+      }
+      // Prevent pinch zoom
+      document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
+      document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
+      document.addEventListener('gestureend', function(e) { e.preventDefault(); }, { passive: false });
+      // Prevent pull-to-refresh and overscroll bounce
+      document.addEventListener('touchmove', function(e) {
+        if (e.target.tagName === 'CANVAS') e.preventDefault();
+      }, { passive: false });
+      // Prevent context menu on long press
+      document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+      // Prevent double-tap zoom
+      var lastTouchEnd = 0;
+      document.addEventListener('touchend', function(e) {
+        var now = Date.now();
+        if (now - lastTouchEnd <= 300) { e.preventDefault(); }
+        lastTouchEnd = now;
+      }, { passive: false });
+
+      // Register service worker for offline support (web only, not native iOS)
+      if ('serviceWorker' in navigator && !(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('./sw.js').catch(function() {});
+        });
+      }
+    </script>
+  </body>
+</html>

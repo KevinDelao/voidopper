@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Void Hopper</string>
+    <string name="title_activity_main">Void Hopper</string>
+    <string name="package_name">com.voidhopper.game</string>
+    <string name="custom_url_scheme">com.voidhopper.game</string>
+</resources>

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#1a1040"/>
+      <stop offset="100%" stop-color="#0a0818"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <circle cx="80" cy="90" r="2" fill="white" opacity="0.7"/>
+  <circle cx="420" cy="60" r="1.5" fill="white" opacity="0.5"/>
+  <circle cx="350" cy="400" r="2.5" fill="white" opacity="0.6"/>
+  <circle cx="50" cy="350" r="1.5" fill="white" opacity="0.8"/>
+  <circle cx="460" cy="250" r="2" fill="white" opacity="0.4"/>
+  <circle cx="150" cy="450" r="1.5" fill="white" opacity="0.6"/>
+  <circle cx="300" cy="80" r="2" fill="white" opacity="0.5"/>
+  <!-- Tail feathers -->
+  <polygon points="181,246 126,206 156,256" fill="#cc3311"/>
+  <polygon points="181,256 116,236 151,266" fill="#cc3311"/>
+  <!-- Body -->
+  <ellipse cx="256" cy="256" rx="80" ry="65" fill="#ff6644"/>
+  <!-- Belly -->
+  <ellipse cx="256" cy="276" rx="55" ry="40" fill="#ffaa66"/>
+  <!-- Wing -->
+  <ellipse cx="206" cy="246" rx="50" ry="25" fill="#dd4422" transform="rotate(-23 206 246)"/>
+  <!-- Eye white -->
+  <ellipse cx="281" cy="236" rx="22" ry="24" fill="white"/>
+  <!-- Pupil -->
+  <ellipse cx="286" cy="236" rx="10" ry="12" fill="#111"/>
+  <!-- Eye shine -->
+  <circle cx="290" cy="230" r="5" fill="white"/>
+  <!-- Beak -->
+  <polygon points="321,251 356,261 321,271" fill="#ffcc00"/>
+</svg>

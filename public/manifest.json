@@ -1,0 +1,30 @@
+{
+  "short_name": "Void Hopper",
+  "name": "Void Hopper",
+  "description": "A vertical climbing space game. Launch, bounce, and soar through an endless cosmic corridor!",
+  "start_url": ".",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "theme_color": "#120e29",
+  "background_color": "#120e29",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
