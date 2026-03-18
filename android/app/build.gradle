@@ -18,19 +18,17 @@ android {
     }
     signingConfigs {
         release {
-            // To sign your release build, create a keystore and fill these in:
-            // storeFile file('your-release-key.jks')
-            // storePassword 'your-store-password'
-            // keyAlias 'your-key-alias'
-            // keyPassword 'your-key-password'
+            storeFile file('voidhopper-release.jks')
+            storePassword 'voidhopper2026'
+            keyAlias 'voidhopper'
+            keyPassword 'voidhopper2026'
         }
     }
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            // Uncomment the line below after filling in signingConfigs.release:
-            // signingConfig signingConfigs.release
+            signingConfig signingConfigs.release
         }
     }
 }
