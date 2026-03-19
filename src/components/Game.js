@@ -4550,6 +4550,7 @@ const Game = () => {
 
       if (showShopRef.current) {
         // === SHOP UI ===
+        const shopTs = Math.max(1, width / 390);
         const shopSafeBot = gameStateRef.current.safeBottom || 0;
         const footerH = Math.round(80 * shopTs) + shopSafeBot;
         const headerH = Math.round(140 * shopTs); // taller to fit tabs
@@ -4836,7 +4837,6 @@ const Game = () => {
 
         // Title
         ctx.save();
-        const shopTs = Math.max(1, width / 390);
         ctx.font = `900 ${Math.round(28 * shopTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.shadowBlur = 20;
@@ -4921,35 +4921,36 @@ const Game = () => {
         // === MAIN MENU ===
         const isSmallScreen = width < 420;
         const safeBot = gameStateRef.current.safeBottom || 0;
-        const menuPad = isSmallScreen ? 8 : 12;
+        const menuTs = Math.min(1.8, Math.max(1, width / 390));
+        const menuMaxW = Math.round(340 * menuTs);
+        const menuPad = Math.round((isSmallScreen ? 8 : 12) * menuTs);
 
         // Vertically center menu between safe areas
         // Estimate total menu height to compute offset
-        const menuTs = Math.min(1.8, Math.max(1, width / 390));
         const titleFontSize = isSmallScreen ? Math.max(28, Math.floor(width * 0.085)) : Math.round(48 * menuTs);
-        const diffBtnH_est = isSmallScreen ? 44 : 50;
-        const playBtnH_est = isSmallScreen ? 48 : 54;
-        const shopBtnH_est = isSmallScreen ? 40 : 44;
+        const diffBtnH_est = Math.round((isSmallScreen ? 44 : 50) * menuTs);
+        const playBtnH_est = Math.round((isSmallScreen ? 48 : 54) * menuTs);
+        const shopBtnH_est = Math.round((isSmallScreen ? 40 : 44) * menuTs);
         const missionRows = progressionRef.current ? progressionRef.current.getMissions().length : 0;
-        const mRowH_est = isSmallScreen ? 26 : 28;
-        const slBtnH_est = 30;
+        const mRowH_est = Math.round((isSmallScreen ? 26 : 28) * menuTs);
+        const slBtnH_est = Math.round(30 * menuTs);
         const hasStreak = progressionRef.current && progressionRef.current.getStreak() >= 1;
         const hasDailyReward = progressionRef.current && progressionRef.current.pendingDailyReward > 0 && !state._dailyRewardClaimed;
         const hasDailyChallenge = progressionRef.current && progressionRef.current.getDailyChallenge() && !progressionRef.current.getDailyChallenge().claimed;
-        const titleBaseY = isSmallScreen ? 34 : 46;
+        const titleBaseY = Math.round((isSmallScreen ? 34 : 46) * menuTs);
         const hasLevel = !!progressionRef.current;
         const totalMenuH = titleBaseY                        // title top offset
-          + (hasLevel ? (isSmallScreen ? 40 : 44) : 0)      // LVL badge + XP bar
-          + (menuPad + 8)                                    // coin row
-          + (menuPad + 8)                                    // gap after coin row
-          + (hasDailyReward ? (isSmallScreen ? 40 : 46) + menuPad : 0) // daily reward
-          + (hasDailyChallenge ? 16 : 0)                     // daily challenge
+          + (hasLevel ? Math.round((isSmallScreen ? 40 : 44) * menuTs) : 0)      // LVL badge + XP bar
+          + (menuPad + Math.round(8 * menuTs))               // coin row
+          + (menuPad + Math.round(8 * menuTs))               // gap after coin row
+          + (hasDailyReward ? Math.round((isSmallScreen ? 40 : 46) * menuTs) + menuPad : 0) // daily reward
+          + (hasDailyChallenge ? Math.round(16 * menuTs) : 0) // daily challenge
           + diffBtnH_est + menuPad                           // difficulty
           + playBtnH_est + menuPad                           // play
           + shopBtnH_est + menuPad                           // shop/gfx row
-          + (hasStreak ? 20 : 0)                             // streak
-          + (missionRows > 0 ? 16 + missionRows * mRowH_est + menuPad : 0) // missions
-          + ((window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ? 0 : slBtnH_est + 12);
+          + (hasStreak ? Math.round(20 * menuTs) : 0)        // streak
+          + (missionRows > 0 ? Math.round(16 * menuTs) + missionRows * mRowH_est + menuPad : 0) // missions
+          + ((window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ? 0 : slBtnH_est + Math.round(12 * menuTs));
         const availableH = height - safeTop - safeBot;
         const menuOffset = Math.max(0, (availableH - totalMenuH) / 2);
 
@@ -4957,7 +4958,7 @@ const Game = () => {
         ctx.save();
         ctx.font = `900 ${titleFontSize}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        const titleY = safeTop + menuOffset + (isSmallScreen ? 34 : 46);
+        const titleY = safeTop + menuOffset + Math.round((isSmallScreen ? 34 : 46) * menuTs);
         // Clip to prevent shadow glow from bleeding below title area
         ctx.beginPath();
         ctx.rect(0, 0, width, titleY + titleFontSize * 0.4);
@@ -4991,14 +4992,14 @@ const Game = () => {
           // XP bar
           const xpW = Math.round(60 * menuTs), xpH = 3;
           ctx.fillStyle = 'rgba(255,255,255,0.1)';
-          ctx.fillRect(width / 2 - xpW / 2, titleY + (isSmallScreen ? 18 : 22), xpW, xpH);
+          ctx.fillRect(width / 2 - xpW / 2, titleY + Math.round((isSmallScreen ? 18 : 22) * menuTs), xpW, xpH);
           ctx.fillStyle = '#aa88ff';
-          ctx.fillRect(width / 2 - xpW / 2, titleY + (isSmallScreen ? 18 : 22), xpW * xpProg, xpH);
+          ctx.fillRect(width / 2 - xpW / 2, titleY + Math.round((isSmallScreen ? 18 : 22) * menuTs), xpW * xpProg, xpH);
           ctx.restore();
         }
 
         // --- Coins + skin name row ---
-        let curY = titleY + (progressionRef.current ? (isSmallScreen ? 40 : 44) : menuPad + 6);
+        let curY = titleY + (progressionRef.current ? Math.round((isSmallScreen ? 40 : 44) * menuTs) : menuPad + Math.round(6 * menuTs));
         const currentSkin = BirdSkins[selectedSkinRef.current];
         const coinText = `${totalCoinsRef.current}`;
         const skinText = currentSkin ? currentSkin.name : '';
@@ -5022,13 +5023,13 @@ const Game = () => {
           ctx.fillStyle = '#aaaacc';
           ctx.fillText(skinText, width / 2 + 12, curY);
         }
-        curY += menuPad + 8;
+        curY += menuPad + Math.round(8 * menuTs);
 
         // --- Daily login reward popup (flows in curY) ---
         state._dailyRewardBounds = null;
         if (progressionRef.current && progressionRef.current.pendingDailyReward > 0 && !state._dailyRewardClaimed) {
           const drInfo = progressionRef.current.getDailyRewardInfo();
-          const drW = Math.min(width - 40, 220), drH = isSmallScreen ? 40 : 46;
+          const drW = Math.min(width - 40, Math.round(220 * menuTs)), drH = Math.round((isSmallScreen ? 40 : 46) * menuTs);
           const drX = width / 2 - drW / 2;
           const drPulse = 0.95 + Math.sin(Date.now() / 200) * 0.05;
           ctx.save();
@@ -5062,7 +5063,7 @@ const Game = () => {
             const dcStatus = dc.completed ? 'DONE!' : `${dc.progress}/${dc.target}`;
             ctx.fillText(`DAILY: ${dc.desc} [${dcStatus}] +${dc.reward}`, width / 2, curY + 4);
             ctx.restore();
-            curY += 16;
+            curY += Math.round(16 * menuTs);
           }
         }
 
@@ -5072,9 +5073,8 @@ const Game = () => {
           { key: 'medium', label: 'MED', color: '#ffaa22', desc: 'Balanced' },
           { key: 'hard', label: 'HARD', color: '#ff4444', desc: 'Fast storm' },
         ];
-        const menuMaxW = Math.round(340 * menuTs);
         const diffTotalW = Math.min(width - 30, menuMaxW);
-        const diffGap = 8;
+        const diffGap = Math.round(8 * menuTs);
         const diffBtnW = (diffTotalW - diffGap * 2) / 3;
         const diffBtnH = Math.round((isSmallScreen ? 44 : 50) * menuTs);
         const diffStartX = width / 2 - diffTotalW / 2;
@@ -5216,7 +5216,7 @@ const Game = () => {
             ctx.shadowBlur = 0;
             ctx.globalAlpha = 1;
             ctx.restore();
-            curY += 20;
+            curY += Math.round(20 * menuTs);
           }
 
           // Missions header
@@ -5225,12 +5225,12 @@ const Game = () => {
           ctx.textAlign = 'center';
           ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
           ctx.fillText('MISSIONS', width / 2, curY + Math.round(10 * menuTs));
-          curY += 16;
+          curY += Math.round(16 * menuTs);
 
           const missions = progressionRef.current.getMissions();
           const mBarW = Math.min(width - 30, menuMaxW);
           const mBarX = width / 2 - mBarW / 2;
-          const mRowH = isSmallScreen ? 26 : 28;
+          const mRowH = Math.round((isSmallScreen ? 26 : 28) * menuTs);
 
           missions.forEach((m, mi) => {
             const my = curY + mi * mRowH;
