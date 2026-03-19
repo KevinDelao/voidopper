@@ -5187,7 +5187,7 @@ const Game = () => {
             ctx.shadowBlur = streakVal >= 5 ? 8 : 4;
             ctx.shadowColor = streakVal >= 5 ? '#ff4400' : '#ffaa00';
             ctx.globalAlpha = streakPulse;
-            const flameIcon = streakVal >= 7 ? '\u{1F525}\u{1F525}' : streakVal >= 3 ? '\u{1F525}' : '';
+            const flameIcon = streakVal >= 7 ? '**' : streakVal >= 3 ? '*' : '';
             ctx.fillText(`${flameIcon} Day ${streakVal} Streak${bonusPct > 0 ? ` +${bonusPct}% coins` : ''} ${flameIcon}`, width / 2, curY + 8);
             ctx.shadowBlur = 0;
             ctx.globalAlpha = 1;
