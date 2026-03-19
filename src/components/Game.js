@@ -1361,6 +1361,11 @@ const Game = () => {
       startX = rightWallX - playerRadius;
     }
     state.player = new Player(startX, startY);
+    // Scale bird speed for wider screens (iPad) so flight feels equally fast
+    const iPhoneBaseWidth = 390;
+    const speedScale = Math.max(1, width / iPhoneBaseWidth);
+    state.player.aimPower = 900 * speedScale;
+    state.speedScale = speedScale;
     state.player.currentSide = startSide;
     state.player.isStuck = true;
     state.player.skin = BirdSkins[selectedSkinRef.current] || BirdSkins.default;
@@ -1620,7 +1625,8 @@ const Game = () => {
     const boostMult = player.hasSpeedBoost ? 1.5 : 1.0;
 
     // Apply gravity (scaled by deltaTime for frame-rate independence)
-    player.applyGravity(state.gravity * moodSpeed * 60, playerDeltaTime);
+    // Scale gravity for wider screens so bird rises proportionally faster
+    player.applyGravity(state.gravity * moodSpeed * 60 * (state.speedScale || 1), playerDeltaTime);
 
     // Speed boost: amplify player's upward velocity
     if (player.hasSpeedBoost && player.vy < 0) {
