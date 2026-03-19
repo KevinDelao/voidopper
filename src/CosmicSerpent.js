@@ -83,29 +83,29 @@ class CosmicSerpent {
       + Math.sin(this.totalDistance * this.waveFrequency) * this.waveAmplitude
       + Math.sin(this.totalDistance * this.waveFrequency * 2.3 + 1.7) * this.waveAmplitude * 0.3;
 
-    // Record head position into path history
-    this.pathHistory.unshift({ x: this.x, y: this.y });
+    // Record head position into path history (append + trim from end to avoid O(n) unshift)
+    this.pathHistory.push({ x: this.x, y: this.y });
     // Keep history long enough for the full body
     const maxHistory = this.numSegments * this.segmentSpacing + 40;
-    if (this.pathHistory.length > maxHistory) {
-      this.pathHistory.length = maxHistory;
+    if (this.pathHistory.length > maxHistory * 2) {
+      this.pathHistory.splice(0, this.pathHistory.length - maxHistory);
     }
 
     // Place each segment along the recorded path at equal arc-length intervals.
-    // This makes the body trace the exact path the head took — true snake motion.
+    // pathHistory is newest-last, so walk backwards from the end (head).
     this.segments[0] = { x: this.x, y: this.y };
-    let pathIdx = 0;
+    let pathIdx = this.pathHistory.length - 1;
     let accumDist = 0;
 
     for (let i = 1; i < this.numSegments; i++) {
       const targetDist = i * this.segmentSpacing;
 
-      // Walk along path history until we've covered enough distance
-      while (pathIdx < this.pathHistory.length - 1 && accumDist < targetDist) {
-        const dx = this.pathHistory[pathIdx + 1].x - this.pathHistory[pathIdx].x;
-        const dy = this.pathHistory[pathIdx + 1].y - this.pathHistory[pathIdx].y;
+      // Walk backwards along path history until we've covered enough distance
+      while (pathIdx > 0 && accumDist < targetDist) {
+        const dx = this.pathHistory[pathIdx - 1].x - this.pathHistory[pathIdx].x;
+        const dy = this.pathHistory[pathIdx - 1].y - this.pathHistory[pathIdx].y;
         const segLen = Math.sqrt(dx * dx + dy * dy);
-        if (segLen < 0.001) { pathIdx++; continue; }
+        if (segLen < 0.001) { pathIdx--; continue; }
 
         const remaining = targetDist - accumDist;
         if (remaining <= segLen) {
@@ -119,14 +119,14 @@ class CosmicSerpent {
           break;
         } else {
           accumDist += segLen;
-          pathIdx++;
+          pathIdx--;
         }
       }
 
       // Fallback if path isn't long enough yet
       if (accumDist < targetDist) {
-        const last = this.pathHistory[this.pathHistory.length - 1];
-        this.segments[i] = { x: last.x, y: last.y };
+        const first = this.pathHistory[0];
+        this.segments[i] = { x: first.x, y: first.y };
       }
     }
 

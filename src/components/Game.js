@@ -1488,7 +1488,7 @@ const Game = () => {
     if (!state.hints || state.hints.seen[key]) return;
     // Don't interrupt an active hint — queue it
     if (state.hints.active) {
-      if (!state.hints.queue.find(h => h.key === key)) {
+      if (state.hints.queue.length < 5 && !state.hints.queue.find(h => h.key === key)) {
         state.hints.queue.push({ key, text, subtext, duration: duration || 3.5 });
       }
       return;
@@ -3171,15 +3171,18 @@ const Game = () => {
       });
     }
 
-    state.menuShootingStars = state.menuShootingStars.filter(s => {
+    let ssWrite = 0;
+    for (let si = 0; si < state.menuShootingStars.length; si++) {
+      const s = state.menuShootingStars[si];
       s.x += s.vx * menuDt;
       s.y += s.vy * menuDt;
       s.life -= menuDt;
-      if (s.life <= 0) return false;
+      if (s.life <= 0) continue;
 
       const alpha = s.life / s.maxLife;
-      const tailX = s.x - (s.vx / Math.sqrt(s.vx * s.vx + s.vy * s.vy)) * s.length;
-      const tailY = s.y - (s.vy / Math.sqrt(s.vx * s.vx + s.vy * s.vy)) * s.length;
+      const speed = Math.sqrt(s.vx * s.vx + s.vy * s.vy);
+      const tailX = s.x - (s.vx / speed) * s.length;
+      const tailY = s.y - (s.vy / speed) * s.length;
 
       const grad = ctx.createLinearGradient(tailX, tailY, s.x, s.y);
       grad.addColorStop(0, `rgba(255, 255, 255, 0)`);
@@ -3198,8 +3201,9 @@ const Game = () => {
       ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
       ctx.fill();
 
-      return true;
-    });
+      state.menuShootingStars[ssWrite++] = s;
+    }
+    state.menuShootingStars.length = ssWrite;
   };
 
   const render = (ctx, width, height, dt) => {
