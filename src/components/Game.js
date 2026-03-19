@@ -20,6 +20,7 @@ import ProgressionManager from '../ProgressionManager';
 import Trails from '../Trails';
 import { getItem, setItem, getJSON, setJSON } from '../storage';
 import { lightTap, mediumTap, heavyTap, notifyTap, selectionTap } from '../haptics';
+import { authenticateGameCenter, submitScore as submitGCScore, showLeaderboard, isAuthenticated as isGCAuthenticated } from '../GameCenter';
 
 // Detect mobile device once at module level
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
@@ -209,6 +210,9 @@ const Game = () => {
     if (!progressionRef.current) {
       progressionRef.current = new ProgressionManager();
     }
+
+    // Authenticate Game Center
+    authenticateGameCenter();
 
     // Try to lock orientation to portrait on mobile
     if (isMobile && window.screen && window.screen.orientation && window.screen.orientation.lock) {
@@ -888,6 +892,16 @@ const Game = () => {
           return;
         }
 
+        // Check if leaderboard button was clicked
+        const menuLbBounds = gameStateRef.current._menuLeaderboardBtnBounds;
+        if (menuLbBounds &&
+            clickX >= menuLbBounds.x && clickX <= menuLbBounds.x + menuLbBounds.w &&
+            menuClickY >= menuLbBounds.y && menuClickY <= menuLbBounds.y + menuLbBounds.h) {
+          selectionTap();
+          showLeaderboard(difficultyRef.current || 'medium');
+          return;
+        }
+
         // Backup/restore only on web (not iOS native)
         if (!window.Capacitor || !window.Capacitor.isNativePlatform || !window.Capacitor.isNativePlatform()) {
           const saveBounds = gameStateRef.current._saveBtnBounds;
@@ -938,6 +952,14 @@ const Game = () => {
             clickY >= shareBounds.y && clickY <= shareBounds.y + shareBounds.h) {
           selectionTap();
           shareScore();
+          return;
+        }
+        // Check Leaderboard button on game over screen
+        const lbBounds = gameStateRef.current._leaderboardBtnBounds;
+        if (lbBounds && clickX >= lbBounds.x && clickX <= lbBounds.x + lbBounds.w &&
+            clickY >= lbBounds.y && clickY <= lbBounds.y + lbBounds.h) {
+          selectionTap();
+          showLeaderboard(gameStateRef.current.difficulty || 'medium');
           return;
         }
         // Check Main Menu button on game over screen
@@ -2788,6 +2810,9 @@ const Game = () => {
     setScore(finalScore);
     setCoinScore(finalCoinScore);
 
+    // Submit score to Game Center
+    submitGCScore(diff, finalScore);
+
     const savedHighScores = getJSON('voidHopper_highScores', {});
     const savedHighCoinScores = getJSON('voidHopper_highCoinScores', {});
     state.newBestScore = finalScore > (savedHighScores[diff] || 0);
@@ -4371,6 +4396,23 @@ const Game = () => {
       ctx.fillText('SHARE SCORE', cx, goShareY + Math.round(goBtnH * 0.4) + 5);
       gameStateRef.current._shareBtnBounds = { x: goShareX, y: goShareY, w: goBtnW, h: Math.round(goBtnH * 0.8) };
 
+      // Leaderboard button (Game Center)
+      if (isGCAuthenticated()) {
+        const goLbY = goShareY + Math.round(goBtnH * 0.8) + goBtnGap;
+        const goLbX = cx - goBtnW / 2;
+        const goLbH = Math.round(goBtnH * 0.8);
+        ctx.fillStyle = 'rgba(40, 80, 140, 0.9)';
+        ctx.fillRect(goLbX, goLbY, goBtnW, goLbH);
+        ctx.strokeStyle = '#4488ff';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(goLbX, goLbY, goBtnW, goLbH);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${Math.round(14 * goScale)}px Orbitron, Arial`;
+        ctx.textAlign = 'center';
+        ctx.fillText('LEADERBOARD', cx, goLbY + goLbH / 2 + 5);
+        gameStateRef.current._leaderboardBtnBounds = { x: goLbX, y: goLbY, w: goBtnW, h: goLbH };
+      }
+
       ctx.restore();
 
       // Draw feather particles ON TOP of game over overlay (2x offscreen for sharpness)
@@ -5094,6 +5136,24 @@ const Game = () => {
         ctx.fillText(gfxLabel, gfxBtnX + gfxBtnW / 2 + 22, curY + shopBtnH / 2 + 4);
         gameStateRef.current._gfxBtnBounds = { x: gfxBtnX, y: curY, w: gfxBtnW, h: shopBtnH };
         curY += shopBtnH + menuPad;
+
+        // --- Leaderboard button (Game Center) ---
+        if (isGCAuthenticated()) {
+          const lbBtnW = Math.min(width - 30, 340);
+          const lbBtnH = isSmallScreen ? 36 : 40;
+          const lbBtnX = width / 2 - lbBtnW / 2;
+          ctx.fillStyle = 'rgba(40, 80, 140, 0.85)';
+          ctx.fillRect(lbBtnX, curY, lbBtnW, lbBtnH);
+          ctx.strokeStyle = '#4488ff';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(lbBtnX, curY, lbBtnW, lbBtnH);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = `bold ${isSmallScreen ? 14 : 16}px Orbitron, Arial`;
+          ctx.textAlign = 'center';
+          ctx.fillText('LEADERBOARD', width / 2, curY + lbBtnH / 2 + 5);
+          gameStateRef.current._menuLeaderboardBtnBounds = { x: lbBtnX, y: curY, w: lbBtnW, h: lbBtnH };
+          curY += lbBtnH + menuPad;
+        }
 
         // --- Missions panel (main feature area) ---
         if (progressionRef.current) {
