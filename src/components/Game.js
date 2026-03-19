@@ -3247,8 +3247,9 @@ const Game = () => {
       ctx.fillRect(0, 0, width, height);
 
       // Pause text
+      const pauseTs = Math.max(1, width / 390);
       const pauseSmall = width < 420;
-      const pauseFontSize = pauseSmall ? Math.max(36, Math.floor(width * 0.1)) : 52;
+      const pauseFontSize = pauseSmall ? Math.max(36, Math.floor(width * 0.1)) : Math.round(52 * pauseTs);
       ctx.font = `900 ${pauseFontSize}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.strokeStyle = '#1a3366';
@@ -3262,31 +3263,31 @@ const Game = () => {
       ctx.fillText('PAUSED', width / 2, height / 2);
 
       // Resume button
-      const pBtnW = Math.min(200, width - 40);
-      const pBtnH = Math.max(44, Math.round(50 * (height < 600 ? height / 700 : 1)));
+      const pBtnW = Math.min(Math.round(200 * pauseTs), width - 40);
+      const pBtnH = Math.max(44, Math.round(50 * pauseTs * (height < 600 ? height / 700 : 1)));
       const resumeBtnX = width / 2 - pBtnW / 2;
-      const resumeBtnY = height / 2 + 40;
+      const resumeBtnY = height / 2 + Math.round(40 * pauseTs);
       ctx.fillStyle = 'rgba(30, 100, 160, 0.9)';
       ctx.fillRect(resumeBtnX, resumeBtnY, pBtnW, pBtnH);
       ctx.strokeStyle = '#4dccff';
       ctx.lineWidth = 2;
       ctx.strokeRect(resumeBtnX, resumeBtnY, pBtnW, pBtnH);
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 20px Orbitron, Arial';
+      ctx.font = `bold ${Math.round(20 * pauseTs)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.fillText('RESUME', width / 2, resumeBtnY + pBtnH / 2 + 7);
       state._resumeBtnBounds = { x: resumeBtnX, y: resumeBtnY, w: pBtnW, h: pBtnH };
 
       // Main Menu button
       const menuBtnX = width / 2 - pBtnW / 2;
-      const menuBtnY = resumeBtnY + pBtnH + 12;
+      const menuBtnY = resumeBtnY + pBtnH + Math.round(12 * pauseTs);
       ctx.fillStyle = 'rgba(60, 40, 100, 0.9)';
       ctx.fillRect(menuBtnX, menuBtnY, pBtnW, pBtnH);
       ctx.strokeStyle = '#9966cc';
       ctx.lineWidth = 2;
       ctx.strokeRect(menuBtnX, menuBtnY, pBtnW, pBtnH);
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 18px Orbitron, Arial';
+      ctx.font = `bold ${Math.round(18 * pauseTs)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.fillText('MAIN MENU', width / 2, menuBtnY + pBtnH / 2 + 6);
 
@@ -3313,11 +3314,12 @@ const Game = () => {
         ctx.save();
         ctx.textAlign = 'center';
         // Icon
-        ctx.font = `${width < 420 ? 36 : 48}px Arial`;
+        const arTs = Math.max(1, width / 390);
+        ctx.font = `${Math.round(48 * arTs)}px Arial`;
         ctx.fillStyle = `rgba(170, 136, 255, ${0.6 + pulse * 0.4})`;
         ctx.fillText('\u266B', width / 2, height / 2 - 20);
         // Text
-        ctx.font = `bold ${width < 420 ? 16 : 20}px Orbitron, Arial`;
+        ctx.font = `bold ${Math.round(20 * arTs)}px Orbitron, Arial`;
         ctx.fillStyle = `rgba(255, 255, 255, ${0.7 + pulse * 0.3})`;
         ctx.fillText('Tap to resume audio', width / 2, height / 2 + 20);
         ctx.restore();
@@ -3442,6 +3444,7 @@ const Game = () => {
     }
 
     // Draw floating text popups (in world space)
+    const ftTs = Math.min(2, Math.max(1, width / 390));
     state.floatingTexts.forEach(ft => {
       const screenY = ft.y - renderCam;
       const alpha = Math.min(1, ft.life / (ft.maxLife * 0.3)); // Fade out in last 30%
@@ -3453,7 +3456,7 @@ const Game = () => {
       ctx.globalAlpha = alpha;
 
       // Label (e.g. "SHIELD") — outlined (no shadowBlur for performance)
-      ctx.font = '900 16px Orbitron, Arial';
+      ctx.font = `900 ${Math.round(16 * ftTs)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
       ctx.lineWidth = 3;
@@ -3462,7 +3465,7 @@ const Game = () => {
       ctx.fillText(ft.label, 0, -10);
 
       // Description (e.g. "Absorbs one hit!")
-      ctx.font = 'bold 12px Orbitron, Arial';
+      ctx.font = `bold ${Math.round(12 * ftTs)}px Orbitron, Arial`;
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.lineWidth = 2;
       ctx.strokeText(ft.desc, 0, 8);
@@ -3593,6 +3596,8 @@ const Game = () => {
 
   const drawUI = (ctx, width, height) => {
     const state = gameStateRef.current;
+    // Scale text for wider screens (iPad) so HUD remains readable
+    const ts = Math.min(2, Math.max(1, width / 390));
     // Safe area offset for notched phones (iPhone X+)
     const safeTop = isMobile ? (state.safeTop || 0) : 0;
 
@@ -3602,63 +3607,63 @@ const Game = () => {
       const diffLabel = (state.difficulty || 'medium').toUpperCase();
       const diffColor = diffLabel === 'EASY' ? '#44cc66' : diffLabel === 'HARD' ? '#ff4444' : '#ffaa22';
       ctx.save();
-      ctx.font = 'bold 12px Orbitron, Arial';
+      ctx.font = `bold ${Math.round(12 * ts)}px Orbitron, Arial`;
       ctx.textAlign = 'left';
       ctx.fillStyle = diffColor;
       ctx.globalAlpha = 0.6;
-      ctx.fillText(diffLabel, 12, 18 + safeTop);
+      ctx.fillText(diffLabel, 12, 18 * ts + safeTop);
       ctx.restore();
 
       // Draw distance score — glowing outline
       ctx.save();
-      ctx.font = 'bold 30px Orbitron, Arial';
+      ctx.font = `bold ${Math.round(30 * ts)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.shadowBlur = getGfx().shadowBlurMed;
       ctx.shadowColor = '#4dccff';
       ctx.strokeStyle = 'rgba(77, 204, 255, 0.4)';
       ctx.lineWidth = 3;
-      ctx.strokeText(`${state.currentScore}m`, width / 2, 50 + safeTop);
+      ctx.strokeText(`${state.currentScore}m`, width / 2, 50 * ts + safeTop);
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(`${state.currentScore}m`, width / 2, 50 + safeTop);
+      ctx.fillText(`${state.currentScore}m`, width / 2, 50 * ts + safeTop);
       ctx.restore();
 
       // Draw coin score with canvas-drawn coin icon
       ctx.save();
       ctx.fillStyle = '#ffd700';
-      ctx.font = 'bold 24px Orbitron, Arial';
+      ctx.font = `bold ${Math.round(24 * ts)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.shadowBlur = getGfx().shadowBlurSmall;
       ctx.shadowColor = '#000000';
       // Draw small coin circle
-      const coinIconX = width / 2 - ctx.measureText(` ${state.currentCoinScore}`).width / 2 - 10;
+      const coinIconX = width / 2 - ctx.measureText(` ${state.currentCoinScore}`).width / 2 - 10 * ts;
       ctx.beginPath();
-      ctx.arc(coinIconX, 74 + safeTop, 8, 0, Math.PI * 2);
+      ctx.arc(coinIconX, 74 * ts + safeTop, 8 * ts, 0, Math.PI * 2);
       ctx.fillStyle = '#ffd700';
       ctx.fill();
       ctx.strokeStyle = '#cc9900';
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.fillStyle = '#cc9900';
-      ctx.font = 'bold 10px Orbitron, Arial';
-      ctx.fillText('$', coinIconX, 78 + safeTop);
+      ctx.font = `bold ${Math.round(10 * ts)}px Orbitron, Arial`;
+      ctx.fillText('$', coinIconX, 78 * ts + safeTop);
       // Draw score text
       ctx.fillStyle = '#ffd700';
-      ctx.font = 'bold 24px Orbitron, Arial';
-      ctx.fillText(`${state.currentCoinScore}`, width / 2 + 5, 80 + safeTop);
+      ctx.font = `bold ${Math.round(24 * ts)}px Orbitron, Arial`;
+      ctx.fillText(`${state.currentCoinScore}`, width / 2 + 5, 80 * ts + safeTop);
       ctx.restore();
     }
 
     // Flowing Y tracker for center HUD elements below coin score
-    let hudFlowY = 102 + safeTop; // default: just below mood meter bar (92+6+4)
+    let hudFlowY = 102 * ts + safeTop; // default: just below mood meter bar (92+6+4)
 
     // Draw mood meter bar
     const player = state.player;
     if (player && gameStarted && !isGameOver) {
       ctx.save();
-      const meterW = 80;
-      const meterH = 6;
+      const meterW = 80 * ts;
+      const meterH = 6 * ts;
       const meterX = width / 2 - meterW / 2;
-      const meterY = 92 + safeTop;
+      const meterY = 92 * ts + safeTop;
       const moodPct = player.moodDisplay / 100;
       const tier = player.getMoodTier();
 
@@ -3704,12 +3709,12 @@ const Game = () => {
       if (tier !== 'neutral') {
         const tierLabels = { chill: 'CHILL', firedup: 'FIRED UP', onfire: 'ON FIRE' };
         const tierColors = { chill: '#6688cc', firedup: '#ffaa44', onfire: '#ff4400' };
-        ctx.font = 'bold 10px Orbitron, Arial';
+        ctx.font = `bold ${Math.round(10 * ts)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = tierColors[tier];
         ctx.shadowBlur = 4;
         ctx.shadowColor = tierColors[tier];
-        ctx.fillText(tierLabels[tier], width / 2, meterY + meterH + 12);
+        ctx.fillText(tierLabels[tier], width / 2, meterY + meterH + Math.round(12 * ts));
         ctx.shadowBlur = 0;
         // Effect hint
         const effects = {
@@ -3717,10 +3722,10 @@ const Game = () => {
           firedup: '+5% speed, coins x1.5',
           onfire: '+10% speed, coins x2',
         };
-        ctx.font = '8px Orbitron, Arial';
+        ctx.font = `${Math.round(8 * ts)}px Orbitron, Arial`;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.fillText(effects[tier], width / 2, meterY + meterH + 22);
-        hudFlowY = meterY + meterH + 44; // below effect hint (at +22) plus 14px font ascent + padding
+        ctx.fillText(effects[tier], width / 2, meterY + meterH + Math.round(22 * ts));
+        hudFlowY = meterY + meterH + Math.round(44 * ts); // below effect hint plus font ascent + padding
       } else {
         hudFlowY = meterY + meterH + 6; // just below the bar
       }
@@ -3744,7 +3749,7 @@ const Game = () => {
         ctx.save();
         const abPulse = 0.7 + Math.sin(Date.now() / 150) * 0.3;
         ctx.globalAlpha = abPulse;
-        ctx.font = 'bold 14px Orbitron, Arial';
+        ctx.font = `bold ${Math.round(14 * ts)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffd700';
         ctx.shadowBlur = 8;
@@ -3765,7 +3770,7 @@ const Game = () => {
       ctx.save();
       const comboTier = getComboLabel(state.combo);
       const comboMult = getComboMultiplier(state.combo);
-      const comboSize = Math.min(20 + state.combo * 2, 40);
+      const comboSize = Math.min(20 + state.combo * 2, 40) * ts;
       const comboScale = 1 + Math.sin(Date.now() / 80) * 0.08;
       const comboAlpha = Math.min(1, state.comboTimer);
       const comboColor = state.combo >= 15 ? '#ff2244' : state.combo >= 10 ? '#ff6600' : state.combo >= 5 ? '#ffaa00' : '#44ddff';
@@ -3795,12 +3800,12 @@ const Game = () => {
 
       // Coin multiplier label
       if (comboMult > 1) {
-        ctx.font = 'bold 12px Orbitron, Arial';
+        ctx.font = `bold ${Math.round(12 * ts)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffd700';
         ctx.shadowBlur = 4;
         ctx.shadowColor = '#ffaa00';
-        ctx.fillText(`coins x${comboMult}`, width / 2, comboY + 16);
+        ctx.fillText(`coins x${comboMult}`, width / 2, comboY + 16 * ts);
         ctx.shadowBlur = 0;
       }
 
@@ -3870,9 +3875,9 @@ const Game = () => {
             ctx.closePath(); ctx.fill();
           }
 
-          ctx.font = 'bold 11px Orbitron, Arial';
+          ctx.font = `bold ${Math.round(11 * ts)}px Orbitron, Arial`;
           ctx.textAlign = 'left';
-          ctx.fillText(`${Math.ceil(pu.timer)}s`, 32, puY + 16);
+          ctx.fillText(`${Math.ceil(pu.timer)}s`, 32 * ts, puY + 16 * ts);
           ctx.restore();
           puY += 28;
         }
@@ -3900,14 +3905,14 @@ const Game = () => {
       ctx.stroke();
 
       // Main text
-      ctx.font = 'bold 14px Orbitron, Arial';
+      ctx.font = `bold ${Math.round(14 * ts)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ffffff';
       ctx.fillText(hint.text, width / 2, hintY + (hint.subtext ? 22 : 24));
 
       // Subtext
       if (hint.subtext) {
-        ctx.font = '10px Orbitron, Arial';
+        ctx.font = `${Math.round(10 * ts)}px Orbitron, Arial`;
         ctx.fillStyle = 'rgba(200, 180, 255, 0.8)';
         ctx.fillText(hint.subtext, width / 2, hintY + 42);
       }
@@ -3999,8 +4004,9 @@ const Game = () => {
       ctx.fillRect(0, 0, width, height);
 
       ctx.save();
+      const pauseTs2 = Math.max(1, width / 390);
       const pauseSmall = width < 420;
-      const pauseFontSize = pauseSmall ? Math.max(36, Math.floor(width * 0.1)) : 52;
+      const pauseFontSize = pauseSmall ? Math.max(36, Math.floor(width * 0.1)) : Math.round(52 * pauseTs2);
       ctx.font = `900 ${pauseFontSize}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.strokeStyle = '#1a3366';
@@ -4015,31 +4021,31 @@ const Game = () => {
       ctx.restore();
 
       // Resume button
-      const pBtnW = Math.min(200, width - 40);
-      const pBtnH = Math.max(44, Math.round(50 * (height < 600 ? height / 700 : 1)));
+      const pBtnW = Math.min(Math.round(200 * pauseTs2), width - 40);
+      const pBtnH = Math.max(44, Math.round(50 * pauseTs2 * (height < 600 ? height / 700 : 1)));
       const resumeBtnX = width / 2 - pBtnW / 2;
-      const resumeBtnY = height / 2 + 40;
+      const resumeBtnY = height / 2 + Math.round(40 * pauseTs2);
       ctx.fillStyle = 'rgba(30, 100, 160, 0.9)';
       ctx.fillRect(resumeBtnX, resumeBtnY, pBtnW, pBtnH);
       ctx.strokeStyle = '#4dccff';
       ctx.lineWidth = 2;
       ctx.strokeRect(resumeBtnX, resumeBtnY, pBtnW, pBtnH);
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 20px Orbitron, Arial';
+      ctx.font = `bold ${Math.round(20 * pauseTs2)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.fillText('RESUME', width / 2, resumeBtnY + pBtnH / 2 + 7);
       gameStateRef.current._resumeBtnBounds = { x: resumeBtnX, y: resumeBtnY, w: pBtnW, h: pBtnH };
 
       // Main Menu button
       const menuBtnX = width / 2 - pBtnW / 2;
-      const menuBtnY = resumeBtnY + pBtnH + 12;
+      const menuBtnY = resumeBtnY + pBtnH + Math.round(12 * pauseTs2);
       ctx.fillStyle = 'rgba(60, 40, 100, 0.9)';
       ctx.fillRect(menuBtnX, menuBtnY, pBtnW, pBtnH);
       ctx.strokeStyle = '#9966cc';
       ctx.lineWidth = 2;
       ctx.strokeRect(menuBtnX, menuBtnY, pBtnW, pBtnH);
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 18px Orbitron, Arial';
+      ctx.font = `bold ${Math.round(18 * pauseTs2)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.fillText('MAIN MENU', width / 2, menuBtnY + pBtnH / 2 + 6);
       ctx.restore();
@@ -4094,16 +4100,17 @@ const Game = () => {
         ctx.restore();
       });
 
-      ctx.font = '900 32px Orbitron, Arial';
+      const rvTs = Math.max(1, width / 390);
+      ctx.font = `900 ${Math.round(32 * rvTs)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ffffff';
-      ctx.fillText('SECOND CHANCE?', width / 2, height / 2 - 110);
+      ctx.fillText('SECOND CHANCE?', width / 2, height / 2 - Math.round(110 * rvTs));
 
       // Show wallet balance (below title, above ring)
-      ctx.font = 'bold 14px Orbitron, Arial';
+      ctx.font = `bold ${Math.round(14 * rvTs)}px Orbitron, Arial`;
       ctx.fillStyle = '#ffd700';
       ctx.textAlign = 'center';
-      ctx.fillText(`Your coins: ${totalCoinsRef.current}`, width / 2, height / 2 - 80);
+      ctx.fillText(`Your coins: ${totalCoinsRef.current}`, width / 2, height / 2 - Math.round(80 * rvTs));
 
       // Countdown ring
       const ringX = width / 2;
@@ -4123,13 +4130,13 @@ const Game = () => {
       ctx.arc(ringX, ringY, ringR, -Math.PI / 2, -Math.PI / 2 + timerPct * Math.PI * 2);
       ctx.stroke();
 
-      ctx.font = 'bold 22px Orbitron, Arial';
+      ctx.font = `bold ${Math.round(22 * rvTs)}px Orbitron, Arial`;
       ctx.fillStyle = '#ffffff';
       ctx.fillText(Math.ceil(state.reviveTimer), ringX, ringY + 8);
 
       // Revive button
-      const revBtnW = 180;
-      const revBtnH = 50;
+      const revBtnW = Math.round(180 * rvTs);
+      const revBtnH = Math.round(50 * rvTs);
       const revBtnX = width / 2 - revBtnW / 2;
       const revBtnY = height / 2 + 12;
       const btnPulse = 0.96 + Math.sin(Date.now() / 150) * 0.04;
@@ -4145,19 +4152,19 @@ const Game = () => {
       ctx.lineWidth = 2;
       ctx.strokeRect(revBtnX, revBtnY, revBtnW, revBtnH);
 
-      ctx.font = 'bold 20px Orbitron, Arial';
+      ctx.font = `bold ${Math.round(20 * rvTs)}px Orbitron, Arial`;
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
-      ctx.fillText('REVIVE', width / 2, revBtnY + 23);
-      ctx.font = 'bold 13px Orbitron, Arial';
+      ctx.fillText('REVIVE', width / 2, revBtnY + Math.round(23 * rvTs));
+      ctx.font = `bold ${Math.round(13 * rvTs)}px Orbitron, Arial`;
       ctx.fillStyle = '#aaffcc';
-      ctx.fillText(`Cost: ${state.reviveCost} coins`, width / 2, revBtnY + 42);
+      ctx.fillText(`Cost: ${state.reviveCost} coins`, width / 2, revBtnY + Math.round(42 * rvTs));
       ctx.restore();
 
-      ctx.font = '15px Orbitron, Arial';
+      ctx.font = `${Math.round(15 * rvTs)}px Orbitron, Arial`;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
       ctx.textAlign = 'center';
-      ctx.fillText('TAP ELSEWHERE TO SKIP', width / 2, height / 2 + 100);
+      ctx.fillText('TAP ELSEWHERE TO SKIP', width / 2, height / 2 + Math.round(100 * rvTs));
 
       state._reviveBtnBounds = { x: revBtnX, y: revBtnY, w: revBtnW, h: revBtnH };
 
@@ -4215,7 +4222,7 @@ const Game = () => {
       const goSmall = width < 420;
       const goShort = height < 600;
       const safeBot = gameStateRef.current.safeBottom || 0;
-      const goScale = goShort ? height / 700 : 1;
+      const goScale = goShort ? height / 700 : Math.min(2, Math.max(1, width / 390));
       const goGap = Math.round(40 * goScale);
       const goLineGap = Math.round(10 * goScale);    // extra breathing room between stat lines
       const cx = width / 2;
@@ -4816,24 +4823,25 @@ const Game = () => {
 
         // Title
         ctx.save();
-        ctx.font = '900 28px Orbitron, Arial';
+        const shopTs = Math.max(1, width / 390);
+        ctx.font = `900 ${Math.round(28 * shopTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.shadowBlur = 20;
         ctx.shadowColor = '#ba55d3';
         ctx.strokeStyle = '#4a1a6a';
         ctx.lineWidth = 4;
-        ctx.strokeText('SHOP', width / 2, 38);
+        ctx.strokeText('SHOP', width / 2, Math.round(38 * shopTs));
         const shopGrad = ctx.createLinearGradient(width / 2 - 80, 15, width / 2 + 80, 45);
         shopGrad.addColorStop(0, '#ee88ff');
         shopGrad.addColorStop(0.5, '#ffffff');
         shopGrad.addColorStop(1, '#ee88ff');
         ctx.fillStyle = shopGrad;
-        ctx.fillText('SHOP', width / 2, 38);
+        ctx.fillText('SHOP', width / 2, Math.round(38 * shopTs));
         ctx.restore();
 
         // Coins
         ctx.save();
-        ctx.font = 'bold 16px Orbitron, Arial';
+        ctx.font = `bold ${Math.round(16 * shopTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.shadowBlur = 10;
         ctx.shadowColor = '#ffaa00';
@@ -4903,7 +4911,8 @@ const Game = () => {
 
         // Vertically center menu between safe areas
         // Estimate total menu height to compute offset
-        const titleFontSize = isSmallScreen ? Math.max(28, Math.floor(width * 0.085)) : 48;
+        const menuTs = Math.min(1.8, Math.max(1, width / 390));
+        const titleFontSize = isSmallScreen ? Math.max(28, Math.floor(width * 0.085)) : Math.round(48 * menuTs);
         const diffBtnH_est = isSmallScreen ? 44 : 50;
         const playBtnH_est = isSmallScreen ? 48 : 54;
         const shopBtnH_est = isSmallScreen ? 40 : 44;
@@ -4961,12 +4970,12 @@ const Game = () => {
           const lvl = progressionRef.current.getLevel();
           const xpProg = progressionRef.current.getXPProgress();
           ctx.save();
-          ctx.font = `bold ${isSmallScreen ? 10 : 11}px Orbitron, Arial`;
+          ctx.font = `bold ${Math.round((isSmallScreen ? 10 : 11) * menuTs)}px Orbitron, Arial`;
           ctx.textAlign = 'center';
           ctx.fillStyle = '#aa88ff';
-          ctx.fillText(`LVL ${lvl}`, width / 2, titleY + (isSmallScreen ? 14 : 18));
+          ctx.fillText(`LVL ${lvl}`, width / 2, titleY + Math.round((isSmallScreen ? 14 : 18) * menuTs));
           // XP bar
-          const xpW = 60, xpH = 3;
+          const xpW = Math.round(60 * menuTs), xpH = 3;
           ctx.fillStyle = 'rgba(255,255,255,0.1)';
           ctx.fillRect(width / 2 - xpW / 2, titleY + (isSmallScreen ? 18 : 22), xpW, xpH);
           ctx.fillStyle = '#aa88ff';
@@ -4980,21 +4989,21 @@ const Game = () => {
         const coinText = `${totalCoinsRef.current}`;
         const skinText = currentSkin ? currentSkin.name : '';
         // Coins — left side
-        ctx.font = `${isSmallScreen ? 14 : 16}px Orbitron, Arial`;
+        ctx.font = `${Math.round((isSmallScreen ? 14 : 16) * menuTs)}px Orbitron, Arial`;
         ctx.textAlign = 'right';
         ctx.fillStyle = '#ffd700';
         ctx.fillText(coinText, width / 2 - 12, curY);
         const coinTx = width / 2 - 12 - ctx.measureText(coinText).width - 10;
         ctx.beginPath();
-        ctx.arc(coinTx, curY - 5, 6, 0, Math.PI * 2);
+        ctx.arc(coinTx, curY - 5, Math.round(6 * menuTs), 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#cc9900';
-        ctx.font = `bold 8px Orbitron, Arial`;
+        ctx.font = `bold ${Math.round(8 * menuTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillText('$', coinTx, curY - 2);
         // Skin name — right side
         if (skinText) {
-          ctx.font = `${isSmallScreen ? 11 : 13}px Orbitron, Arial`;
+          ctx.font = `${Math.round((isSmallScreen ? 11 : 13) * menuTs)}px Orbitron, Arial`;
           ctx.textAlign = 'left';
           ctx.fillStyle = '#aaaacc';
           ctx.fillText(skinText, width / 2 + 12, curY);
@@ -5018,10 +5027,10 @@ const Game = () => {
           ctx.lineWidth = 2;
           ctx.strokeRect(drX, curY, drW, drH);
           ctx.fillStyle = '#000000';
-          ctx.font = `bold ${isSmallScreen ? 11 : 13}px Orbitron, Arial`;
+          ctx.font = `bold ${Math.round((isSmallScreen ? 11 : 13) * menuTs)}px Orbitron, Arial`;
           ctx.textAlign = 'center';
           ctx.fillText(`DAILY BONUS: +${drInfo.pending}`, width / 2, curY + drH / 2 - 3);
-          ctx.font = `${isSmallScreen ? 8 : 9}px Orbitron, Arial`;
+          ctx.font = `${Math.round((isSmallScreen ? 8 : 9) * menuTs)}px Orbitron, Arial`;
           ctx.fillText(`Day ${drInfo.day}/7 - Tap to claim!`, width / 2, curY + drH / 2 + 10);
           ctx.restore();
           state._dailyRewardBounds = { x: drX, y: curY, w: drW, h: drH };
@@ -5033,7 +5042,7 @@ const Game = () => {
           const dc = progressionRef.current.getDailyChallenge();
           if (dc && !dc.claimed) {
             ctx.save();
-            ctx.font = `bold ${isSmallScreen ? 9 : 10}px Orbitron, Arial`;
+            ctx.font = `bold ${Math.round((isSmallScreen ? 9 : 10) * menuTs)}px Orbitron, Arial`;
             ctx.textAlign = 'center';
             ctx.fillStyle = dc.completed ? '#44ff88' : '#44ddff';
             const dcStatus = dc.completed ? 'DONE!' : `${dc.progress}/${dc.target}`;
@@ -5049,10 +5058,11 @@ const Game = () => {
           { key: 'medium', label: 'MED', color: '#ffaa22', desc: 'Balanced' },
           { key: 'hard', label: 'HARD', color: '#ff4444', desc: 'Fast storm' },
         ];
-        const diffTotalW = Math.min(width - 30, 340);
+        const menuMaxW = Math.round(340 * menuTs);
+        const diffTotalW = Math.min(width - 30, menuMaxW);
         const diffGap = 8;
         const diffBtnW = (diffTotalW - diffGap * 2) / 3;
-        const diffBtnH = isSmallScreen ? 44 : 50;
+        const diffBtnH = Math.round((isSmallScreen ? 44 : 50) * menuTs);
         const diffStartX = width / 2 - diffTotalW / 2;
 
         difficulties.forEach((d, i) => {
@@ -5075,13 +5085,13 @@ const Game = () => {
           }
 
           ctx.fillStyle = isSelected ? '#000000' : d.color;
-          ctx.font = `bold ${isSmallScreen ? 13 : 15}px Orbitron, Arial`;
+          ctx.font = `bold ${Math.round((isSmallScreen ? 13 : 15) * menuTs)}px Orbitron, Arial`;
           ctx.textAlign = 'center';
-          ctx.fillText(d.label, bx + diffBtnW / 2, by + (isSmallScreen ? 18 : 20));
+          ctx.fillText(d.label, bx + diffBtnW / 2, by + Math.round((isSmallScreen ? 18 : 20) * menuTs));
 
-          ctx.font = `${isSmallScreen ? 9 : 10}px Orbitron, Arial`;
+          ctx.font = `${Math.round((isSmallScreen ? 9 : 10) * menuTs)}px Orbitron, Arial`;
           ctx.fillStyle = isSelected ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.35)';
-          ctx.fillText(best > 0 ? `Best: ${best}m` : d.desc, bx + diffBtnW / 2, by + (isSmallScreen ? 36 : 40));
+          ctx.fillText(best > 0 ? `Best: ${best}m` : d.desc, bx + diffBtnW / 2, by + Math.round((isSmallScreen ? 36 : 40) * menuTs));
 
           d._bounds = { x: bx, y: by, w: diffBtnW, h: diffBtnH };
         });
@@ -5089,8 +5099,8 @@ const Game = () => {
         curY += diffBtnH + menuPad;
 
         // --- PLAY button ---
-        const playBtnW = Math.min(width - 30, 340);
-        const playBtnH = isSmallScreen ? 48 : 54;
+        const playBtnW = Math.min(width - 30, menuMaxW);
+        const playBtnH = Math.round((isSmallScreen ? 48 : 54) * menuTs);
         const playBtnX = width / 2 - playBtnW / 2;
         const playBtnY = curY;
         const selDiff = difficulties.find(d => d.key === difficultyRef.current) || difficulties[1];
@@ -5109,18 +5119,18 @@ const Game = () => {
         ctx.strokeRect(playBtnX, playBtnY, playBtnW, playBtnH);
         ctx.shadowBlur = 0;
         ctx.fillStyle = '#000000';
-        ctx.font = `bold ${isSmallScreen ? 20 : 24}px Orbitron, Arial`;
+        ctx.font = `bold ${Math.round((isSmallScreen ? 20 : 24) * menuTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText('PLAY', width / 2, playBtnY + playBtnH / 2 + 8);
+        ctx.fillText('PLAY', width / 2, playBtnY + playBtnH / 2 + Math.round(8 * menuTs));
         ctx.restore();
         gameStateRef.current._playBtnBounds = { x: playBtnX, y: playBtnY, w: playBtnW, h: playBtnH };
         curY += playBtnH + menuPad;
 
         // --- SHOP + GFX row (side by side) ---
-        const rowW = Math.min(width - 30, 340);
+        const rowW = Math.min(width - 30, menuMaxW);
         const rowStartX = width / 2 - rowW / 2;
         const shopBtnW = Math.floor(rowW * 0.48);
-        const shopBtnH = isSmallScreen ? 40 : 44;
+        const shopBtnH = Math.round((isSmallScreen ? 40 : 44) * menuTs);
         const gfxBtnW = rowW - shopBtnW - 8;
 
         // Shop button
@@ -5130,9 +5140,9 @@ const Game = () => {
         ctx.lineWidth = 1.5;
         ctx.strokeRect(rowStartX, curY, shopBtnW, shopBtnH);
         ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${isSmallScreen ? 16 : 18}px Orbitron, Arial`;
+        ctx.font = `bold ${Math.round((isSmallScreen ? 16 : 18) * menuTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText('SHOP', rowStartX + shopBtnW / 2, curY + shopBtnH / 2 + 6);
+        ctx.fillText('SHOP', rowStartX + shopBtnW / 2, curY + shopBtnH / 2 + Math.round(6 * menuTs));
         gameStateRef.current._shopBtnBounds = { x: rowStartX, y: curY, w: shopBtnW, h: shopBtnH };
 
         // Graphics button
@@ -5145,20 +5155,20 @@ const Game = () => {
         ctx.strokeStyle = gfxColor;
         ctx.lineWidth = 1;
         ctx.strokeRect(gfxBtnX, curY, gfxBtnW, shopBtnH);
-        ctx.font = `bold ${isSmallScreen ? 10 : 11}px Orbitron, Arial`;
+        ctx.font = `bold ${Math.round((isSmallScreen ? 10 : 11) * menuTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#aaaaaa';
-        ctx.fillText('GFX:', gfxBtnX + gfxBtnW / 2 - 20, curY + shopBtnH / 2 + 4);
+        ctx.fillText('GFX:', gfxBtnX + gfxBtnW / 2 - Math.round(20 * menuTs), curY + shopBtnH / 2 + 4);
         ctx.fillStyle = gfxColor;
-        ctx.font = `bold ${isSmallScreen ? 12 : 13}px Orbitron, Arial`;
-        ctx.fillText(gfxLabel, gfxBtnX + gfxBtnW / 2 + 22, curY + shopBtnH / 2 + 4);
+        ctx.font = `bold ${Math.round((isSmallScreen ? 12 : 13) * menuTs)}px Orbitron, Arial`;
+        ctx.fillText(gfxLabel, gfxBtnX + gfxBtnW / 2 + Math.round(22 * menuTs), curY + shopBtnH / 2 + 4);
         gameStateRef.current._gfxBtnBounds = { x: gfxBtnX, y: curY, w: gfxBtnW, h: shopBtnH };
         curY += shopBtnH + menuPad;
 
         // --- Leaderboard button (Game Center) ---
         if (isGCAuthenticated()) {
-          const lbBtnW = Math.min(width - 30, 340);
-          const lbBtnH = isSmallScreen ? 36 : 40;
+          const lbBtnW = Math.min(width - 30, menuMaxW);
+          const lbBtnH = Math.round((isSmallScreen ? 36 : 40) * menuTs);
           const lbBtnX = width / 2 - lbBtnW / 2;
           ctx.fillStyle = 'rgba(40, 80, 140, 0.85)';
           ctx.fillRect(lbBtnX, curY, lbBtnW, lbBtnH);
@@ -5166,9 +5176,9 @@ const Game = () => {
           ctx.lineWidth = 1.5;
           ctx.strokeRect(lbBtnX, curY, lbBtnW, lbBtnH);
           ctx.fillStyle = '#ffffff';
-          ctx.font = `bold ${isSmallScreen ? 14 : 16}px Orbitron, Arial`;
+          ctx.font = `bold ${Math.round((isSmallScreen ? 14 : 16) * menuTs)}px Orbitron, Arial`;
           ctx.textAlign = 'center';
-          ctx.fillText('LEADERBOARD', width / 2, curY + lbBtnH / 2 + 5);
+          ctx.fillText('LEADERBOARD', width / 2, curY + lbBtnH / 2 + Math.round(5 * menuTs));
           gameStateRef.current._menuLeaderboardBtnBounds = { x: lbBtnX, y: curY, w: lbBtnW, h: lbBtnH };
           curY += lbBtnH + menuPad;
         }
@@ -5181,7 +5191,7 @@ const Game = () => {
             const bonusPct = Math.floor(progressionRef.current.getStreakBonus() * 100);
             const streakPulse = 0.9 + Math.sin(Date.now() / 200) * 0.1;
             ctx.save();
-            ctx.font = `bold ${isSmallScreen ? 12 : 14}px Orbitron, Arial`;
+            ctx.font = `bold ${Math.round((isSmallScreen ? 12 : 14) * menuTs)}px Orbitron, Arial`;
             ctx.textAlign = 'center';
             ctx.fillStyle = streakVal >= 5 ? '#ff6600' : '#ffaa44';
             ctx.shadowBlur = streakVal >= 5 ? 8 : 4;
@@ -5197,14 +5207,14 @@ const Game = () => {
 
           // Missions header
           ctx.save();
-          ctx.font = `bold ${isSmallScreen ? 10 : 11}px Orbitron, Arial`;
+          ctx.font = `bold ${Math.round((isSmallScreen ? 10 : 11) * menuTs)}px Orbitron, Arial`;
           ctx.textAlign = 'center';
           ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-          ctx.fillText('MISSIONS', width / 2, curY + 10);
+          ctx.fillText('MISSIONS', width / 2, curY + Math.round(10 * menuTs));
           curY += 16;
 
           const missions = progressionRef.current.getMissions();
-          const mBarW = Math.min(width - 30, 340);
+          const mBarW = Math.min(width - 30, menuMaxW);
           const mBarX = width / 2 - mBarW / 2;
           const mRowH = isSmallScreen ? 26 : 28;
 
@@ -5222,10 +5232,10 @@ const Game = () => {
             ctx.lineWidth = 0.5;
             ctx.strokeRect(mBarX, my, mBarW, 4);
             // Description
-            ctx.font = `${isSmallScreen ? 9 : 10}px Orbitron, Arial`;
+            ctx.font = `${Math.round((isSmallScreen ? 9 : 10) * menuTs)}px Orbitron, Arial`;
             ctx.textAlign = 'left';
             ctx.fillStyle = m.completed ? '#44ff88' : 'rgba(255, 255, 255, 0.55)';
-            ctx.fillText(`${m.desc} (${m.progress}/${m.target})`, mBarX, my + 16);
+            ctx.fillText(`${m.desc} (${m.progress}/${m.target})`, mBarX, my + Math.round(16 * menuTs));
             // Reward
             ctx.textAlign = 'right';
             ctx.fillStyle = '#ffd700';
