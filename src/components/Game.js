@@ -2280,9 +2280,11 @@ const Game = () => {
         const dx = player.x - coin.x;
         const dy = player.y - coin.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 200 && dist > 0) {
-          coin.x += (dx / dist) * 300 * deltaTime;
-          coin.y += (dy / dist) * 300 * deltaTime;
+        if (dist < 350 && dist > 0) {
+          // Speed increases as coins get closer for a satisfying snap
+          const pullSpeed = 600 + (1 - dist / 350) * 400;
+          coin.x += (dx / dist) * pullSpeed * deltaTime;
+          coin.y += (dy / dist) * pullSpeed * deltaTime;
         }
       });
     }

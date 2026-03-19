@@ -38,8 +38,17 @@ class AudioManager {
         await this.audioContext.resume();
       }
 
+      // Limiter to prevent volume spikes when multiple SFX play simultaneously
+      this.limiter = this.audioContext.createDynamicsCompressor();
+      this.limiter.threshold.setValueAtTime(-6, this.audioContext.currentTime);   // start compressing at -6dB
+      this.limiter.knee.setValueAtTime(3, this.audioContext.currentTime);         // soft knee
+      this.limiter.ratio.setValueAtTime(20, this.audioContext.currentTime);       // hard limiting
+      this.limiter.attack.setValueAtTime(0.001, this.audioContext.currentTime);   // instant catch
+      this.limiter.release.setValueAtTime(0.05, this.audioContext.currentTime);   // quick release
+      this.limiter.connect(this.audioContext.destination);
+
       this.masterGain = this.audioContext.createGain();
-      this.masterGain.connect(this.audioContext.destination);
+      this.masterGain.connect(this.limiter);
       this.masterGain.gain.value = 0.5;
 
       this.musicGain = this.audioContext.createGain();
