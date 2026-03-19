@@ -787,8 +787,15 @@ class AudioManager {
     // actively touching the screen so the resume call is allowed on iOS.
     if (this.audioContext.state === 'suspended' || this.audioContext.state === 'interrupted') {
       this.audioContext.resume().then(() => {
-        // Restart music if it was playing before the interruption
-        if (this.isMusicPlaying && !this.musicIntervalId) {
+        // Kill all existing oscillators — their scheduled params are broken
+        // after an interruption and will cause stuck/droning sounds
+        if (this.musicIntervalId) {
+          clearInterval(this.musicIntervalId);
+          this.musicIntervalId = null;
+        }
+        this._replaceMusicGain();
+        // Restart music cleanly
+        if (this.isMusicPlaying) {
           this.isMusicPlaying = false;
           this.startMusic(this.currentDifficulty);
         }

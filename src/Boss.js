@@ -450,6 +450,7 @@ class Boss {
       this._drawDeath(ctx, cameraY);
       return;
     }
+    const _noShadow = window._voidHopperGfx === 'low';
 
     const screenY = this.y - cameraY;
     const pulse = Math.sin(this.phase * 2) * 0.1 + 1;
@@ -463,7 +464,7 @@ class Boss {
       ctx.strokeStyle = this.color.glow;
       ctx.lineWidth = 3;
       ctx.globalAlpha = 0.4 + Math.sin(this.phase * 5) * 0.2;
-      ctx.shadowBlur = 15;
+      ctx.shadowBlur = _noShadow ? 0 : 15;
       ctx.shadowColor = this.color.glow;
       ctx.beginPath();
       ctx.arc(0, 0, this.radius * 1.5, 0, Math.PI * 2);
@@ -511,7 +512,7 @@ class Boss {
     bodyGrad.addColorStop(0.6, this.color.secondary);
     bodyGrad.addColorStop(1, this.color.secondary + '88');
     ctx.fillStyle = bodyGrad;
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = _noShadow ? 0 : 12;
     ctx.shadowColor = this.color.glow;
     ctx.beginPath();
     ctx.arc(0, 0, this.radius * pulse, 0, Math.PI * 2);
@@ -542,7 +543,7 @@ class Boss {
     const hpRatio = this.health / this.maxHealth;
     const irisColor = hpRatio > 0.5 ? this.color.eye : '#ff3333';
     ctx.fillStyle = irisColor;
-    ctx.shadowBlur = 6;
+    ctx.shadowBlur = _noShadow ? 0 : 6;
     ctx.shadowColor = irisColor;
     ctx.beginPath();
     ctx.ellipse(0, -this.radius * 0.15, eyeSize * 0.5, eyeSize * 0.4, 0, 0, Math.PI * 2);
@@ -561,7 +562,7 @@ class Boss {
     this.projectiles.forEach(p => {
       const py = p.y - cameraY;
       ctx.fillStyle = this.color.glow;
-      ctx.shadowBlur = 6;
+      ctx.shadowBlur = _noShadow ? 0 : 6;
       ctx.shadowColor = this.color.glow;
       ctx.beginPath();
       ctx.arc(p.x, py, p.radius + Math.sin(p.phase) * 1.5, 0, Math.PI * 2);
@@ -574,7 +575,7 @@ class Boss {
       const my = m.y - cameraY;
       const mPulse = 1 + Math.sin(m.phase) * 0.15;
       ctx.fillStyle = this.color.secondary;
-      ctx.shadowBlur = 5;
+      ctx.shadowBlur = _noShadow ? 0 : 5;
       ctx.shadowColor = this.color.glow;
       ctx.beginPath();
       ctx.arc(m.x, my, m.radius * mPulse, 0, Math.PI * 2);
@@ -608,7 +609,7 @@ class Boss {
       // Core
       ctx.strokeStyle = '#ff4444';
       ctx.lineWidth = laserWidth;
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = _noShadow ? 0 : 10;
       ctx.shadowColor = '#ff0000';
       ctx.beginPath();
       ctx.moveTo(0, 0);
@@ -632,7 +633,7 @@ class Boss {
       ctx.strokeStyle = this.color.glow;
       ctx.lineWidth = 4 * alpha;
       ctx.globalAlpha = alpha * 0.6;
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = _noShadow ? 0 : 8;
       ctx.shadowColor = this.color.glow;
       ctx.beginPath();
       ctx.arc(this.x, this.y - cameraY, this.shockwaveRadius, 0, Math.PI * 2);
@@ -672,7 +673,7 @@ class Boss {
     ctx.font = 'bold 11px Arial';
     ctx.textAlign = 'center';
     ctx.fillStyle = this.color.glow;
-    ctx.shadowBlur = 4;
+    ctx.shadowBlur = _noShadow ? 0 : 4;
     ctx.shadowColor = this.color.glow;
     ctx.fillText(this.name, this.x, barY - 6);
     ctx.shadowBlur = 0;
@@ -707,7 +708,7 @@ class Boss {
     // Expanding ring
     ctx.strokeStyle = this.color.glow;
     ctx.lineWidth = 3;
-    ctx.shadowBlur = 15;
+    ctx.shadowBlur = window._voidHopperGfx === 'low' ? 0 : 15;
     ctx.shadowColor = this.color.glow;
     ctx.beginPath();
     ctx.arc(0, 0, this.radius * expand, 0, Math.PI * 2);

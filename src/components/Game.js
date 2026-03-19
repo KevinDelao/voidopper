@@ -22,6 +22,10 @@ import { getItem, setItem, getJSON, setJSON } from '../storage';
 import { lightTap, mediumTap, heavyTap, notifyTap, selectionTap } from '../haptics';
 import { authenticateGameCenter, submitScore as submitGCScore, showLeaderboard, isAuthenticated as isGCAuthenticated } from '../GameCenter';
 
+// Detect iPad for performance tuning
+const isIPad = /iPad/i.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 // Detect mobile device once at module level
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
   ('ontouchstart' in window && window.innerWidth < 768);
@@ -29,7 +33,7 @@ const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
 // Graphics quality presets
 const GFX = {
   low: {
-    dprCap: 1.5, stars: 30, dust: 10, wallParticles: 4, coinSparkles: 2,
+    dprCap: isIPad ? 1 : 1.5, stars: 30, dust: 10, wallParticles: 4, coinSparkles: 2,
     shadowBlurSmall: 0, shadowBlurMed: 0, shadowBlurLarge: 0,
     enableParticleShadows: false,
   },
@@ -110,7 +114,7 @@ const Game = () => {
   const [shopTab, setShopTab] = useState('skins');
   const shopTabRef = useRef('skins');
   const graphicsRef = useRef(
-    getItem('voidHopper_graphics') || (isMobile ? 'medium' : 'high')
+    getItem('voidHopper_graphics') || (isIPad ? 'low' : isMobile ? 'medium' : 'high')
   );
   const getGfx = () => GFX[graphicsRef.current] || GFX.medium;
 
@@ -218,6 +222,9 @@ const Game = () => {
     if (isMobile && window.screen && window.screen.orientation && window.screen.orientation.lock) {
       window.screen.orientation.lock('portrait').catch(() => {});
     }
+
+    // Expose graphics quality globally so entities can skip expensive effects
+    window._voidHopperGfx = graphicsRef.current;
 
     // Set canvas size (account for devicePixelRatio for sharp text)
     const resizeCanvas = () => {
@@ -885,6 +892,7 @@ const Game = () => {
           selectionTap();
           const cycle = { low: 'medium', medium: 'high', high: 'low' };
           graphicsRef.current = cycle[graphicsRef.current] || 'medium';
+          window._voidHopperGfx = graphicsRef.current;
           setItem('voidHopper_graphics', graphicsRef.current);
           // Regenerate stars/dust with new particle count and update canvas DPR
           generateBackgroundStars(getW());
