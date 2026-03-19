@@ -458,19 +458,20 @@ const Game = () => {
         return;
       }
 
-      // Pause button hit area (larger for touch — accounts for safe area)
-      const st = gameStateRef.current.safeTop || 0;
-      if (tx >= getW() - 140 && tx <= getW() - 70 &&
-          ty >= 10 + st && ty <= 80 + st && gameStarted && !isGameOver) {
+      // Pause button hit area (uses stored bounds from drawing + padding)
+      const pbBounds = gameStateRef.current._pauseBtnBounds;
+      if (pbBounds && tx >= pbBounds.x - 10 && tx <= pbBounds.x + pbBounds.w + 10 &&
+          ty >= pbBounds.y - 10 && ty <= pbBounds.y + pbBounds.h + 10 && gameStarted && !isGameOver) {
         isPausedRef.current = !isPausedRef.current;
         setIsPaused(isPausedRef.current);
         selectionTap();
         return;
       }
 
-      // Mute button hit area (larger for touch — accounts for safe area)
-      if (tx >= getW() - 80 && tx <= getW() - 10 &&
-          ty >= 10 + st && ty <= 80 + st) {
+      // Mute button hit area (uses stored bounds from drawing + padding)
+      const mbBounds = gameStateRef.current._muteBtnBounds;
+      if (mbBounds && tx >= mbBounds.x - 10 && tx <= mbBounds.x + mbBounds.w + 10 &&
+          ty >= mbBounds.y - 10 && ty <= mbBounds.y + mbBounds.h + 10) {
         selectionTap();
         if (audioManagerRef.current) {
           if (!audioManagerRef.current.isInitialized) {
@@ -589,10 +590,10 @@ const Game = () => {
       const clickX = e.clientX - rect.left;
       const clickY = e.clientY - rect.top;
 
-      // Check if pause button was clicked (top right, left of music button)
-      const st = gameStateRef.current.safeTop || 0;
-      if (clickX >= getW() - 130 && clickX <= getW() - 80 &&
-          clickY >= 20 + st && clickY <= 70 + st && gameStarted && !isGameOver) {
+      // Check if pause button was clicked (uses stored bounds)
+      const pbBounds = gameStateRef.current._pauseBtnBounds;
+      if (pbBounds && clickX >= pbBounds.x && clickX <= pbBounds.x + pbBounds.w &&
+          clickY >= pbBounds.y && clickY <= pbBounds.y + pbBounds.h && gameStarted && !isGameOver) {
         isPausedRef.current = !isPausedRef.current;
         setIsPaused(isPausedRef.current);
         selectionTap();
@@ -610,11 +611,10 @@ const Game = () => {
           selectionTap();
           return;
         }
-        // Main Menu button
-        const menuBtnX = getW() / 2 - 100;
-        const menuBtnY = (rBounds ? rBounds.y + rBounds.h + 12 : getH() / 2 + 102);
-        if (clickX >= menuBtnX && clickX <= menuBtnX + 200 &&
-            clickY >= menuBtnY && clickY <= menuBtnY + 50) {
+        // Main Menu button (uses stored bounds from pause overlay drawing)
+        const goMenuBnds = gameStateRef.current._pauseMenuBtnBounds;
+        if (goMenuBnds && clickX >= goMenuBnds.x && clickX <= goMenuBnds.x + goMenuBnds.w &&
+            clickY >= goMenuBnds.y && clickY <= goMenuBnds.y + goMenuBnds.h) {
           mediumTap();
           isPausedRef.current = false;
           setIsPaused(false);
@@ -631,10 +631,10 @@ const Game = () => {
         return;
       }
 
-      // Check if mute button was clicked (top right corner, safe area aware)
-      const muteSafeTop = gameStateRef.current.safeTop || 0;
-      if (clickX >= getW() - 70 && clickX <= getW() - 20 &&
-          clickY >= 20 + muteSafeTop && clickY <= 70 + muteSafeTop) {
+      // Check if mute button was clicked (uses stored bounds)
+      const mbBounds = gameStateRef.current._muteBtnBounds;
+      if (mbBounds && clickX >= mbBounds.x && clickX <= mbBounds.x + mbBounds.w &&
+          clickY >= mbBounds.y && clickY <= mbBounds.y + mbBounds.h) {
         selectionTap();
         if (audioManagerRef.current) {
           if (!audioManagerRef.current.isInitialized) {
@@ -687,11 +687,10 @@ const Game = () => {
             }
           }
 
-          // Back button (safe area aware) — check BEFORE shop items so overlapping cards don't block it
-          const shopSafeBotClick = gameStateRef.current.safeBottom || 0;
-          const backBtnClickY = getH() - shopSafeBotClick - 68;
-          if (clickX >= getW() / 2 - 80 && clickX <= getW() / 2 + 80 &&
-              clickY >= backBtnClickY && clickY <= backBtnClickY + 50) {
+          // Back button (uses stored bounds)
+          const backBnds = gameStateRef.current._shopBackBtnBounds;
+          if (backBnds && clickX >= backBnds.x && clickX <= backBnds.x + backBnds.w &&
+              clickY >= backBnds.y && clickY <= backBnds.y + backBnds.h) {
             selectionTap();
             showShopRef.current = false;
             setShowShop(false);
@@ -2316,9 +2315,10 @@ const Game = () => {
         const dx = player.x - coin.x;
         const dy = player.y - coin.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 350 && dist > 0) {
+        const magnetRange = 350 * (state.speedScale || 1);
+        if (dist < magnetRange && dist > 0) {
           // Speed increases as coins get closer for a satisfying snap
-          const pullSpeed = 600 + (1 - dist / 350) * 400;
+          const pullSpeed = (600 + (1 - dist / magnetRange) * 400) * (state.speedScale || 1);
           coin.x += (dx / dist) * pullSpeed * deltaTime;
           coin.y += (dy / dist) * pullSpeed * deltaTime;
         }
@@ -3290,6 +3290,7 @@ const Game = () => {
       ctx.font = `bold ${Math.round(18 * pauseTs)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.fillText('MAIN MENU', width / 2, menuBtnY + pBtnH / 2 + 6);
+      state._pauseMenuBtnBounds = { x: menuBtnX, y: menuBtnY, w: pBtnW, h: pBtnH };
 
       return;
     }
@@ -3377,8 +3378,9 @@ const Game = () => {
     ctx.shadowColor = 'transparent';
 
     // Draw only on-screen entities (cull off-screen)
-    const cullTop = renderCam - 200;
-    const cullBottom = renderCam + height + 200;
+    const cullMargin = Math.max(200, height * 0.2);
+    const cullTop = renderCam - cullMargin;
+    const cullBottom = renderCam + height + cullMargin;
 
     // Use the already-sampled bgBiome for all spikes (they're all on screen, same biome)
     state.spikes.forEach(spike => {
@@ -3810,10 +3812,10 @@ const Game = () => {
       }
 
       // Timer bar
-      const barW = 80;
-      const barH = 3;
+      const barW = Math.round(80 * ts);
+      const barH = Math.max(2, Math.round(3 * ts));
       const barX = width / 2 - barW / 2;
-      const barY = comboY + 22;
+      const barY = comboY + Math.round(22 * ts);
       const timerPct = state.comboTimer / state.comboTimerMax;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
       ctx.fillRect(barX, barY, barW, barH);
@@ -3825,7 +3827,9 @@ const Game = () => {
 
     // Draw active power-up indicators (left side)
     if (player && gameStarted && !isGameOver) {
-      let puY = 30 + safeTop;
+      let puY = Math.round(30 * ts) + safeTop;
+      const puBoxW = Math.round(90 * ts);
+      const puBoxH = Math.round(22 * ts);
       const puConfigs = [
         { active: player.hasShield, timer: player.shieldTimer, label: 'SHIELD', color: '#44aaff' },
         { active: player.hasMagnet, timer: player.magnetTimer, label: 'MAGNET', color: '#ff44aa' },
@@ -3837,49 +3841,50 @@ const Game = () => {
           ctx.save();
           ctx.fillStyle = pu.color;
           ctx.globalAlpha = 0.8;
-          ctx.fillRect(10, puY, 90, 22);
+          ctx.fillRect(Math.round(10 * ts), puY, puBoxW, puBoxH);
 
           // Draw canvas icon instead of emoji
           ctx.globalAlpha = 1;
-          const ix = 22, iy = puY + 11;
+          const ic = ts; // icon scale
+          const ix = Math.round(22 * ic), iy = puY + Math.round(11 * ic);
           ctx.strokeStyle = '#ffffff';
           ctx.fillStyle = '#ffffff';
           ctx.lineWidth = 1.5;
           if (idx === 0) {
             // Shield icon — circle with cross
             ctx.beginPath();
-            ctx.arc(ix, iy, 6, 0, Math.PI * 2);
+            ctx.arc(ix, iy, 6 * ic, 0, Math.PI * 2);
             ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(ix, iy - 4); ctx.lineTo(ix, iy + 4); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(ix - 4, iy); ctx.lineTo(ix + 4, iy); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(ix, iy - 4 * ic); ctx.lineTo(ix, iy + 4 * ic); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(ix - 4 * ic, iy); ctx.lineTo(ix + 4 * ic, iy); ctx.stroke();
           } else if (idx === 1) {
             // Magnet icon — U shape
             ctx.beginPath();
-            ctx.arc(ix, iy - 1, 5, 0, Math.PI);
+            ctx.arc(ix, iy - 1 * ic, 5 * ic, 0, Math.PI);
             ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(ix - 5, iy - 1); ctx.lineTo(ix - 5, iy + 5); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(ix + 5, iy - 1); ctx.lineTo(ix + 5, iy + 5); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(ix - 5 * ic, iy - 1 * ic); ctx.lineTo(ix - 5 * ic, iy + 5 * ic); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(ix + 5 * ic, iy - 1 * ic); ctx.lineTo(ix + 5 * ic, iy + 5 * ic); ctx.stroke();
           } else if (idx === 2) {
             // Slowmo icon — hourglass
             ctx.beginPath();
-            ctx.moveTo(ix - 4, iy - 5); ctx.lineTo(ix + 4, iy - 5);
-            ctx.lineTo(ix, iy); ctx.lineTo(ix + 4, iy + 5);
-            ctx.lineTo(ix - 4, iy + 5); ctx.lineTo(ix, iy);
+            ctx.moveTo(ix - 4 * ic, iy - 5 * ic); ctx.lineTo(ix + 4 * ic, iy - 5 * ic);
+            ctx.lineTo(ix, iy); ctx.lineTo(ix + 4 * ic, iy + 5 * ic);
+            ctx.lineTo(ix - 4 * ic, iy + 5 * ic); ctx.lineTo(ix, iy);
             ctx.closePath(); ctx.stroke();
           } else {
             // Boost icon — lightning bolt
             ctx.beginPath();
-            ctx.moveTo(ix + 1, iy - 6); ctx.lineTo(ix - 3, iy + 1);
-            ctx.lineTo(ix, iy); ctx.lineTo(ix - 1, iy + 6);
-            ctx.lineTo(ix + 3, iy - 1); ctx.lineTo(ix, iy);
+            ctx.moveTo(ix + 1 * ic, iy - 6 * ic); ctx.lineTo(ix - 3 * ic, iy + 1 * ic);
+            ctx.lineTo(ix, iy); ctx.lineTo(ix - 1 * ic, iy + 6 * ic);
+            ctx.lineTo(ix + 3 * ic, iy - 1 * ic); ctx.lineTo(ix, iy);
             ctx.closePath(); ctx.fill();
           }
 
           ctx.font = `bold ${Math.round(11 * ts)}px Orbitron, Arial`;
           ctx.textAlign = 'left';
-          ctx.fillText(`${Math.ceil(pu.timer)}s`, 32 * ts, puY + 16 * ts);
+          ctx.fillText(`${Math.ceil(pu.timer)}s`, Math.round(32 * ts), puY + Math.round(16 * ts));
           ctx.restore();
-          puY += 28;
+          puY += Math.round(28 * ts);
         }
       });
     }
@@ -3892,13 +3897,13 @@ const Game = () => {
       ctx.globalAlpha = hAlpha;
 
       // Background pill
-      const hintW = Math.min(280, width - 40);
-      const hintH = hint.subtext ? 52 : 36;
+      const hintW = Math.min(Math.round(280 * ts), width - 40);
+      const hintH = Math.round((hint.subtext ? 52 : 36) * ts);
       const hintX = width / 2 - hintW / 2;
       const hintY = height * 0.38 - hintH / 2;
       ctx.fillStyle = 'rgba(10, 8, 24, 0.85)';
       ctx.beginPath();
-      ctx.roundRect(hintX, hintY, hintW, hintH, 12);
+      ctx.roundRect(hintX, hintY, hintW, hintH, Math.round(12 * ts));
       ctx.fill();
       ctx.strokeStyle = 'rgba(147, 112, 219, 0.6)';
       ctx.lineWidth = 1.5;
@@ -3908,42 +3913,45 @@ const Game = () => {
       ctx.font = `bold ${Math.round(14 * ts)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(hint.text, width / 2, hintY + (hint.subtext ? 22 : 24));
+      ctx.fillText(hint.text, width / 2, hintY + Math.round((hint.subtext ? 22 : 24) * ts));
 
       // Subtext
       if (hint.subtext) {
         ctx.font = `${Math.round(10 * ts)}px Orbitron, Arial`;
         ctx.fillStyle = 'rgba(200, 180, 255, 0.8)';
-        ctx.fillText(hint.subtext, width / 2, hintY + 42);
+        ctx.fillText(hint.subtext, width / 2, hintY + Math.round(42 * ts));
       }
 
       ctx.restore();
     }
 
-    // Draw mute toggle button (top right)
+    // Draw mute toggle button (top right) — scaled for iPad
     ctx.save();
-    const btnX = width - 70;
-    const btnY = 20 + safeTop;
+    const btnSize = Math.round(50 * ts);
+    const btnX = width - Math.round(70 * ts);
+    const btnY = Math.round(20 * ts) + safeTop;
     const muted = isMutedRef.current;
     ctx.fillStyle = muted ? 'rgba(100, 100, 100, 0.8)' : 'rgba(147, 112, 219, 0.8)';
     ctx.beginPath();
-    ctx.roundRect(btnX, btnY, 50, 50, 8);
+    ctx.roundRect(btnX, btnY, btnSize, btnSize, Math.round(8 * ts));
     ctx.fill();
     ctx.strokeStyle = muted ? '#666666' : '#bb88ff';
     ctx.lineWidth = 1.5;
     ctx.stroke();
+    state._muteBtnBounds = { x: btnX, y: btnY, w: btnSize, h: btnSize };
 
-    // Speaker icon
-    const sx = btnX + 16;
-    const sy = btnY + 25;
+    // Speaker icon (scaled)
+    const si = ts; // icon scale
+    const sx = btnX + Math.round(16 * si);
+    const sy = btnY + Math.round(25 * si);
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.moveTo(sx, sy - 5);
-    ctx.lineTo(sx + 8, sy - 5);
-    ctx.lineTo(sx + 15, sy - 12);
-    ctx.lineTo(sx + 15, sy + 12);
-    ctx.lineTo(sx + 8, sy + 5);
-    ctx.lineTo(sx, sy + 5);
+    ctx.moveTo(sx, sy - 5 * si);
+    ctx.lineTo(sx + 8 * si, sy - 5 * si);
+    ctx.lineTo(sx + 15 * si, sy - 12 * si);
+    ctx.lineTo(sx + 15 * si, sy + 12 * si);
+    ctx.lineTo(sx + 8 * si, sy + 5 * si);
+    ctx.lineTo(sx, sy + 5 * si);
     ctx.closePath();
     ctx.fill();
 
@@ -3952,20 +3960,20 @@ const Game = () => {
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(sx + 18, sy, 6, -0.6, 0.6);
+      ctx.arc(sx + 18 * si, sy, 6 * si, -0.6, 0.6);
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(sx + 18, sy, 11, -0.7, 0.7);
+      ctx.arc(sx + 18 * si, sy, 11 * si, -0.7, 0.7);
       ctx.stroke();
     } else {
       // Red X for muted
       ctx.strokeStyle = '#ff4444';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(sx + 20, sy - 8);
-      ctx.lineTo(sx + 32, sy + 8);
-      ctx.moveTo(sx + 32, sy - 8);
-      ctx.lineTo(sx + 20, sy + 8);
+      ctx.moveTo(sx + 20 * si, sy - 8 * si);
+      ctx.lineTo(sx + 32 * si, sy + 8 * si);
+      ctx.moveTo(sx + 32 * si, sy - 8 * si);
+      ctx.lineTo(sx + 20 * si, sy + 8 * si);
       ctx.stroke();
     }
     ctx.restore();
@@ -3973,26 +3981,30 @@ const Game = () => {
     // Draw pause button (top right, left of music button)
     if (gameStarted && !isGameOver) {
       ctx.save();
+      const pbX = width - Math.round(130 * ts);
+      const pbY = Math.round(20 * ts) + safeTop;
       ctx.fillStyle = isPausedRef.current ? 'rgba(77, 204, 255, 0.8)' : 'rgba(100, 100, 100, 0.8)';
-      ctx.fillRect(width - 130, 20 + safeTop, 50, 50);
+      ctx.fillRect(pbX, pbY, btnSize, btnSize);
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
-      ctx.strokeRect(width - 130, 20 + safeTop, 50, 50);
+      ctx.strokeRect(pbX, pbY, btnSize, btnSize);
+      state._pauseBtnBounds = { x: pbX, y: pbY, w: btnSize, h: btnSize };
 
-      // Draw pause/play icon
+      // Draw pause/play icon (scaled)
       ctx.fillStyle = '#ffffff';
+      const pi = ts;
       if (isPausedRef.current) {
         // Play triangle
         ctx.beginPath();
-        ctx.moveTo(width - 118, 32 + safeTop);
-        ctx.lineTo(width - 118, 58 + safeTop);
-        ctx.lineTo(width - 94, 45 + safeTop);
+        ctx.moveTo(pbX + Math.round(12 * pi), pbY + Math.round(12 * pi));
+        ctx.lineTo(pbX + Math.round(12 * pi), pbY + Math.round(38 * pi));
+        ctx.lineTo(pbX + Math.round(36 * pi), pbY + Math.round(25 * pi));
         ctx.closePath();
         ctx.fill();
       } else {
         // Pause bars
-        ctx.fillRect(width - 120, 32 + safeTop, 8, 26);
-        ctx.fillRect(width - 104, 32 + safeTop, 8, 26);
+        ctx.fillRect(pbX + Math.round(10 * pi), pbY + Math.round(12 * pi), Math.round(8 * pi), Math.round(26 * pi));
+        ctx.fillRect(pbX + Math.round(26 * pi), pbY + Math.round(12 * pi), Math.round(8 * pi), Math.round(26 * pi));
       }
       ctx.restore();
     }
@@ -4048,6 +4060,7 @@ const Game = () => {
       ctx.font = `bold ${Math.round(18 * pauseTs2)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.fillText('MAIN MENU', width / 2, menuBtnY + pBtnH / 2 + 6);
+      gameStateRef.current._pauseMenuBtnBounds = { x: menuBtnX, y: menuBtnY, w: pBtnW, h: pBtnH };
       ctx.restore();
     }
 
@@ -4114,8 +4127,8 @@ const Game = () => {
 
       // Countdown ring
       const ringX = width / 2;
-      const ringY = height / 2 - 38;
-      const ringR = 28;
+      const ringY = height / 2 - Math.round(38 * rvTs);
+      const ringR = Math.round(28 * rvTs);
       const timerPct = Math.max(0, state.reviveTimer / 5.0);
 
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
@@ -4132,13 +4145,13 @@ const Game = () => {
 
       ctx.font = `bold ${Math.round(22 * rvTs)}px Orbitron, Arial`;
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(Math.ceil(state.reviveTimer), ringX, ringY + 8);
+      ctx.fillText(Math.ceil(state.reviveTimer), ringX, ringY + Math.round(8 * rvTs));
 
       // Revive button
       const revBtnW = Math.round(180 * rvTs);
       const revBtnH = Math.round(50 * rvTs);
       const revBtnX = width / 2 - revBtnW / 2;
-      const revBtnY = height / 2 + 12;
+      const revBtnY = height / 2 + Math.round(12 * rvTs);
       const btnPulse = 0.96 + Math.sin(Date.now() / 150) * 0.04;
 
       ctx.save();
@@ -4538,20 +4551,20 @@ const Game = () => {
       if (showShopRef.current) {
         // === SHOP UI ===
         const shopSafeBot = gameStateRef.current.safeBottom || 0;
-        const footerH = 80 + shopSafeBot;
-        const headerH = 140; // taller to fit tabs
+        const footerH = Math.round(80 * shopTs) + shopSafeBot;
+        const headerH = Math.round(140 * shopTs); // taller to fit tabs
         const activeTab = shopTabRef.current;
 
         // --- Tab-dependent content ---
         const shopSmall = width < 380;
         const cols = shopSmall ? 1 : 2;
-        const cardGap = shopSmall ? 10 : 15;
+        const cardGap = Math.round((shopSmall ? 10 : 15) * shopTs);
         const now = Date.now();
 
         if (activeTab === 'skins') {
           const skinKeys = Object.keys(BirdSkins);
-          const cardW = shopSmall ? Math.min(width - 40, 200) : 160;
-          const cardH = 80;
+          const cardW = shopSmall ? Math.min(width - 40, Math.round(200 * shopTs)) : Math.round(160 * shopTs);
+          const cardH = Math.round(80 * shopTs);
           const startXSk = width / 2 - (cols * cardW + (cols - 1) * cardGap) / 2;
           const gridStartY = headerH;
           const totalRows = Math.ceil(skinKeys.length / cols);
@@ -4665,8 +4678,8 @@ const Game = () => {
         } else {
           // === TRAILS TAB ===
           const trailKeys = Object.keys(Trails);
-          const cardW = shopSmall ? Math.min(width - 40, 280) : Math.min(width - 30, 340);
-          const cardH = 72;
+          const cardW = shopSmall ? Math.min(width - 40, Math.round(280 * shopTs)) : Math.min(width - 30, Math.round(340 * shopTs));
+          const cardH = Math.round(72 * shopTs);
           const tCols = 1;
           const gridStartY = headerH;
           const totalRows = trailKeys.length;
@@ -4850,10 +4863,10 @@ const Game = () => {
         ctx.restore();
 
         // Tab buttons
-        const tabW = 100;
-        const tabH = 36;
-        const tabY = headerH - tabH - 10;
-        const tabGap = 12;
+        const tabW = Math.round(100 * shopTs);
+        const tabH = Math.round(36 * shopTs);
+        const tabY = headerH - tabH - Math.round(10 * shopTs);
+        const tabGap = Math.round(12 * shopTs);
         const tabs = [
           { tab: 'skins', label: 'BIRDS' },
           { tab: 'trails', label: 'TRAILS' },
@@ -4871,10 +4884,10 @@ const Game = () => {
           ctx.strokeStyle = isActive ? '#ba55d3' : '#555577';
           ctx.lineWidth = isActive ? 2 : 1;
           ctx.strokeRect(tx, tabY, tabW, tabH);
-          ctx.font = `bold 13px Orbitron, Arial`;
+          ctx.font = `bold ${Math.round(13 * shopTs)}px Orbitron, Arial`;
           ctx.textAlign = 'center';
           ctx.fillStyle = isActive ? '#ffffff' : '#888899';
-          ctx.fillText(t.label, tx + tabW / 2, tabY + tabH / 2 + 5);
+          ctx.fillText(t.label, tx + tabW / 2, tabY + tabH / 2 + Math.round(5 * shopTs));
           ctx.restore();
           tabBounds.push({ x: tx, y: tabY, w: tabW, h: tabH, tab: t.tab });
         });
@@ -4886,9 +4899,9 @@ const Game = () => {
 
         // Back button
         ctx.save();
-        const backBtnW = 160;
-        const backBtnH = 50;
-        const backBtnY = height - shopSafeBot - 68;
+        const backBtnW = Math.round(160 * shopTs);
+        const backBtnH = Math.round(50 * shopTs);
+        const backBtnY = height - shopSafeBot - Math.round(68 * shopTs);
         ctx.fillStyle = 'rgba(60, 40, 100, 0.9)';
         ctx.fillRect(width / 2 - backBtnW / 2, backBtnY, backBtnW, backBtnH);
         ctx.strokeStyle = '#9966cc';
@@ -4897,11 +4910,12 @@ const Game = () => {
         ctx.shadowColor = '#9966cc';
         ctx.strokeRect(width / 2 - backBtnW / 2, backBtnY, backBtnW, backBtnH);
         ctx.shadowBlur = 0;
-        ctx.font = 'bold 18px Orbitron, Arial';
+        ctx.font = `bold ${Math.round(18 * shopTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText('BACK', width / 2, backBtnY + 31);
+        ctx.fillText('BACK', width / 2, backBtnY + Math.round(31 * shopTs));
         ctx.restore();
+        gameStateRef.current._shopBackBtnBounds = { x: width / 2 - backBtnW / 2, y: backBtnY, w: backBtnW, h: backBtnH };
 
       } else {
         // === MAIN MENU ===
