@@ -345,8 +345,8 @@ const Game = () => {
       const deltaTime = Math.min((timestamp - gameStateRef.current.lastTime) / 1000, 0.1);
       gameStateRef.current.lastTime = timestamp;
 
-      // Periodic audio context health check — iOS suspends AudioContext after inactivity
-      if (timestamp - lastAudioCheckTime > 2000) {
+      // Periodic audio context health check — iOS can suspend AudioContext during heavy rendering
+      if (timestamp - lastAudioCheckTime > 500) {
         lastAudioCheckTime = timestamp;
         if (audioManagerRef.current) audioManagerRef.current.ensureContextRunning();
       }

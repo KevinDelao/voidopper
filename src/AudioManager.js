@@ -783,8 +783,18 @@ class AudioManager {
 
   ensureContextRunning() {
     if (!this.audioContext) return false;
-    // Don't try to auto-resume on iOS — it won't work without a user gesture.
-    // Just report whether the context is usable. The touch handler handles recovery.
+    // Attempt to resume if suspended/interrupted — during gameplay the user is
+    // actively touching the screen so the resume call is allowed on iOS.
+    if (this.audioContext.state === 'suspended' || this.audioContext.state === 'interrupted') {
+      this.audioContext.resume().then(() => {
+        // Restart music if it was playing before the interruption
+        if (this.isMusicPlaying && !this.musicIntervalId) {
+          this.isMusicPlaying = false;
+          this.startMusic(this.currentDifficulty);
+        }
+      }).catch(() => {});
+      return false;
+    }
     return this.audioContext.state === 'running';
   }
 

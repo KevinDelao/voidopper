@@ -237,15 +237,13 @@ class CosmicSerpent {
     ctx.translate(this.x, headScreenY);
     ctx.rotate(headAngle - Math.PI / 2);
 
-    // Head glow
-    const headGlow = ctx.createRadialGradient(0, -4, 0, 0, -2, 16);
-    headGlow.addColorStop(0, this.colors.core);
-    headGlow.addColorStop(0.5, this.colors.body);
-    headGlow.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = headGlow;
+    // Head glow — simple circle instead of radial gradient for performance
+    ctx.fillStyle = this.colors.body;
+    ctx.globalAlpha = 0.4 * glowPulse;
     ctx.beginPath();
     ctx.arc(0, -2, 14, 0, Math.PI * 2);
     ctx.fill();
+    ctx.globalAlpha = 1;
 
     // Head mask shape
     ctx.fillStyle = this.colors.body;
