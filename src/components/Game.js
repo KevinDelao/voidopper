@@ -1771,9 +1771,9 @@ const Game = () => {
       }
     }
 
-    // Slow-mo: enemies/items slow down, player stays normal speed
+    // Slow-mo: enemies/items/bosses slow to a crawl, player stays normal speed
     const playerDeltaTime = rawDeltaTime;
-    const deltaTime = player.hasSlowmo ? rawDeltaTime * 0.4 : rawDeltaTime;
+    const deltaTime = player.hasSlowmo ? rawDeltaTime * 0.15 : rawDeltaTime;
     // Speed boost + mood speed modifier
     const moodSpeed = player.getSpeedMultiplier();
     const boostMult = player.hasSpeedBoost ? 1.5 : 1.0;

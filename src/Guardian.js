@@ -8,9 +8,9 @@ const MILESTONE_BOSSES = [
     name: 'STAR WHELP',
     desc: 'A fledgling star creature guards the lower void',
     color: { primary: '#4488cc', secondary: '#66bbff', glow: '#88ddff' },
-    attackPattern: 'shockwave',
+    attackPattern: 'energy_wave',
     attackInterval: 2.2,
-    attackParams: { radius: 400, speed: 200 },
+    attackParams: { waves: 2, segments: 4, speed: 140 },
     movementPattern: 'hover_drift',
     movementSpeed: 40,
     size: 28,
@@ -85,7 +85,7 @@ const MILESTONE_BOSSES = [
     color: { primary: '#ffd700', secondary: '#ffee44', glow: '#ffffff' },
     attackPattern: 'leviathan',
     attackInterval: 0.8,
-    attackParams: { burstCount: 8, burstSpeed: 170, spiralSpeed: 140, minionCount: 4, minionSpeed: 130, shockwaveRadius: 420, shockwaveSpeed: 300 },
+    attackParams: { burstCount: 8, burstSpeed: 170, spiralSpeed: 140, minionCount: 4, minionSpeed: 130 },
     movementPattern: 'figure_eight',
     movementSpeed: 70,
     size: 50,
@@ -125,9 +125,9 @@ const EASY_GUARDIANS = [
     name: 'MOON MOTH',
     desc: 'Watch the wings!',
     color: { primary: '#8866cc', secondary: '#aa88ee', glow: '#ccaaff' },
-    attackPattern: 'shockwave',
+    attackPattern: 'energy_wave',
     attackInterval: 2.5,
-    attackParams: { radius: 380, speed: 220 },
+    attackParams: { waves: 2, segments: 5, speed: 150 },
     movementPattern: 'figure_eight',
     movementSpeed: 45,
     size: 30,
@@ -200,9 +200,9 @@ const MEDIUM_GUARDIANS = [
     name: 'PHASE SHIFTER',
     desc: 'Watch the ripples!',
     color: { primary: '#ff8800', secondary: '#ffaa00', glow: '#ffcc44' },
-    attackPattern: 'shockwave',
+    attackPattern: 'energy_wave',
     attackInterval: 1.4,
-    attackParams: { radius: 400, speed: 250 },
+    attackParams: { waves: 3, segments: 5, speed: 180 },
     movementPattern: 'figure_eight',
     movementSpeed: 65,
     size: 30,
@@ -277,7 +277,7 @@ const HARD_GUARDIANS = [
     color: { primary: '#ff4400', secondary: '#ff8844', glow: '#ffcc88' },
     attackPattern: 'nova_burst',
     attackInterval: 1.8,
-    attackParams: { ringCount: 10, speed: 180, shockwaveRadius: 400, shockwaveSpeed: 300 },
+    attackParams: { ringCount: 10, speed: 180 },
     movementPattern: 'figure_eight',
     movementSpeed: 50,
     size: 38,
@@ -366,11 +366,6 @@ class Guardian {
     this.laser2Active = false;
     this.laser2Angle = 0;
     this.laser2Timer = 0;
-    this.shockwaveActive = false;
-    this.shockwaveRadius = 0;
-    this.shockwaveMaxRadius = 0;
-    this.shockwaveGaps = []; // array of gap center angles
-    this.shockwaveGapSize = Math.PI / 4.5; // ~40 degree per gap (3 gaps = ~120° total safe)
     this.vortexActive = false;
     this.vortexTimer = 0;
     this.vortexRadius = 0;
@@ -415,7 +410,6 @@ class Guardian {
       this.minions = [];
       this.laserActive = false;
       this.laser2Active = false;
-      this.shockwaveActive = false;
       this.vortexActive = false;
     }
 
@@ -505,15 +499,6 @@ class Guardian {
       const sweepSpeed = this.config.attackParams.sweepSpeed || 2;
       this.laser2Angle -= sweepSpeed * deltaTime;
       if (this.laser2Timer <= 0) this.laser2Active = false;
-    }
-
-    // Update shockwave
-    if (this.shockwaveActive) {
-      const speed = this.config.attackParams.shockwaveSpeed || this.config.attackParams.speed || 150;
-      this.shockwaveRadius += speed * deltaTime;
-      if (this.shockwaveRadius > this.shockwaveMaxRadius) {
-        this.shockwaveActive = false;
-      }
     }
 
     // Update vortex
@@ -647,14 +632,26 @@ class Guardian {
         }
         break;
       }
-      case 'shockwave': {
-        this.shockwaveActive = true;
-        this.shockwaveRadius = 0;
-        this.shockwaveMaxRadius = (params.radius || 380) * ss;
-        // Gap faces toward player with slight random offset so it's fair but not trivial
-        // 3 evenly-spaced gaps with random offset — always one nearby
-        const baseGap = Math.random() * Math.PI * 2;
-        this.shockwaveGaps = [baseGap, baseGap + Math.PI * 2 / 3, baseGap + Math.PI * 4 / 3];
+      case 'energy_wave': {
+        // Horizontal energy bars sweep toward player with gaps to dodge through
+        const waveCount = params.waves || 3;
+        const wSpeed = (params.speed || 160) * this.difficultyScale;
+        const cw = this.corridorRight - this.corridorLeft;
+        const segCount = params.segments || 5;
+        for (let w = 0; w < waveCount; w++) {
+          const waveY = this.y + w * 30 * ss;
+          const gapIdx = Math.floor(Math.random() * segCount);
+          const segW = cw / segCount;
+          for (let s = 0; s < segCount; s++) {
+            if (s === gapIdx) continue;
+            this.projectiles.push({
+              x: this.corridorLeft + (s + 0.5) * segW, y: waveY,
+              vx: 0, vy: wSpeed,
+              radius: Math.round(segW * 0.35), life: 4.0 * ss, phase: 0,
+              isWave: true,
+            });
+          }
+        }
         break;
       }
       case 'gravity_pull': {
@@ -702,7 +699,7 @@ class Guardian {
         break;
       }
       case 'nova_burst': {
-        // Ring of projectiles + shockwave
+        // Ring of projectiles + energy wave
         const ringCount = params.ringCount || 8;
         const speed = (params.speed || 160) * this.difficultyScale;
         for (let i = 0; i < ringCount; i++) {
@@ -714,12 +711,20 @@ class Guardian {
             radius: 5, life: 3.0 * ss, phase: 0,
           });
         }
-        this.shockwaveActive = true;
-        this.shockwaveRadius = 0;
-        this.shockwaveMaxRadius = (params.shockwaveRadius || 380) * ss;
-        // 3 evenly-spaced gaps with random offset — always one nearby
-        const baseGap = Math.random() * Math.PI * 2;
-        this.shockwaveGaps = [baseGap, baseGap + Math.PI * 2 / 3, baseGap + Math.PI * 4 / 3];
+        // Add energy wave bars
+        const novaCw = this.corridorRight - this.corridorLeft;
+        const novaSegs = 5;
+        const novaGap = Math.floor(Math.random() * novaSegs);
+        const novaSegW = novaCw / novaSegs;
+        for (let s = 0; s < novaSegs; s++) {
+          if (s === novaGap) continue;
+          this.projectiles.push({
+            x: this.corridorLeft + (s + 0.5) * novaSegW, y: this.y,
+            vx: 0, vy: speed * 0.8,
+            radius: Math.round(novaSegW * 0.35), life: 4.0 * ss, phase: 0,
+            isWave: true,
+          });
+        }
         break;
       }
       case 'multi_attack': {
@@ -822,13 +827,23 @@ class Guardian {
             });
           }
         } else if (this.multiAttackPhase === 3) {
-          // Shockwave with gap
-          this.shockwaveActive = true;
-          this.shockwaveRadius = 0;
-          this.shockwaveMaxRadius = (params.shockwaveRadius || 400) * ss;
-          // 3 evenly-spaced gaps with random offset — always one nearby
-        const baseGap = Math.random() * Math.PI * 2;
-        this.shockwaveGaps = [baseGap, baseGap + Math.PI * 2 / 3, baseGap + Math.PI * 4 / 3];
+          // Energy wave barrage
+          const levCw = this.corridorRight - this.corridorLeft;
+          const levSegs = 6;
+          const levSpeed = (params.burstSpeed || 150) * scale;
+          for (let w = 0; w < 2; w++) {
+            const levGap = Math.floor(Math.random() * levSegs);
+            const levSegW = levCw / levSegs;
+            for (let s = 0; s < levSegs; s++) {
+              if (s === levGap) continue;
+              this.projectiles.push({
+                x: this.corridorLeft + (s + 0.5) * levSegW, y: this.y + w * 30 * ss,
+                vx: 0, vy: levSpeed,
+                radius: Math.round(levSegW * 0.35), life: 4.0 * ss, phase: 0,
+                isWave: true,
+              });
+            }
+          }
         } else {
           // Dual laser
           this.laserActive = true;
@@ -952,27 +967,6 @@ class Guardian {
       }
     }
 
-    // Shockwave ring with gaps — player can dodge through any opening
-    if (this.shockwaveActive) {
-      const sdx = player.x - this.x;
-      const sdy = player.y - this.y;
-      const sdist = Math.sqrt(sdx * sdx + sdy * sdy);
-      if (Math.abs(sdist - this.shockwaveRadius) < 10 + player.radius) {
-        const playerAngle = Math.atan2(sdy, sdx);
-        let inGap = false;
-        for (const gapAngle of this.shockwaveGaps) {
-          let angleDiff = playerAngle - gapAngle;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-          if (Math.abs(angleDiff) < this.shockwaveGapSize / 2) {
-            inGap = true;
-            break;
-          }
-        }
-        if (!inGap) return 'shockwave';
-      }
-    }
-
     // Hydra heads
     for (const h of this.heads) {
       const hx = this.x + Math.cos(h.angle) * h.dist;
@@ -1036,19 +1030,35 @@ class Guardian {
     if (this.projectiles.length > 0) {
       this.projectiles.forEach(p => {
         const py = p.y - cameraY;
-        const r = p.radius + Math.sin(p.phase) * 1.5;
         ctx.globalAlpha = alpha;
-        // Homing projectiles glow differently
-        if (p.homing) {
-          ctx.fillStyle = '#ff4488';
+        if (p.isWave) {
+          // Energy wave — glowing horizontal bar
+          const barW = p.radius * 2;
+          const barH = 6 * ts;
+          const pulse = 0.7 + Math.sin(p.phase * 3) * 0.3;
+          ctx.fillStyle = this.color.glow;
+          ctx.globalAlpha = alpha * 0.3 * pulse;
+          ctx.fillRect(p.x - barW / 2 - 2, py - barH, barW + 4, barH * 2);
+          ctx.globalAlpha = alpha * 0.8 * pulse;
+          ctx.fillStyle = this.color.secondary;
+          ctx.fillRect(p.x - barW / 2, py - barH / 2, barW, barH);
+          ctx.fillStyle = '#ffffff';
+          ctx.globalAlpha = alpha * 0.5 * pulse;
+          ctx.fillRect(p.x - barW / 2, py - 1, barW, 2);
+        } else {
+          const r = p.radius + Math.sin(p.phase) * 1.5;
+          // Homing projectiles glow differently
+          if (p.homing) {
+            ctx.fillStyle = '#ff4488';
+            ctx.beginPath();
+            ctx.arc(p.x, py, r + 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.fillStyle = this.color.glow;
           ctx.beginPath();
-          ctx.arc(p.x, py, r + 2, 0, Math.PI * 2);
+          ctx.arc(p.x, py, r, 0, Math.PI * 2);
           ctx.fill();
         }
-        ctx.fillStyle = this.color.glow;
-        ctx.beginPath();
-        ctx.arc(p.x, py, r, 0, Math.PI * 2);
-        ctx.fill();
       });
       ctx.globalAlpha = 1;
     }
@@ -1104,43 +1114,6 @@ class Guardian {
       ctx.stroke();
       ctx.restore();
     });
-
-    // Draw shockwave ring with multiple visible gaps
-    if (this.shockwaveActive && this.shockwaveGaps.length > 0) {
-      const swAlpha = 1 - (this.shockwaveRadius / this.shockwaveMaxRadius);
-      const halfGap = this.shockwaveGapSize / 2;
-      const sx = this.x;
-      const sy = this.y - cameraY;
-      const sr = this.shockwaveRadius;
-
-      // Sort gaps to draw solid arcs between them
-      const sorted = this.shockwaveGaps.slice().sort((a, b) => a - b);
-
-      // Draw solid arcs (dangerous segments between gaps)
-      ctx.strokeStyle = this.color.glow;
-      ctx.lineWidth = 4 * ts * swAlpha;
-      ctx.globalAlpha = swAlpha * 0.6;
-      for (let i = 0; i < sorted.length; i++) {
-        const arcStart = sorted[i] + halfGap;
-        const arcEnd = sorted[(i + 1) % sorted.length] - halfGap;
-        ctx.beginPath();
-        ctx.arc(sx, sy, sr, arcStart, i + 1 < sorted.length ? arcEnd : arcEnd + Math.PI * 2);
-        ctx.stroke();
-      }
-
-      // Draw green dashed gap markers (safe openings)
-      ctx.globalAlpha = swAlpha * 0.25;
-      ctx.strokeStyle = '#44ff88';
-      ctx.lineWidth = 2 * ts;
-      ctx.setLineDash([4 * ts, 6 * ts]);
-      for (const gapAngle of sorted) {
-        ctx.beginPath();
-        ctx.arc(sx, sy, sr, gapAngle - halfGap, gapAngle + halfGap);
-        ctx.stroke();
-      }
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
-    }
 
     // Draw hydra heads
     this.heads.forEach(h => {
