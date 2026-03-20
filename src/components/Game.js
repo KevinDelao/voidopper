@@ -1034,7 +1034,11 @@ const Game = () => {
       // Initialize audio on first keyboard interaction
       if (audioManagerRef.current && !audioManagerRef.current.isInitialized) {
         await audioManagerRef.current.initialize();
-        await audioManagerRef.current.startMusic(difficultyRef.current);
+        if (gameStarted && !isGameOver) {
+          await audioManagerRef.current.startMusic(difficultyRef.current);
+        } else {
+          await audioManagerRef.current.startMenuMusic();
+        }
         setIsMusicPlaying(true);
       }
 
@@ -1120,6 +1124,9 @@ const Game = () => {
       am._wasGameMusicPlaying = am.isMusicPlaying;
       am._wasMenuMusicPlaying = am.isMenuMusicPlaying;
       am._savedDifficulty = am.currentDifficulty;
+      // Stop music intervals so oscillators don't pile up in background
+      if (am.isMusicPlaying) am.stopMusic();
+      if (am.isMenuMusicPlaying) am.stopMenuMusic();
       // Mark that the next touch needs to reinitialize audio from scratch
       am._needsResume = true;
     };
@@ -2724,13 +2731,15 @@ const Game = () => {
     state.runStats.maxCombo = Math.max(state.runStats.maxCombo, state.combo);
     if (player.getMoodTier() === 'onfire') state.runStats.reachedOnFire = true;
     // Mood hint on first tier-up + mood tier change sounds
-    if (player.moodFlashDir > 0 && player.getMoodTier() === 'firedup') {
+    // Only trigger on the first frame of a tier change (moodFlashTimer near its initial value)
+    const moodJustChanged = player.moodFlashTimer > 0.35;
+    if (moodJustChanged && player.moodFlashDir > 0 && player.getMoodTier() === 'firedup') {
       showHint(state, 'mood', 'MOOD RISING!', 'High mood = faster speed & more coins');
     }
-    if (player.moodFlashDir > 0 && player.getMoodTier() === 'onfire' && audioManagerRef.current && audioManagerRef.current.playMoodIgnitionSound) {
+    if (moodJustChanged && player.moodFlashDir > 0 && player.getMoodTier() === 'onfire' && audioManagerRef.current && audioManagerRef.current.playMoodIgnitionSound) {
       audioManagerRef.current.playMoodIgnitionSound();
     }
-    if (player.moodFlashDir < 0 && player.getMoodTier() === 'chill' && audioManagerRef.current && audioManagerRef.current.playMoodChillSound) {
+    if (moodJustChanged && player.moodFlashDir < 0 && player.getMoodTier() === 'chill' && audioManagerRef.current && audioManagerRef.current.playMoodChillSound) {
       audioManagerRef.current.playMoodChillSound();
     }
 
@@ -4614,48 +4623,48 @@ const Game = () => {
             ctx.restore();
 
             ctx.save();
-            Player.drawPreview(ctx, cx + 30, cy + cardH / 2 + 2, skin, now, key);
+            Player.drawPreview(ctx, cx + Math.round(30 * shopTs), cy + cardH / 2 + 2, skin, now, key, undefined, shopTs);
             ctx.restore();
 
             if (isPremium) {
               ctx.save();
-              ctx.font = 'bold 9px Orbitron, Arial';
+              ctx.font = `bold ${Math.round(9 * shopTs)}px Orbitron, Arial`;
               ctx.textAlign = 'center';
               ctx.fillStyle = '#ffaa00';
               ctx.shadowBlur = 4;
               ctx.shadowColor = '#ffaa00';
-              ctx.fillText('PREMIUM', cx + 30, cy + 12);
+              ctx.fillText('PREMIUM', cx + Math.round(30 * shopTs), cy + Math.round(12 * shopTs));
               ctx.shadowBlur = 0;
               ctx.restore();
             }
 
             ctx.save();
-            ctx.font = 'bold 13px Orbitron, Arial';
+            ctx.font = `bold ${Math.round(13 * shopTs)}px Orbitron, Arial`;
             ctx.textAlign = 'left';
             ctx.shadowBlur = 4;
             ctx.shadowColor = isSelected ? '#ba55d3' : '#444466';
             ctx.fillStyle = isPremium ? '#ffdd88' : '#ffffff';
-            ctx.fillText(skin.name, cx + 55, cy + 30);
+            ctx.fillText(skin.name, cx + Math.round(55 * shopTs), cy + Math.round(30 * shopTs));
             ctx.restore();
 
             ctx.save();
-            ctx.font = 'bold 11px Orbitron, Arial';
+            ctx.font = `bold ${Math.round(11 * shopTs)}px Orbitron, Arial`;
             ctx.textAlign = 'left';
             if (isSelected) {
               ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
               ctx.fillStyle = '#44ff88';
-              ctx.fillText('EQUIPPED', cx + 55, cy + 50);
+              ctx.fillText('EQUIPPED', cx + Math.round(55 * shopTs), cy + Math.round(50 * shopTs));
             } else if (isUnlocked) {
               ctx.fillStyle = '#bbbbcc';
-              ctx.fillText('TAP TO EQUIP', cx + 55, cy + 50);
+              ctx.fillText('TAP TO EQUIP', cx + Math.round(55 * shopTs), cy + Math.round(50 * shopTs));
             } else if (totalCoinsRef.current >= skin.cost) {
               ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
               ctx.fillStyle = '#44ff88';
-              ctx.fillText(`${skin.cost} coins`, cx + 55, cy + 50);
+              ctx.fillText(`${skin.cost} coins`, cx + Math.round(55 * shopTs), cy + Math.round(50 * shopTs));
             } else {
               ctx.shadowBlur = 4; ctx.shadowColor = '#ff4444';
               ctx.fillStyle = '#ff6666';
-              ctx.fillText(`${skin.cost} coins`, cx + 55, cy + 50);
+              ctx.fillText(`${skin.cost} coins`, cx + Math.round(55 * shopTs), cy + Math.round(50 * shopTs));
             }
             ctx.restore();
 
@@ -4729,86 +4738,88 @@ const Game = () => {
             ctx.restore();
 
             // Trail preview — color swatches
-            const previewX = cx + 12;
+            const previewX = cx + Math.round(12 * shopTs);
             const previewY = cy + cardH / 2;
             const colors = trail.colors && trail.colors.length > 0 ? trail.colors : ['#888888'];
+            const dotR = Math.round(4 * shopTs);
+            const dotSpacing = Math.round(9 * shopTs);
             if (trail.type === 'default') {
               ctx.fillStyle = '#666688';
-              ctx.fillRect(previewX, previewY - 10, 36, 20);
-              ctx.font = 'bold 10px Orbitron, Arial';
+              ctx.fillRect(previewX, previewY - Math.round(10 * shopTs), Math.round(36 * shopTs), Math.round(20 * shopTs));
+              ctx.font = `bold ${Math.round(10 * shopTs)}px Orbitron, Arial`;
               ctx.textAlign = 'center';
               ctx.fillStyle = '#aaaacc';
-              ctx.fillText('---', previewX + 18, previewY + 4);
+              ctx.fillText('---', previewX + Math.round(18 * shopTs), previewY + Math.round(4 * shopTs));
             } else {
               // Animated color dots
               for (let ci = 0; ci < Math.min(colors.length, 4); ci++) {
-                const dotX = previewX + 6 + ci * 9;
-                const dotY = previewY - 4 + Math.sin(now / 300 + ci) * 3;
+                const dotX = previewX + Math.round(6 * shopTs) + ci * dotSpacing;
+                const dotY = previewY - Math.round(4 * shopTs) + Math.sin(now / 300 + ci) * Math.round(3 * shopTs);
                 ctx.beginPath();
-                ctx.arc(dotX, dotY, 4, 0, Math.PI * 2);
+                ctx.arc(dotX, dotY, dotR, 0, Math.PI * 2);
                 ctx.fillStyle = colors[ci];
                 ctx.fill();
               }
               // Small label for type
               ctx.save();
-              ctx.font = '8px Orbitron, Arial';
+              ctx.font = `${Math.round(8 * shopTs)}px Orbitron, Arial`;
               ctx.textAlign = 'center';
               ctx.fillStyle = 'rgba(255,255,255,0.35)';
-              ctx.fillText(trail.type.toUpperCase(), previewX + 18, previewY + 14);
+              ctx.fillText(trail.type.toUpperCase(), previewX + Math.round(18 * shopTs), previewY + Math.round(14 * shopTs));
               ctx.restore();
             }
 
             // Premium badge
             if (isPremium) {
               ctx.save();
-              ctx.font = 'bold 8px Orbitron, Arial';
+              ctx.font = `bold ${Math.round(8 * shopTs)}px Orbitron, Arial`;
               ctx.textAlign = 'left';
               ctx.fillStyle = '#ffaa00';
               ctx.shadowBlur = 4;
               ctx.shadowColor = '#ffaa00';
-              ctx.fillText('PREMIUM', cx + 52, cy + 14);
+              ctx.fillText('PREMIUM', cx + Math.round(52 * shopTs), cy + Math.round(14 * shopTs));
               ctx.shadowBlur = 0;
               ctx.restore();
             }
 
             // Name
             ctx.save();
-            ctx.font = 'bold 13px Orbitron, Arial';
+            ctx.font = `bold ${Math.round(13 * shopTs)}px Orbitron, Arial`;
             ctx.textAlign = 'left';
             ctx.fillStyle = isPremium ? '#ffdd88' : '#ffffff';
-            ctx.fillText(trail.name, cx + 52, cy + 28);
+            ctx.fillText(trail.name, cx + Math.round(52 * shopTs), cy + Math.round(28 * shopTs));
             ctx.restore();
 
             // Description
             ctx.save();
-            ctx.font = '10px Orbitron, Arial';
+            ctx.font = `${Math.round(10 * shopTs)}px Orbitron, Arial`;
             ctx.textAlign = 'left';
             ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            ctx.fillText(trail.desc, cx + 52, cy + 42);
+            ctx.fillText(trail.desc, cx + Math.round(52 * shopTs), cy + Math.round(42 * shopTs));
             ctx.restore();
 
             // Status / price (right side)
             ctx.save();
-            ctx.font = 'bold 11px Orbitron, Arial';
+            ctx.font = `bold ${Math.round(11 * shopTs)}px Orbitron, Arial`;
             ctx.textAlign = 'right';
             if (isEquipped) {
               ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
               ctx.fillStyle = '#44ff88';
-              ctx.fillText('EQUIPPED', cx + cardW - 12, cy + 32);
+              ctx.fillText('EQUIPPED', cx + cardW - Math.round(12 * shopTs), cy + Math.round(32 * shopTs));
             } else if (isOwned) {
               ctx.fillStyle = '#bbbbcc';
-              ctx.fillText('TAP TO EQUIP', cx + cardW - 12, cy + 32);
+              ctx.fillText('TAP TO EQUIP', cx + cardW - Math.round(12 * shopTs), cy + Math.round(32 * shopTs));
             } else if (trail.cost === 0) {
               ctx.fillStyle = '#44ff88';
-              ctx.fillText('FREE', cx + cardW - 12, cy + 32);
+              ctx.fillText('FREE', cx + cardW - Math.round(12 * shopTs), cy + Math.round(32 * shopTs));
             } else if (totalCoinsRef.current >= trail.cost) {
               ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
               ctx.fillStyle = '#44ff88';
-              ctx.fillText(`${trail.cost} coins`, cx + cardW - 12, cy + 32);
+              ctx.fillText(`${trail.cost} coins`, cx + cardW - Math.round(12 * shopTs), cy + Math.round(32 * shopTs));
             } else {
               ctx.shadowBlur = 4; ctx.shadowColor = '#ff4444';
               ctx.fillStyle = '#ff6666';
-              ctx.fillText(`${trail.cost} coins`, cx + cardW - 12, cy + 32);
+              ctx.fillText(`${trail.cost} coins`, cx + cardW - Math.round(12 * shopTs), cy + Math.round(32 * shopTs));
             }
             ctx.restore();
 
@@ -4859,7 +4870,7 @@ const Game = () => {
         ctx.shadowBlur = 10;
         ctx.shadowColor = '#ffaa00';
         ctx.fillStyle = '#ffd700';
-        ctx.fillText(`Coins: ${totalCoinsRef.current}`, width / 2, 62);
+        ctx.fillText(`Coins: ${totalCoinsRef.current}`, width / 2, Math.round(62 * shopTs));
         ctx.restore();
 
         // Tab buttons

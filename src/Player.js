@@ -94,7 +94,7 @@ class Player {
     const oldTier = this.getMoodTier();
     this.mood = Math.max(0, this.mood - amount);
     const newTier = this.getMoodTier();
-    if (newTier !== oldTier && (oldTier === 'onfire' || oldTier === 'firedup')) {
+    if (newTier !== oldTier) {
       this.moodFlashTimer = 0.4;
       this.moodFlashDir = -1;
     }
@@ -249,6 +249,10 @@ class Player {
     // Decay mood flash
     if (this.moodFlashTimer > 0) {
       this.moodFlashTimer -= deltaTime;
+      if (this.moodFlashTimer <= 0) {
+        this.moodFlashTimer = 0;
+        this.moodFlashDir = 0;
+      }
     }
 
     // Decay danger pulse
@@ -2091,7 +2095,7 @@ class Player {
 
   // ── STATIC PREVIEW for shop cards ──────────────────────
 
-  static drawPreview(ctx, x, y, skin, time, skinKey, spriteManager) {
+  static drawPreview(ctx, x, y, skin, time, skinKey, spriteManager, displayScale) {
     // 2x offscreen canvas for sharp skin previews
     const pScale = 2;
     const pLogSize = 48;
@@ -2332,8 +2336,10 @@ class Player {
       ctx.shadowBlur = 8 * pulse;
       ctx.shadowColor = glowColor;
     }
-    const pHalf = pLogSize / 2;
-    ctx.drawImage(pc, -pHalf, -pHalf, pLogSize, pLogSize);
+    const ds = displayScale || 1;
+    const drawSize = pLogSize * ds;
+    const dHalf = drawSize / 2;
+    ctx.drawImage(pc, -dHalf, -dHalf, drawSize, drawSize);
     ctx.restore();
   }
 }

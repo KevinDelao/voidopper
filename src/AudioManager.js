@@ -15,12 +15,30 @@ class AudioManager {
     this.currentDifficulty = 'medium';
     this.voidStormOsc = null;
     this.voidStormGain = null;
+    this._isInGame = false;
 
     try { this.isMuted = localStorage.getItem('voidHopper_muted') === 'true'; } catch { this.isMuted = false; }
 
     // Music settings
     this.baseFrequency = 220; // A3
     this.tempo = 0.8;
+
+    // SFX debounce — minimum ms between consecutive plays of the same sound
+    this._sfxLastPlayed = {};
+    this._sfxCooldowns = {
+      boost: 80,
+      bounce: 80,
+      collision: 100,
+      scoreMilestone: 150,
+      coinPickup: 50,
+      nearMiss: 100,
+      comboTierUp: 120,
+      moodIgnition: 400,
+      moodChill: 400,
+    };
+
+    // Cached noise buffers (created on first init)
+    this._noiseBuffers = {};
   }
 
   async initialize() {
@@ -63,6 +81,13 @@ class AudioManager {
         this.masterGain.gain.value = 0;
       }
 
+      // Pre-generate noise buffers for SFX reuse
+      this._noiseBuffers = {
+        boost: this._createNoiseBuffer(0.2),
+        collision: this._createNoiseBuffer(0.3),
+        nearMiss: this._createNoiseBuffer(0.15),
+      };
+
       this.isInitialized = true;
     } catch (error) {
       if (this.audioContext) {
@@ -72,29 +97,63 @@ class AudioManager {
     }
   }
 
+  // SFX debounce — returns true if the sound should be skipped (too soon since last play)
+  _sfxThrottled(name) {
+    const now = performance.now();
+    const cooldown = this._sfxCooldowns[name] || 50;
+    if (now - (this._sfxLastPlayed[name] || 0) < cooldown) return true;
+    this._sfxLastPlayed[name] = now;
+    return false;
+  }
+
+  // Create a reusable noise buffer of given duration (seconds)
+  _createNoiseBuffer(duration) {
+    if (!this.audioContext) return null;
+    const length = this.audioContext.sampleRate * duration;
+    const buffer = this.audioContext.createBuffer(1, length, this.audioContext.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    return buffer;
+  }
+
   // Nuclear option for iOS: tear down everything and rebuild from scratch.
   // Called inside a user gesture (touchstart) so the new AudioContext is allowed to play.
   async forceReinitialize() {
     // Kill all running oscillators and intervals
+    this._stopWatchdog();
     if (this.musicIntervalId) { clearInterval(this.musicIntervalId); this.musicIntervalId = null; }
     if (this.menuMusicIntervalId) { clearInterval(this.menuMusicIntervalId); this.menuMusicIntervalId = null; }
     this.musicTimeouts.forEach(t => clearTimeout(t));
     this.musicTimeouts = [];
-    [...this.musicOscillators, ...this.menuMusicOscillators].forEach(({ osc, gain }) => {
+    [...this.musicOscillators, ...this.menuMusicOscillators].forEach(({ osc, gain, filters }) => {
       try { osc.stop(); } catch (e) {}
       try { osc.disconnect(); } catch (e) {}
       try { gain.disconnect(); } catch (e) {}
+      if (filters) filters.forEach(f => { try { f.disconnect(); } catch (e) {} });
     });
     this.musicOscillators = [];
     this.menuMusicOscillators = [];
     this.isMusicPlaying = false;
     this.isMenuMusicPlaying = false;
+    // Clean up void storm oscillator
+    if (this.voidStormOsc) {
+      try { this.voidStormOsc.stop(); } catch (e) {}
+      try { this.voidStormOsc.disconnect(); } catch (e) {}
+    }
+    if (this.voidStormGain) {
+      try { this.voidStormGain.disconnect(); } catch (e) {}
+    }
+    this.voidStormOsc = null;
+    this.voidStormGain = null;
     // Close the old context entirely
     if (this.audioContext && this.audioContext.state !== 'closed') {
       try { this.audioContext.close(); } catch (e) {}
     }
     this.audioContext = null;
     this.isInitialized = false;
+    this._noiseBuffers = {};
     // Create a brand new context (inside user gesture = iOS allows it)
     await this.initialize();
   }
@@ -106,10 +165,11 @@ class AudioManager {
   _replaceMusicGain() {
     if (!this.audioContext || !this.masterGain) return;
     // Stop all tracked oscillators so they don't consume CPU
-    [...this.musicOscillators, ...this.menuMusicOscillators].forEach(({ osc, gain }) => {
+    [...this.musicOscillators, ...this.menuMusicOscillators].forEach(({ osc, gain, filters }) => {
       try { osc.stop(); } catch (e) {}
       try { osc.disconnect(); } catch (e) {}
       try { gain.disconnect(); } catch (e) {}
+      if (filters) filters.forEach(f => { try { f.disconnect(); } catch (e) {} });
     });
     // Disconnect old musicGain so any untracked oscillators still connected go silent
     if (this.musicGain) {
@@ -134,7 +194,9 @@ class AudioManager {
     this._replaceMusicGain();
 
     this.isMusicPlaying = true;
+    this._isInGame = true;
     this.currentDifficulty = difficulty || 'medium';
+    this._startWatchdog();
 
     // Fade in the fresh musicGain cleanly from silence
     const now = this.audioContext.currentTime;
@@ -196,7 +258,7 @@ class AudioManager {
         gain.connect(this.musicGain);
         osc.start(now);
         osc.stop(now + SUSTAIN);
-        this.musicOscillators.push({ osc, gain, stopTime: now + SUSTAIN });
+        this._trackOsc(this.musicOscillators, osc, gain, now + SUSTAIN);
 
         // Warm octave above — very soft
         const high = this.audioContext.createOscillator();
@@ -211,7 +273,7 @@ class AudioManager {
         highGain.connect(this.musicGain);
         high.start(now);
         high.stop(now + SUSTAIN);
-        this.musicOscillators.push({ osc: high, gain: highGain, stopTime: now + SUSTAIN });
+        this._trackOsc(this.musicOscillators, high, highGain, now + SUSTAIN);
       });
 
       // Sub bass — gentle foundation
@@ -227,7 +289,7 @@ class AudioManager {
       subGain.connect(this.musicGain);
       sub.start(now);
       sub.stop(now + SUSTAIN);
-      this.musicOscillators.push({ osc: sub, gain: subGain, stopTime: now + SUSTAIN });
+      this._trackOsc(this.musicOscillators, sub, subGain, now + SUSTAIN);
 
       // Bright melody — bell-like sine tones, 2 notes per chord
       melody.slice(0, 2).forEach((freq, m) => {
@@ -244,7 +306,7 @@ class AudioManager {
         melGain.connect(this.musicGain);
         mel.start(now + del);
         mel.stop(stopT);
-        this.musicOscillators.push({ osc: mel, gain: melGain, stopTime: stopT });
+        this._trackOsc(this.musicOscillators, mel, melGain, stopT);
       });
 
       idx = (idx + 1) % chords.length;
@@ -308,7 +370,7 @@ class AudioManager {
       padGain.connect(this.musicGain);
       pad.start(now);
       pad.stop(now + SUSTAIN);
-      this.musicOscillators.push({ osc: pad, gain: padGain, stopTime: now + SUSTAIN });
+      this._trackOsc(this.musicOscillators, pad, padGain, now + SUSTAIN, [padFilter]);
 
       // Chord tones with shimmer
       chord.forEach((freq, i) => {
@@ -325,7 +387,7 @@ class AudioManager {
         gain.connect(this.musicGain);
         osc.start(now);
         osc.stop(now + SUSTAIN);
-        this.musicOscillators.push({ osc, gain, stopTime: now + SUSTAIN });
+        this._trackOsc(this.musicOscillators, osc, gain, now + SUSTAIN);
 
         // Octave shimmer
         const shim = this.audioContext.createOscillator();
@@ -340,7 +402,7 @@ class AudioManager {
         shimGain.connect(this.musicGain);
         shim.start(now);
         shim.stop(now + SUSTAIN);
-        this.musicOscillators.push({ osc: shim, gain: shimGain, stopTime: now + SUSTAIN });
+        this._trackOsc(this.musicOscillators, shim, shimGain, now + SUSTAIN);
       });
 
       // Melody — triangle wave, gentle
@@ -362,7 +424,7 @@ class AudioManager {
         melGain.connect(this.musicGain);
         mel.start(now + del);
         mel.stop(stopT);
-        this.musicOscillators.push({ osc: mel, gain: melGain, stopTime: stopT });
+        this._trackOsc(this.musicOscillators, mel, melGain, stopT, [melFilter]);
       });
 
       idx = (idx + 1) % chords.length;
@@ -431,7 +493,7 @@ class AudioManager {
       subGain.connect(this.musicGain);
       sub.start(now);
       sub.stop(now + SUSTAIN);
-      this.musicOscillators.push({ osc: sub, gain: subGain, stopTime: now + SUSTAIN });
+      this._trackOsc(this.musicOscillators, sub, subGain, now + SUSTAIN, [subFilter]);
 
       // Dark pad — detuned for unease
       chord.forEach((freq, i) => {
@@ -454,7 +516,7 @@ class AudioManager {
         gain.connect(this.musicGain);
         osc.start(now);
         osc.stop(now + SUSTAIN);
-        this.musicOscillators.push({ osc, gain, stopTime: now + SUSTAIN });
+        this._trackOsc(this.musicOscillators, osc, gain, now + SUSTAIN, [filter]);
       });
 
       // Eerie high overtone — distant, ghostly
@@ -476,7 +538,7 @@ class AudioManager {
       ghostGain.connect(this.musicGain);
       ghost.start(now);
       ghost.stop(now + SUSTAIN);
-      this.musicOscillators.push({ osc: ghost, gain: ghostGain, stopTime: now + SUSTAIN });
+      this._trackOsc(this.musicOscillators, ghost, ghostGain, now + SUSTAIN, [ghostFilter]);
 
       // Melody — sine wave, sparse, with reverb-like delay
       melody.slice(0, 2).forEach((freq, m) => {
@@ -494,7 +556,7 @@ class AudioManager {
         melGain.connect(this.musicGain);
         mel.start(now + del);
         mel.stop(stopT);
-        this.musicOscillators.push({ osc: mel, gain: melGain, stopTime: stopT });
+        this._trackOsc(this.musicOscillators, mel, melGain, stopT);
 
         // Echo/delay ghost note
         const echoStopT = now + del + 4;
@@ -509,7 +571,7 @@ class AudioManager {
         echoGain.connect(this.musicGain);
         echo.start(now + del + 0.4);
         echo.stop(echoStopT);
-        this.musicOscillators.push({ osc: echo, gain: echoGain, stopTime: echoStopT });
+        this._trackOsc(this.musicOscillators, echo, echoGain, echoStopT);
       });
 
       idx = (idx + 1) % chords.length;
@@ -523,40 +585,91 @@ class AudioManager {
 
   // ── SHARED MUSIC HELPERS ─────────────────────────────
 
-  // Remove oscillators that have already stopped naturally
-  _cleanupExpiredOscillators() {
+  // Hard cap — if we exceed this many live oscillators, something is stuck
+  static MAX_OSCILLATORS = 40;
+
+  // Register an oscillator for tracking. Adds onended cleanup and enforces cap.
+  // Optional filters array for BiquadFilter nodes that should be cleaned up with the oscillator.
+  _trackOsc(arr, osc, gain, stopTime, filters) {
+    osc.onended = () => {
+      try { osc.disconnect(); } catch (e) {}
+      try { gain.disconnect(); } catch (e) {}
+      if (filters) filters.forEach(f => { try { f.disconnect(); } catch (e) {} });
+    };
+    arr.push({ osc, gain, stopTime, filters });
+    // Enforce hard cap — kill oldest if too many
+    if (arr.length > AudioManager.MAX_OSCILLATORS) {
+      const excess = arr.splice(0, arr.length - AudioManager.MAX_OSCILLATORS);
+      excess.forEach(({ osc: o, gain: g, filters: fs }) => {
+        try { o.stop(); } catch (e) {}
+        try { o.disconnect(); } catch (e) {}
+        try { g.disconnect(); } catch (e) {}
+        if (fs) fs.forEach(f => { try { f.disconnect(); } catch (e) {} });
+      });
+    }
+  }
+
+  // Start a watchdog that periodically force-kills stuck oscillators
+  _startWatchdog() {
+    if (this._watchdogId) return;
+    this._watchdogId = setInterval(() => {
+      this._forceCleanup(this.musicOscillators);
+      this._forceCleanup(this.menuMusicOscillators);
+    }, 2000);
+  }
+
+  _stopWatchdog() {
+    if (this._watchdogId) {
+      clearInterval(this._watchdogId);
+      this._watchdogId = null;
+    }
+  }
+
+  // Force-disconnect oscillators past their stopTime + grace period
+  _forceCleanup(arr) {
     if (!this.audioContext) return;
     const now = this.audioContext.currentTime;
     let write = 0;
-    for (let i = 0; i < this.musicOscillators.length; i++) {
-      if (this.musicOscillators[i].stopTime > now) {
-        this.musicOscillators[write++] = this.musicOscillators[i];
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i].stopTime > now) {
+        arr[write++] = arr[i];
       } else {
-        // Disconnect expired nodes from audio graph to prevent node accumulation
-        const { osc, gain } = this.musicOscillators[i];
+        const { osc, gain, filters } = arr[i];
+        try { osc.stop(); } catch (e) {}
         try { osc.disconnect(); } catch (e) {}
         try { gain.disconnect(); } catch (e) {}
+        if (filters) filters.forEach(f => { try { f.disconnect(); } catch (e) {} });
       }
     }
-    this.musicOscillators.length = write;
+    arr.length = write;
+  }
+
+  // Remove oscillators that have already stopped naturally
+  _cleanupExpiredOscillators() {
+    this._forceCleanup(this.musicOscillators);
   }
 
   _stopGameOscillators(fadeDuration = 1.5) {
     if (!this.audioContext) return;
     const now = this.audioContext.currentTime;
-    this.musicOscillators.forEach(({ osc, gain }) => {
+    const oscs = this.musicOscillators.splice(0);
+    oscs.forEach(({ osc, gain }) => {
       try {
         gain.gain.cancelScheduledValues(now);
         gain.gain.setValueAtTime(gain.gain.value, now);
         gain.gain.linearRampToValueAtTime(0, now + fadeDuration);
         osc.stop(now + fadeDuration + 0.1);
-        // Disconnect nodes after fade to prevent audio graph leak
-        setTimeout(() => {
-          try { osc.disconnect(); gain.disconnect(); } catch (e) {}
-        }, (fadeDuration + 0.2) * 1000);
       } catch (e) {}
     });
-    this.musicOscillators = [];
+    // Hard-kill after fade duration as safety net (iOS gain ramps can fail)
+    setTimeout(() => {
+      oscs.forEach(({ osc, gain, filters }) => {
+        try { osc.stop(); } catch (e) {}
+        try { osc.disconnect(); } catch (e) {}
+        try { gain.disconnect(); } catch (e) {}
+        if (filters) filters.forEach(f => { try { f.disconnect(); } catch (e) {} });
+      });
+    }, (fadeDuration + 0.5) * 1000);
   }
 
   stopMusic() {
@@ -590,10 +703,17 @@ class AudioManager {
     if (this.isMusicPlaying || this.isMenuMusicPlaying) {
       this.stopMusic();
       this.stopMenuMusic();
+      return false;
     } else {
-      await this.startMusic(this.currentDifficulty);
+      // Context-aware: start the right music type
+      if (this._isInGame) {
+        await this.startMusic(this.currentDifficulty);
+        return this.isMusicPlaying;
+      } else {
+        await this.startMenuMusic();
+        return this.isMenuMusicPlaying;
+      }
     }
-    return this.isMusicPlaying;
   }
 
   // ── MENU MUSIC — dreamy ambient ──────────────────────
@@ -615,6 +735,8 @@ class AudioManager {
     this.musicGain.gain.linearRampToValueAtTime(0.6, menuNow + 2.0);
 
     this.isMenuMusicPlaying = true;
+    this._isInGame = false;
+    this._startWatchdog();
 
     // Ethereal chord progression: Dm9 - Bbmaj7 - Fmaj7 - Am7
     const chords = [
@@ -664,7 +786,7 @@ class AudioManager {
       padGain.connect(this.musicGain);
       pad.start(now);
       pad.stop(now + SUSTAIN);
-      this.menuMusicOscillators.push({ osc: pad, gain: padGain, stopTime: now + SUSTAIN });
+      this._trackOsc(this.menuMusicOscillators, pad, padGain, now + SUSTAIN, [padFilter]);
 
       // Chord tones
       chord.forEach((freq, i) => {
@@ -681,7 +803,7 @@ class AudioManager {
         gain.connect(this.musicGain);
         osc.start(now);
         osc.stop(now + SUSTAIN);
-        this.menuMusicOscillators.push({ osc, gain, stopTime: now + SUSTAIN });
+        this._trackOsc(this.menuMusicOscillators, osc, gain, now + SUSTAIN);
 
         // Shimmer
         const shim = this.audioContext.createOscillator();
@@ -696,7 +818,7 @@ class AudioManager {
         shimGain.connect(this.musicGain);
         shim.start(now);
         shim.stop(now + SUSTAIN);
-        this.menuMusicOscillators.push({ osc: shim, gain: shimGain, stopTime: now + SUSTAIN });
+        this._trackOsc(this.menuMusicOscillators, shim, shimGain, now + SUSTAIN);
       });
 
       // Melody
@@ -719,7 +841,7 @@ class AudioManager {
         melGain.connect(this.musicGain);
         mel.start(now + noteDelay);
         mel.stop(stopT);
-        this.menuMusicOscillators.push({ osc: mel, gain: melGain, stopTime: stopT });
+        this._trackOsc(this.menuMusicOscillators, mel, melGain, stopT, [melFilter]);
       }
 
       chordIndex = (chordIndex + 1) % chords.length;
@@ -732,36 +854,30 @@ class AudioManager {
   }
 
   _cleanupExpiredMenuOscillators() {
-    if (!this.audioContext) return;
-    const now = this.audioContext.currentTime;
-    let write = 0;
-    for (let i = 0; i < this.menuMusicOscillators.length; i++) {
-      if (this.menuMusicOscillators[i].stopTime > now) {
-        this.menuMusicOscillators[write++] = this.menuMusicOscillators[i];
-      } else {
-        const { osc, gain } = this.menuMusicOscillators[i];
-        try { osc.disconnect(); } catch (e) {}
-        try { gain.disconnect(); } catch (e) {}
-      }
-    }
-    this.menuMusicOscillators.length = write;
+    this._forceCleanup(this.menuMusicOscillators);
   }
 
   stopAllMenuOscillators(fadeDuration = 2.0) {
     if (!this.audioContext) return;
     const now = this.audioContext.currentTime;
-    this.menuMusicOscillators.forEach(({ osc, gain }) => {
+    const oscs = this.menuMusicOscillators.splice(0);
+    oscs.forEach(({ osc, gain }) => {
       try {
         gain.gain.cancelScheduledValues(now);
         gain.gain.setValueAtTime(gain.gain.value, now);
         gain.gain.linearRampToValueAtTime(0, now + fadeDuration);
         osc.stop(now + fadeDuration + 0.1);
-        setTimeout(() => {
-          try { osc.disconnect(); gain.disconnect(); } catch (e) {}
-        }, (fadeDuration + 0.2) * 1000);
       } catch (e) {}
     });
-    this.menuMusicOscillators = [];
+    // Hard-kill after fade duration as safety net (iOS gain ramps can fail)
+    setTimeout(() => {
+      oscs.forEach(({ osc, gain, filters }) => {
+        try { osc.stop(); } catch (e) {}
+        try { osc.disconnect(); } catch (e) {}
+        try { gain.disconnect(); } catch (e) {}
+        if (filters) filters.forEach(f => { try { f.disconnect(); } catch (e) {} });
+      });
+    }, (fadeDuration + 0.5) * 1000);
   }
 
   stopMenuMusic() {
@@ -830,6 +946,7 @@ class AudioManager {
 
   playBoostSound() {
     if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (this._sfxThrottled('boost')) return;
     const now = this.audioContext.currentTime;
 
     const osc1 = this.audioContext.createOscillator();
@@ -865,13 +982,8 @@ class AudioManager {
     osc2.start(now);
     osc2.stop(now + 0.25);
 
-    const noiseBuffer = this.audioContext.createBuffer(1, this.audioContext.sampleRate * 0.2, this.audioContext.sampleRate);
-    const noiseData = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < noiseBuffer.length; i++) {
-      noiseData[i] = Math.random() * 2 - 1;
-    }
     const noise = this.audioContext.createBufferSource();
-    noise.buffer = noiseBuffer;
+    noise.buffer = this._noiseBuffers.boost || this._createNoiseBuffer(0.2);
     const noiseFilter = this.audioContext.createBiquadFilter();
     noiseFilter.type = 'highpass';
     noiseFilter.frequency.setValueAtTime(2000, now);
@@ -889,6 +1001,7 @@ class AudioManager {
 
   playBounceSound() {
     if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (this._sfxThrottled('bounce')) return;
     const now = this.audioContext.currentTime;
 
     const osc1 = this.audioContext.createOscillator();
@@ -925,15 +1038,11 @@ class AudioManager {
 
   playCollisionSound() {
     if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (this._sfxThrottled('collision')) return;
     const now = this.audioContext.currentTime;
 
     const noise = this.audioContext.createBufferSource();
-    const buffer = this.audioContext.createBuffer(1, this.audioContext.sampleRate * 0.3, this.audioContext.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < buffer.length; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-    noise.buffer = buffer;
+    noise.buffer = this._noiseBuffers.collision || this._createNoiseBuffer(0.3);
     const filter = this.audioContext.createBiquadFilter();
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(1000, now);
@@ -950,6 +1059,7 @@ class AudioManager {
 
   playScoreMilestoneSound() {
     if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (this._sfxThrottled('scoreMilestone')) return;
     const now = this.audioContext.currentTime;
 
     const frequencies = [523.25, 659.25, 783.99]; // C5, E5, G5
@@ -970,6 +1080,7 @@ class AudioManager {
 
   playCoinPickupSound() {
     if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (this._sfxThrottled('coinPickup')) return;
     const now = this.audioContext.currentTime;
 
     const osc = this.audioContext.createOscillator();
@@ -1004,6 +1115,7 @@ class AudioManager {
 
   playNearMissSound() {
     if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (this._sfxThrottled('nearMiss')) return;
     const now = this.audioContext.currentTime;
 
     // Quick frequency sweep from 400Hz down to 100Hz
@@ -1028,13 +1140,8 @@ class AudioManager {
     osc.stop(now + 0.15);
 
     // Noise layer for whoosh texture
-    const noiseBuffer = this.audioContext.createBuffer(1, this.audioContext.sampleRate * 0.15, this.audioContext.sampleRate);
-    const noiseData = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < noiseBuffer.length; i++) {
-      noiseData[i] = Math.random() * 2 - 1;
-    }
     const noise = this.audioContext.createBufferSource();
-    noise.buffer = noiseBuffer;
+    noise.buffer = this._noiseBuffers.nearMiss || this._createNoiseBuffer(0.15);
     const noiseFilter = this.audioContext.createBiquadFilter();
     noiseFilter.type = 'bandpass';
     noiseFilter.frequency.setValueAtTime(1000, now);
@@ -1054,6 +1161,7 @@ class AudioManager {
 
   playComboTierUpSound(tier) {
     if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (this._sfxThrottled('comboTierUp')) return;
     const now = this.audioContext.currentTime;
 
     const baseFreq = 400 + tier * 100;
@@ -1101,6 +1209,7 @@ class AudioManager {
 
   playMoodIgnitionSound() {
     if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (this._sfxThrottled('moodIgnition')) return;
     const now = this.audioContext.currentTime;
 
     // Rising swoosh — sweep from 200Hz to 800Hz over 0.3s with increasing gain
@@ -1156,6 +1265,7 @@ class AudioManager {
 
   playMoodChillSound() {
     if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (this._sfxThrottled('moodChill')) return;
     const now = this.audioContext.currentTime;
 
     // Gentle descending tone — 600Hz down to 300Hz over 0.4s
@@ -1252,6 +1362,7 @@ class AudioManager {
   }
 
   dispose() {
+    this._stopWatchdog();
     this.stopMusic();
     this.stopMenuMusic();
     this.stopVoidStormAmbience();
