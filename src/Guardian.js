@@ -955,9 +955,11 @@ class Guardian {
     return null;
   }
 
-  draw(ctx, cameraY, safeTop = 0) {
+  draw(ctx, cameraY, safeTop = 0, screenWidth = 390) {
     const screenY = this.y - cameraY;
     const pulse = Math.sin(this.phase * 2) * 0.1 + 1;
+    // Scale factor for iPad — matches Game.js HUD scaling
+    const ts = Math.min(2, Math.max(1, screenWidth / 390));
 
     // Entrance/exit alpha
     let alpha = 1;
@@ -1123,28 +1125,28 @@ class Guardian {
       ctx.restore();
     });
 
-    // Zone progress bar
+    // Zone progress bar (scaled for iPad)
     if (!this.exiting && this.entered) {
-      const barW = 200;
-      const barH = this.isMilestone ? 6 : 4;
+      const barW = Math.round(200 * ts);
+      const barH = this.isMilestone ? Math.round(6 * ts) : Math.round(4 * ts);
       const barX = (this.corridorLeft + this.corridorRight) / 2 - barW / 2;
-      const barScreenY = 125 + safeTop;
+      const barScreenY = Math.round(125 * ts) + safeTop;
 
       ctx.save();
 
       // Milestone badge
       if (this.isMilestone) {
-        ctx.font = 'bold 10px Orbitron, Arial';
+        ctx.font = `bold ${Math.round(10 * ts)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffd700';
-        ctx.fillText('MILESTONE BOSS', (this.corridorLeft + this.corridorRight) / 2, barScreenY - 22);
+        ctx.fillText('MILESTONE BOSS', (this.corridorLeft + this.corridorRight) / 2, barScreenY - Math.round(22 * ts));
       }
 
       // Name
-      ctx.font = 'bold 13px Orbitron, Arial';
+      ctx.font = `bold ${Math.round(13 * ts)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.fillStyle = this.color.glow;
-      ctx.fillText(this.name, (this.corridorLeft + this.corridorRight) / 2, barScreenY - 10);
+      ctx.fillText(this.name, (this.corridorLeft + this.corridorRight) / 2, barScreenY - Math.round(10 * ts));
 
       // Background
       ctx.fillStyle = '#1a1a2e';
@@ -1159,7 +1161,7 @@ class Guardian {
 
       // Border
       ctx.strokeStyle = this.isMilestone ? '#ffd700' : '#ffffff44';
-      ctx.lineWidth = this.isMilestone ? 1.5 : 1;
+      ctx.lineWidth = this.isMilestone ? 1.5 * ts : ts;
       ctx.strokeRect(barX, barScreenY, barW, barH);
       ctx.restore();
     }

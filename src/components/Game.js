@@ -3580,7 +3580,7 @@ const Game = () => {
 
     // Draw guardian
     if (state.guardian && state.guardian.active) {
-      state.guardian.draw(ctx, renderCam, state.safeTop || 0);
+      state.guardian.draw(ctx, renderCam, state.safeTop || 0, width);
     }
 
     // Draw player (hide when death dance is playing — it draws its own bird)
@@ -3685,10 +3685,11 @@ const Game = () => {
       const progress = 1 - (state.milestoneTextTimer / 3.0);
       const scale = progress < 0.1 ? progress / 0.1 : 1;
       const fadeAlpha = state.milestoneTextTimer > 0.5 ? 1 : state.milestoneTextTimer / 0.5;
-      // Scale font to fit screen width with padding
-      let maxTitleSize = Math.min(42, Math.floor(width * 0.09));
+      // Scale font to fit screen width with padding (scale up for iPad)
+      const milestoneTs = Math.min(2, Math.max(1, width / 390));
+      let maxTitleSize = Math.min(Math.round(42 * milestoneTs), Math.floor(width * 0.12));
       let titleSize = Math.floor(maxTitleSize * scale);
-      const subSize = Math.floor(Math.min(22, width * 0.05) * scale);
+      const subSize = Math.floor(Math.min(Math.round(22 * milestoneTs), width * 0.06) * scale);
       const my = height * 0.35;
       ctx.globalAlpha = fadeAlpha;
       ctx.textAlign = 'center';
@@ -3719,9 +3720,10 @@ const Game = () => {
       ctx.font = `bold ${subSize}px Orbitron, Arial`;
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
       ctx.lineWidth = 3;
-      ctx.strokeText(`${state.lastMilestone}m`, width / 2, my + Math.min(38, width * 0.08));
+      const subGap = Math.min(Math.round(38 * milestoneTs), width * 0.1);
+      ctx.strokeText(`${state.lastMilestone}m`, width / 2, my + subGap);
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(`${state.lastMilestone}m`, width / 2, my + Math.min(38, width * 0.08));
+      ctx.fillText(`${state.lastMilestone}m`, width / 2, my + subGap);
       ctx.restore();
     }
 
