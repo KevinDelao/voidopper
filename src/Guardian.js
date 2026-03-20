@@ -313,11 +313,12 @@ class Guardian {
     this.isMilestone = type.isMilestone;
     this.drawStyle = type.drawStyle || 'sentinel';
 
-    // Size scaling
+    // Size scaling — scale up for wider corridors (iPad)
+    const corridorWidth = corridorRight - corridorLeft;
+    const sizeScale = Math.max(1, corridorWidth / 330); // 330px is typical iPhone corridor
     const growthPerEncounter = type.isMilestone ? 0 : 2;
     const maxGrowth = Math.min(guardianIndex * growthPerEncounter, 12);
-    this.radius = type.size + maxGrowth;
-    const corridorWidth = corridorRight - corridorLeft;
+    this.radius = (type.size + maxGrowth) * sizeScale;
     if (this.radius * 2 > corridorWidth * 0.6) {
       this.radius = corridorWidth * 0.3;
     }
@@ -429,6 +430,9 @@ class Guardian {
     // Track camera — position at 40% from top so attacks can reach player at 75%
     const targetY = cameraY + screenHeight * 0.4;
     this.y = targetY;
+
+    // Screen scale factor — attacks sized for iPhone 844px, scale up for iPad
+    this.screenScale = Math.max(1, screenHeight / 844);
 
     // Movement
     this._updateMovement(deltaTime, playerX, playerY);
@@ -569,6 +573,7 @@ class Guardian {
 
   _executeAttack(playerX, playerY) {
     const params = this.config.attackParams;
+    const ss = this.screenScale || 1; // screen scale for iPad
 
     switch (this.config.attackPattern) {
       case 'slow_burst':
@@ -583,7 +588,7 @@ class Guardian {
             x: this.x, y: this.y,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
-            radius: 4, life: 2.5, phase: 0,
+            radius: 4, life: 2.5 * ss, phase: 0,
           });
         }
         break;
@@ -597,7 +602,7 @@ class Guardian {
             x: this.x + offsetX, y: this.y,
             vx: (Math.random() - 0.5) * 30,
             vy: speed * 0.8,
-            radius: 6, life: 3.0, phase: 0,
+            radius: 6, life: 3.0 * ss, phase: 0,
           });
         }
         break;
@@ -610,7 +615,7 @@ class Guardian {
           x: this.x, y: this.y,
           vx: Math.cos(this.spiralAngle) * speed,
           vy: Math.sin(this.spiralAngle) * speed,
-          radius: r, life: 3.0, phase: 0,
+          radius: r, life: 3.0 * ss, phase: 0,
         });
         break;
       }
@@ -637,7 +642,7 @@ class Guardian {
           this.minions.push({
             x: this.x + Math.cos(angle) * 30,
             y: this.y + Math.sin(angle) * 30,
-            speed: mSpeed, radius: 8, life: 4, phase: 0,
+            speed: mSpeed, radius: 8, life: 4 * ss, phase: 0,
           });
         }
         break;
@@ -645,7 +650,7 @@ class Guardian {
       case 'shockwave': {
         this.shockwaveActive = true;
         this.shockwaveRadius = 0;
-        this.shockwaveMaxRadius = params.radius || 380;
+        this.shockwaveMaxRadius = (params.radius || 380) * ss;
         // Gap faces toward player with slight random offset so it's fair but not trivial
         this.shockwaveGapAngle = Math.atan2(playerY - this.y, playerX - this.x) + (Math.random() - 0.5) * 1.0;
         break;
@@ -653,7 +658,7 @@ class Guardian {
       case 'gravity_pull': {
         this.vortexActive = true;
         this.vortexTimer = 2.5;
-        this.vortexRadius = params.radius || 350;
+        this.vortexRadius = (params.radius || 350) * ss;
         this.vortexStrength = (params.strength || 100) * this.difficultyScale;
         break;
       }
@@ -667,7 +672,7 @@ class Guardian {
             x: this.x, y: this.y,
             vx: Math.cos(angle) * speed * 0.5,
             vy: Math.sin(angle) * speed * 0.5,
-            radius: 5, life: 3.5, phase: 0,
+            radius: 5, life: 3.5 * ss, phase: 0,
             homing: homing * this.difficultyScale,
             maxSpeed: speed,
           });
@@ -688,7 +693,7 @@ class Guardian {
               x: this.x + ox, y: this.y,
               vx: Math.cos(angle) * speed,
               vy: Math.sin(angle) * speed,
-              radius: 4, life: 3.0, phase: 0,
+              radius: 4, life: 3.0 * ss, phase: 0,
             });
           }
         });
@@ -704,12 +709,12 @@ class Guardian {
             x: this.x, y: this.y,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
-            radius: 5, life: 3.0, phase: 0,
+            radius: 5, life: 3.0 * ss, phase: 0,
           });
         }
         this.shockwaveActive = true;
         this.shockwaveRadius = 0;
-        this.shockwaveMaxRadius = params.shockwaveRadius || 380;
+        this.shockwaveMaxRadius = (params.shockwaveRadius || 380) * ss;
         this.shockwaveGapAngle = Math.atan2(playerY - this.y, playerX - this.x) + (Math.random() - 0.5) * 1.0;
         break;
       }
@@ -727,7 +732,7 @@ class Guardian {
               x: this.x, y: this.y,
               vx: Math.cos(angle) * speed,
               vy: Math.sin(angle) * speed,
-              radius: 5, life: 2.5, phase: 0,
+              radius: 5, life: 2.5 * ss, phase: 0,
             });
           }
         } else if (this.multiAttackPhase === 1) {
@@ -739,7 +744,7 @@ class Guardian {
           // Vortex
           this.vortexActive = true;
           this.vortexTimer = 2.0;
-          this.vortexRadius = params.vortexRadius || 350;
+          this.vortexRadius = (params.vortexRadius || 350) * ss;
           this.vortexStrength = (params.vortexStrength || 100) * this.difficultyScale;
         }
         break;
@@ -761,7 +766,7 @@ class Guardian {
                 x: hx, y: hy,
                 vx: Math.cos(angle) * speed,
                 vy: Math.sin(angle) * speed,
-                radius: 4, life: 3.0, phase: 0,
+                radius: 4, life: 3.0 * ss, phase: 0,
               });
             }
           } else {
@@ -786,7 +791,7 @@ class Guardian {
               x: this.x, y: this.y,
               vx: Math.cos(angle) * params.spiralSpeed * scale,
               vy: Math.sin(angle) * params.spiralSpeed * scale,
-              radius: 4, life: 2.5, phase: 0,
+              radius: 4, life: 2.5 * ss, phase: 0,
             });
           }
         } else if (this.multiAttackPhase === 1) {
@@ -797,7 +802,7 @@ class Guardian {
             this.minions.push({
               x: this.x + Math.cos(angle) * 40,
               y: this.y + Math.sin(angle) * 40,
-              speed: params.minionSpeed * scale, radius: 8, life: 4, phase: 0,
+              speed: params.minionSpeed * scale, radius: 8, life: 4 * ss, phase: 0,
             });
           }
         } else if (this.multiAttackPhase === 2) {
@@ -809,14 +814,14 @@ class Guardian {
               x: this.x, y: this.y,
               vx: Math.cos(angle) * params.burstSpeed * scale,
               vy: Math.sin(angle) * params.burstSpeed * scale,
-              radius: 5, life: 2.5, phase: 0,
+              radius: 5, life: 2.5 * ss, phase: 0,
             });
           }
         } else if (this.multiAttackPhase === 3) {
           // Shockwave with gap
           this.shockwaveActive = true;
           this.shockwaveRadius = 0;
-          this.shockwaveMaxRadius = params.shockwaveRadius || 400;
+          this.shockwaveMaxRadius = (params.shockwaveRadius || 400) * ss;
           this.shockwaveGapAngle = Math.atan2(playerY - this.y, playerX - this.x) + (Math.random() - 0.5) * 1.0;
         } else {
           // Dual laser
@@ -840,7 +845,7 @@ class Guardian {
             y: this.y + (Math.random() - 0.5) * this.radius,
             vx: Math.cos(angle) * speed * (0.7 + Math.random() * 0.6),
             vy: Math.sin(angle) * speed * (0.7 + Math.random() * 0.6),
-            radius: 3 + Math.random() * 2, life: 3.5, phase: Math.random() * 6,
+            radius: 3 + Math.random() * 2, life: 3.5 * ss, phase: Math.random() * 6,
           });
         }
         break;
@@ -859,7 +864,7 @@ class Guardian {
             x: xPos, y: this.y,
             vx: 0,
             vy: speed,
-            radius: 5, life: 4.5, phase: 0,
+            radius: 5, life: 4.5 * ss, phase: 0,
           });
         }
         break;
@@ -881,7 +886,7 @@ class Guardian {
             x: spawnX, y: spawnY,
             vx: (dx / d) * speed + Math.cos(angle) * speed * 0.5,
             vy: (dy / d) * speed + Math.sin(angle) * speed * 0.5,
-            radius: 6, life: 3.5, phase: 0,
+            radius: 6, life: 3.5 * ss, phase: 0,
             homing: params.homingStrength || 40,
             maxSpeed: speed * 1.5,
           });
@@ -993,8 +998,8 @@ class Guardian {
     // Vortex visual
     if (this.vortexActive) {
       ctx.strokeStyle = 'rgba(150, 50, 200, 0.3)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 8]);
+      ctx.lineWidth = 2 * ts;
+      ctx.setLineDash([4 * ts, 8 * ts]);
       ctx.beginPath();
       ctx.arc(0, 0, this.vortexRadius, 0, Math.PI * 2);
       ctx.stroke();
@@ -1003,7 +1008,7 @@ class Guardian {
       for (let i = 0; i < 3; i++) {
         const angle = this.phase * 2 + (i * Math.PI * 2) / 3;
         ctx.strokeStyle = 'rgba(150, 50, 200, 0.2)';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.5 * ts;
         ctx.beginPath();
         for (let r = 20; r < this.vortexRadius; r += 5) {
           const a = angle + r * 0.03;
@@ -1059,10 +1064,10 @@ class Guardian {
     if (this.laser2Active) lasersToRender.push({ angle: this.laser2Angle, color: '#ff8844' });
 
     lasersToRender.forEach(l => {
-      const laserWidth = this.config.attackParams.width || this.config.attackParams.laserWidth || 4;
+      const laserWidth = (this.config.attackParams.width || this.config.attackParams.laserWidth || 4) * ts;
       const lx = Math.cos(l.angle);
       const ly = Math.sin(l.angle);
-      const len = 500;
+      const len = 500 * ts;
 
       ctx.save();
       ctx.globalAlpha = alpha;
@@ -1083,7 +1088,7 @@ class Guardian {
       ctx.stroke();
 
       ctx.strokeStyle = '#ffaaaa';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = ts;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.lineTo(lx * len, ly * len);
@@ -1098,7 +1103,7 @@ class Guardian {
       const gapAngle = this.shockwaveGapAngle;
       // Draw the solid arc (the dangerous part)
       ctx.strokeStyle = this.color.glow;
-      ctx.lineWidth = 4 * swAlpha;
+      ctx.lineWidth = 4 * ts * swAlpha;
       ctx.globalAlpha = swAlpha * 0.6;
       ctx.beginPath();
       ctx.arc(this.x, this.y - cameraY, this.shockwaveRadius, gapAngle + halfGap, gapAngle - halfGap + Math.PI * 2);
@@ -1106,8 +1111,8 @@ class Guardian {
       // Draw faint gap markers so player can see the safe opening
       ctx.globalAlpha = swAlpha * 0.2;
       ctx.strokeStyle = '#44ff88';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 6]);
+      ctx.lineWidth = 2 * ts;
+      ctx.setLineDash([4 * ts, 6 * ts]);
       ctx.beginPath();
       ctx.arc(this.x, this.y - cameraY, this.shockwaveRadius, gapAngle - halfGap, gapAngle + halfGap);
       ctx.stroke();

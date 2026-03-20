@@ -1,12 +1,15 @@
 class BlackHole {
-  constructor(x, y) {
+  constructor(x, y, screenWidth = 390) {
     this.x = x;
     this.y = y;
-    this.radius = 18; // Kill zone
+    // Scale for iPad — baseline is iPhone 390px wide
+    const ss = Math.max(1, screenWidth / 390);
+    this.radius = Math.round(18 * ss); // Kill zone
     this.active = true;
     this.isBlackHole = true;
-    this.pullRadius = 280; // Gravitational pull range — wide enough to feel
-    this.pullStrength = 500; // How hard it pulls
+    this.pullRadius = Math.round(280 * ss); // Gravitational pull range — wide enough to feel
+    this.pullStrength = 500 * ss; // How hard it pulls
+    this.screenScale = ss;
 
     // Doesn't move
     this.vy = 0;
@@ -20,14 +23,14 @@ class BlackHole {
     this.diskParticles = [];
     for (let i = 0; i < 40; i++) {
       const angle = (i / 40) * Math.PI * 2;
-      const orbitRadius = 25 + Math.random() * 20;
+      const orbitRadius = (25 + Math.random() * 20) * ss;
       this.diskParticles.push({
         angle: angle,
         radius: orbitRadius,
-        speed: (0.8 + Math.random() * 0.6) / (orbitRadius * 0.03), // Inner = faster
-        size: 1 + Math.random() * 2.5,
+        speed: (0.8 + Math.random() * 0.6) / (orbitRadius * 0.03),
+        size: (1 + Math.random() * 2.5) * ss,
         brightness: 0.4 + Math.random() * 0.6,
-        hue: Math.random() * 40 + 10, // Orange-yellow range
+        hue: Math.random() * 40 + 10,
       });
     }
 
@@ -36,10 +39,10 @@ class BlackHole {
     for (let i = 0; i < 8; i++) {
       this.debris.push({
         angle: Math.random() * Math.PI * 2,
-        radius: 30 + Math.random() * 50,
+        radius: (30 + Math.random() * 50) * ss,
         speed: 0.3 + Math.random() * 0.4,
         spiralRate: 0.1 + Math.random() * 0.1,
-        size: 1 + Math.random() * 1.5,
+        size: (1 + Math.random() * 1.5) * ss,
         alpha: 0.3 + Math.random() * 0.4,
       });
     }
@@ -58,8 +61,8 @@ class BlackHole {
     this.debris.forEach(d => {
       d.angle += d.speed * deltaTime;
       d.radius -= d.spiralRate * deltaTime * 30;
-      if (d.radius < 15) {
-        d.radius = 40 + Math.random() * 40;
+      if (d.radius < 15 * this.screenScale) {
+        d.radius = (40 + Math.random() * 40) * this.screenScale;
         d.angle = Math.random() * Math.PI * 2;
         d.alpha = 0.3 + Math.random() * 0.4;
       }

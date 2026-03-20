@@ -2083,7 +2083,7 @@ const Game = () => {
           } else if (roll < 0.7) {
             enemy = new CosmicSerpent(enemyX, enemyY, spawnLeftBound, spawnRightBound);
           } else {
-            enemy = new BlackHole(enemyX, enemyY);
+            enemy = new BlackHole(enemyX, enemyY, width);
           }
         }
 
