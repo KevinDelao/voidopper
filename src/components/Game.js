@@ -4145,7 +4145,7 @@ const Game = () => {
     // Draw pause button (next to mute button, flipped for left-hand mode)
     if (gameStarted && !isGameOver) {
       ctx.save();
-      const pbX = leftHandRef.current ? Math.round(80 * ts) : width - Math.round(130 * ts);
+      const pbX = leftHandRef.current ? btnX + btnSize + Math.round(10 * ts) : width - Math.round(130 * ts);
       const pbY = Math.round(20 * ts) + safeTop;
       ctx.fillStyle = isPausedRef.current ? 'rgba(77, 204, 255, 0.8)' : 'rgba(100, 100, 100, 0.8)';
       ctx.fillRect(pbX, pbY, btnSize, btnSize);
@@ -5085,18 +5085,22 @@ const Game = () => {
 
       } else if (showSettingsRef.current) {
         // === SETTINGS PANEL ===
-        const sTs = Math.max(1, width / 390);
+        const sTs = Math.min(1.8, Math.max(1, width / 390));
+        const sSafeTop = isMobile ? (gameStateRef.current.safeTop || 0) : 0;
         const sSafeBot = gameStateRef.current.safeBottom || 0;
         const sFooterH = Math.round(80 * sTs) + sSafeBot;
-        const sHeaderH = Math.round(80 * sTs);
+        const sHeaderH = Math.round(80 * sTs) + sSafeTop;
         const sVisibleH = height - sHeaderH - sFooterH;
-        const sPad = Math.round(14 * sTs);
-        const sRowH = Math.round(50 * sTs);
-        const sMaxW = Math.min(width - 30, Math.round(340 * sTs));
+        const sPad = Math.round(16 * sTs);
+        const sRowH = Math.round(54 * sTs);
+        const sIsWide = width > 600;
+        const sMaxW = sIsWide ? Math.min(width - 60, Math.round(480 * sTs)) : Math.min(width - 30, Math.round(340 * sTs));
         const sStartX = width / 2 - sMaxW / 2;
 
-        // Total content height for scrolling
-        const sTotalH = sRowH * 9 + sPad * 10;
+        // Total content height for scrolling (3 section headers + 3 vol + 1 gfx + 3 access rows + padding)
+        const sContentRows = 10;
+        const sSectionHeaders = 3;
+        const sTotalH = sRowH * sContentRows + Math.round(24 * sTs) * sSectionHeaders + sPad * 6;
         const sMaxScroll = Math.max(0, sTotalH - sVisibleH + 10);
         if (settingsScrollRef.current > sMaxScroll) settingsScrollRef.current = sMaxScroll;
         if (settingsScrollRef.current < 0) settingsScrollRef.current = 0;
@@ -5108,7 +5112,7 @@ const Game = () => {
         ctx.font = `bold ${Math.round(22 * sTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText('SETTINGS', width / 2, sHeaderH / 2 + Math.round(8 * sTs));
+        ctx.fillText('SETTINGS', width / 2, sSafeTop + (sHeaderH - sSafeTop) / 2 + Math.round(8 * sTs));
 
         // Scrollable content area
         ctx.save();
@@ -5118,9 +5122,18 @@ const Game = () => {
 
         let sY = sHeaderH + sPad - sScrollY;
 
+        // Label width proportion — wider labels on wider screens
+        const sLabelW = sIsWide ? Math.round(130 * sTs) : Math.round(95 * sTs);
+        const sLabelFs = Math.round((sIsWide ? 14 : 11) * sTs);
+        const sBtnFs = Math.round((sIsWide ? 14 : 12) * sTs);
+        const sSmallFs = Math.round((sIsWide ? 13 : 11) * sTs);
+        const sCycleFs = Math.round((sIsWide ? 12 : 10) * sTs);
+        // Minimum touch target 44pt (Apple HIG)
+        const sMinTouch = Math.max(44, Math.round(28 * sTs));
+
         // Helper: draw section label
         const drawLabel = (text, y) => {
-          ctx.font = `bold ${Math.round(11 * sTs)}px Orbitron, Arial`;
+          ctx.font = `bold ${sLabelFs}px Orbitron, Arial`;
           ctx.textAlign = 'left';
           ctx.fillStyle = '#88aacc';
           ctx.fillText(text, sStartX, y + Math.round(14 * sTs));
@@ -5129,23 +5142,29 @@ const Game = () => {
         // Helper: draw a volume bar
         const drawVolBar = (label, value, y, boundsKey) => {
           drawLabel(label, y);
-          const barX = sStartX + Math.round(90 * sTs);
-          const barW = sMaxW - Math.round(130 * sTs);
-          const barH = Math.round(20 * sTs);
+          const barX = sStartX + sLabelW;
+          const barW = sMaxW - sLabelW - Math.round(50 * sTs);
+          const barH = Math.max(sMinTouch, Math.round(24 * sTs));
           const barY = y + Math.round(15 * sTs) - barH / 2;
           // Background
           ctx.fillStyle = 'rgba(40, 30, 60, 0.8)';
-          ctx.fillRect(barX, barY, barW, barH);
+          ctx.beginPath();
+          ctx.roundRect(barX, barY, barW, barH, Math.round(4 * sTs));
+          ctx.fill();
           // Fill
           const fillW = (value / 100) * barW;
           ctx.fillStyle = '#9966cc';
-          ctx.fillRect(barX, barY, fillW, barH);
+          ctx.beginPath();
+          ctx.roundRect(barX, barY, fillW, barH, Math.round(4 * sTs));
+          ctx.fill();
           // Border
           ctx.strokeStyle = '#666688';
           ctx.lineWidth = 1;
-          ctx.strokeRect(barX, barY, barW, barH);
+          ctx.beginPath();
+          ctx.roundRect(barX, barY, barW, barH, Math.round(4 * sTs));
+          ctx.stroke();
           // Value text
-          ctx.font = `bold ${Math.round(12 * sTs)}px Orbitron, Arial`;
+          ctx.font = `bold ${sBtnFs}px Orbitron, Arial`;
           ctx.textAlign = 'right';
           ctx.fillStyle = '#ffffff';
           ctx.fillText(`${value}%`, sStartX + sMaxW, y + Math.round(18 * sTs));
@@ -5155,16 +5174,20 @@ const Game = () => {
         // Helper: draw toggle row
         const drawToggle = (label, value, y, boundsKey) => {
           drawLabel(label, y);
-          const btnW = Math.round(70 * sTs);
-          const btnH = Math.round(28 * sTs);
+          const btnW = Math.round((sIsWide ? 90 : 70) * sTs);
+          const btnH = sMinTouch;
           const btnX = sStartX + sMaxW - btnW;
           const btnY = y + Math.round(15 * sTs) - btnH / 2;
           ctx.fillStyle = value ? 'rgba(68, 204, 102, 0.8)' : 'rgba(60, 40, 80, 0.8)';
-          ctx.fillRect(btnX, btnY, btnW, btnH);
+          ctx.beginPath();
+          ctx.roundRect(btnX, btnY, btnW, btnH, Math.round(6 * sTs));
+          ctx.fill();
           ctx.strokeStyle = value ? '#44cc66' : '#555577';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(btnX, btnY, btnW, btnH);
-          ctx.font = `bold ${Math.round(11 * sTs)}px Orbitron, Arial`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(btnX, btnY, btnW, btnH, Math.round(6 * sTs));
+          ctx.stroke();
+          ctx.font = `bold ${sSmallFs}px Orbitron, Arial`;
           ctx.textAlign = 'center';
           ctx.fillStyle = '#ffffff';
           ctx.fillText(value ? 'ON' : 'OFF', btnX + btnW / 2, btnY + btnH / 2 + Math.round(4 * sTs));
@@ -5174,28 +5197,35 @@ const Game = () => {
         // Helper: draw cycle button row
         const drawCycle = (label, value, y, boundsKey) => {
           drawLabel(label, y);
-          const btnW = Math.round(140 * sTs);
-          const btnH = Math.round(28 * sTs);
+          const btnW = Math.round((sIsWide ? 180 : 140) * sTs);
+          const btnH = sMinTouch;
           const btnX = sStartX + sMaxW - btnW;
           const btnY = y + Math.round(15 * sTs) - btnH / 2;
           ctx.fillStyle = 'rgba(40, 30, 60, 0.8)';
-          ctx.fillRect(btnX, btnY, btnW, btnH);
+          ctx.beginPath();
+          ctx.roundRect(btnX, btnY, btnW, btnH, Math.round(6 * sTs));
+          ctx.fill();
           ctx.strokeStyle = '#88aacc';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(btnX, btnY, btnW, btnH);
-          ctx.font = `bold ${Math.round(10 * sTs)}px Orbitron, Arial`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(btnX, btnY, btnW, btnH, Math.round(6 * sTs));
+          ctx.stroke();
+          ctx.font = `bold ${sCycleFs}px Orbitron, Arial`;
           ctx.textAlign = 'center';
           ctx.fillStyle = '#ffffff';
           ctx.fillText(value.toUpperCase(), btnX + btnW / 2, btnY + btnH / 2 + Math.round(4 * sTs));
           gameStateRef.current[boundsKey] = { x: btnX, y: btnY, w: btnW, h: btnH };
         };
 
+        // Section header font size
+        const sSectionFs = Math.round((sIsWide ? 18 : 14) * sTs);
+
         // --- SECTION: AUDIO ---
-        ctx.font = `bold ${Math.round(14 * sTs)}px Orbitron, Arial`;
+        ctx.font = `bold ${sSectionFs}px Orbitron, Arial`;
         ctx.textAlign = 'left';
         ctx.fillStyle = '#bb88ff';
         ctx.fillText('AUDIO', sStartX, sY + Math.round(14 * sTs));
-        sY += Math.round(24 * sTs);
+        sY += Math.round(28 * sTs);
 
         drawVolBar('MASTER', masterVolRef.current, sY, '_settingsMasterVolBounds');
         sY += sRowH;
@@ -5205,25 +5235,29 @@ const Game = () => {
         sY += sRowH + sPad;
 
         // --- SECTION: DISPLAY ---
-        ctx.font = `bold ${Math.round(14 * sTs)}px Orbitron, Arial`;
+        ctx.font = `bold ${sSectionFs}px Orbitron, Arial`;
         ctx.textAlign = 'left';
         ctx.fillStyle = '#bb88ff';
         ctx.fillText('DISPLAY', sStartX, sY + Math.round(14 * sTs));
-        sY += Math.round(24 * sTs);
+        sY += Math.round(28 * sTs);
 
         const gfxColors = { low: '#44cc66', medium: '#ffaa22', high: '#ff4466' };
         const gfxColor = gfxColors[graphicsRef.current] || '#ffaa22';
         drawLabel('GRAPHICS', sY);
-        const gBtnW = Math.round(90 * sTs);
-        const gBtnH = Math.round(28 * sTs);
+        const gBtnW = Math.round((sIsWide ? 120 : 90) * sTs);
+        const gBtnH = sMinTouch;
         const gBtnX = sStartX + sMaxW - gBtnW;
         const gBtnY = sY + Math.round(15 * sTs) - gBtnH / 2;
         ctx.fillStyle = 'rgba(40, 30, 60, 0.8)';
-        ctx.fillRect(gBtnX, gBtnY, gBtnW, gBtnH);
+        ctx.beginPath();
+        ctx.roundRect(gBtnX, gBtnY, gBtnW, gBtnH, Math.round(6 * sTs));
+        ctx.fill();
         ctx.strokeStyle = gfxColor;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(gBtnX, gBtnY, gBtnW, gBtnH);
-        ctx.font = `bold ${Math.round(12 * sTs)}px Orbitron, Arial`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(gBtnX, gBtnY, gBtnW, gBtnH, Math.round(6 * sTs));
+        ctx.stroke();
+        ctx.font = `bold ${sBtnFs}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = gfxColor;
         ctx.fillText(graphicsRef.current.toUpperCase(), gBtnX + gBtnW / 2, gBtnY + gBtnH / 2 + Math.round(4 * sTs));
@@ -5231,11 +5265,11 @@ const Game = () => {
         sY += sRowH + sPad;
 
         // --- SECTION: ACCESSIBILITY ---
-        ctx.font = `bold ${Math.round(14 * sTs)}px Orbitron, Arial`;
+        ctx.font = `bold ${sSectionFs}px Orbitron, Arial`;
         ctx.textAlign = 'left';
         ctx.fillStyle = '#bb88ff';
         ctx.fillText('ACCESSIBILITY', sStartX, sY + Math.round(14 * sTs));
-        sY += Math.round(24 * sTs);
+        sY += Math.round(28 * sTs);
 
         const cbLabels = { none: 'NONE', deuteranopia: 'DEUTERANOPIA', protanopia: 'PROTANOPIA', tritanopia: 'TRITANOPIA' };
         drawCycle('COLOR BLIND', cbLabels[colorblindModeRef.current] || 'NONE', sY, '_settingsColorblindBounds');
@@ -5254,8 +5288,8 @@ const Game = () => {
 
         // Back button
         ctx.save();
-        const sBackW = Math.round(160 * sTs);
-        const sBackH = Math.round(50 * sTs);
+        const sBackW = Math.round((sIsWide ? 200 : 160) * sTs);
+        const sBackH = Math.max(50, Math.round(50 * sTs));
         const sBackY = height - sSafeBot - Math.round(68 * sTs);
         ctx.fillStyle = 'rgba(60, 40, 100, 0.9)';
         ctx.fillRect(width / 2 - sBackW / 2, sBackY, sBackW, sBackH);
@@ -5500,7 +5534,8 @@ const Game = () => {
         const rowStartX = width / 2 - rowW / 2;
         const shopBtnW = Math.floor(rowW * 0.48);
         const shopBtnH = Math.round((isSmallScreen ? 40 : 44) * menuTs);
-        const gfxBtnW = rowW - shopBtnW - 8;
+        const rowGap = Math.round(8 * menuTs);
+        const gfxBtnW = rowW - shopBtnW - rowGap;
 
         // Shop button
         ctx.fillStyle = 'rgba(147, 112, 219, 0.8)';
@@ -5515,7 +5550,7 @@ const Game = () => {
         gameStateRef.current._shopBtnBounds = { x: rowStartX, y: curY, w: shopBtnW, h: shopBtnH };
 
         // Settings button
-        const settingsBtnX = rowStartX + shopBtnW + 8;
+        const settingsBtnX = rowStartX + shopBtnW + rowGap;
         ctx.fillStyle = 'rgba(30, 20, 50, 0.9)';
         ctx.fillRect(settingsBtnX, curY, gfxBtnW, shopBtnH);
         ctx.strokeStyle = '#88aacc';
