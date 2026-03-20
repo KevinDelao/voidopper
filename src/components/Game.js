@@ -4812,34 +4812,50 @@ const Game = () => {
               ctx.restore();
             }
 
+            // Skin name — shrink to fit card
             ctx.save();
-            ctx.font = `bold ${Math.round(13 * shopTs)}px Orbitron, Arial`;
+            const skinTextX = cx + Math.round(55 * shopTs);
+            const skinMaxW = cx + cardW - skinTextX - Math.round(4 * shopTs);
+            let skinNameSize = Math.round(13 * shopTs);
+            ctx.font = `bold ${skinNameSize}px Orbitron, Arial`;
+            while (skinNameSize > 7 && ctx.measureText(skin.name).width > skinMaxW) {
+              skinNameSize--;
+              ctx.font = `bold ${skinNameSize}px Orbitron, Arial`;
+            }
             ctx.textAlign = 'left';
             ctx.shadowBlur = 4;
             ctx.shadowColor = isSelected ? '#ba55d3' : '#444466';
             ctx.fillStyle = isPremium ? '#ffdd88' : '#ffffff';
-            ctx.fillText(skin.name, cx + Math.round(55 * shopTs), cy + Math.round(30 * shopTs));
+            ctx.fillText(skin.name, skinTextX, cy + Math.round(30 * shopTs));
             ctx.restore();
 
+            // Skin status/price — shrink to fit card
             ctx.save();
-            ctx.font = `bold ${Math.round(11 * shopTs)}px Orbitron, Arial`;
-            ctx.textAlign = 'left';
+            let skinStatusSize = Math.round(11 * shopTs);
+            let skinStatusText = '';
             if (isSelected) {
               ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
               ctx.fillStyle = '#44ff88';
-              ctx.fillText('EQUIPPED', cx + Math.round(55 * shopTs), cy + Math.round(50 * shopTs));
+              skinStatusText = 'EQUIPPED';
             } else if (isUnlocked) {
               ctx.fillStyle = '#bbbbcc';
-              ctx.fillText('TAP TO EQUIP', cx + Math.round(55 * shopTs), cy + Math.round(50 * shopTs));
+              skinStatusText = 'TAP TO EQUIP';
             } else if (totalCoinsRef.current >= skin.cost) {
               ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
               ctx.fillStyle = '#44ff88';
-              ctx.fillText(`${skin.cost} coins`, cx + Math.round(55 * shopTs), cy + Math.round(50 * shopTs));
+              skinStatusText = `${skin.cost} coins`;
             } else {
               ctx.shadowBlur = 4; ctx.shadowColor = '#ff4444';
               ctx.fillStyle = '#ff6666';
-              ctx.fillText(`${skin.cost} coins`, cx + Math.round(55 * shopTs), cy + Math.round(50 * shopTs));
+              skinStatusText = `${skin.cost} coins`;
             }
+            ctx.font = `bold ${skinStatusSize}px Orbitron, Arial`;
+            while (skinStatusSize > 7 && ctx.measureText(skinStatusText).width > skinMaxW) {
+              skinStatusSize--;
+              ctx.font = `bold ${skinStatusSize}px Orbitron, Arial`;
+            }
+            ctx.textAlign = 'left';
+            ctx.fillText(skinStatusText, skinTextX, cy + Math.round(50 * shopTs));
             ctx.restore();
 
             skin._shopBounds = { x: cx, y: cy, w: cardW, h: cardH, key };
@@ -4956,45 +4972,67 @@ const Game = () => {
               ctx.restore();
             }
 
-            // Name
+            // Name — shrink to fit left half of card
+            const trailTextX = cx + Math.round(52 * shopTs);
+            const trailRightX = cx + cardW - Math.round(12 * shopTs);
+            const trailNameMaxW = trailRightX - trailTextX - Math.round(10 * shopTs);
             ctx.save();
-            ctx.font = `bold ${Math.round(13 * shopTs)}px Orbitron, Arial`;
+            let trailNameSize = Math.round(13 * shopTs);
+            ctx.font = `bold ${trailNameSize}px Orbitron, Arial`;
+            while (trailNameSize > 7 && ctx.measureText(trail.name).width > trailNameMaxW) {
+              trailNameSize--;
+              ctx.font = `bold ${trailNameSize}px Orbitron, Arial`;
+            }
             ctx.textAlign = 'left';
             ctx.fillStyle = isPremium ? '#ffdd88' : '#ffffff';
-            ctx.fillText(trail.name, cx + Math.round(52 * shopTs), cy + Math.round(28 * shopTs));
+            ctx.fillText(trail.name, trailTextX, cy + Math.round(28 * shopTs));
             ctx.restore();
 
-            // Description
+            // Description — shrink to fit full card width
+            const trailDescMaxW = cardW - Math.round(64 * shopTs);
             ctx.save();
-            ctx.font = `${Math.round(10 * shopTs)}px Orbitron, Arial`;
+            let trailDescSize = Math.round(10 * shopTs);
+            ctx.font = `${trailDescSize}px Orbitron, Arial`;
+            while (trailDescSize > 6 && ctx.measureText(trail.desc).width > trailDescMaxW) {
+              trailDescSize--;
+              ctx.font = `${trailDescSize}px Orbitron, Arial`;
+            }
             ctx.textAlign = 'left';
             ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            ctx.fillText(trail.desc, cx + Math.round(52 * shopTs), cy + Math.round(42 * shopTs));
+            ctx.fillText(trail.desc, trailTextX, cy + Math.round(42 * shopTs));
             ctx.restore();
 
-            // Status / price (right side)
+            // Status / price (right side) — shrink to fit
+            const trailStatusMaxW = cardW * 0.4;
             ctx.save();
-            ctx.font = `bold ${Math.round(11 * shopTs)}px Orbitron, Arial`;
-            ctx.textAlign = 'right';
+            let trailStatusSize = Math.round(11 * shopTs);
+            let trailStatusText = '';
             if (isEquipped) {
               ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
               ctx.fillStyle = '#44ff88';
-              ctx.fillText('EQUIPPED', cx + cardW - Math.round(12 * shopTs), cy + Math.round(32 * shopTs));
+              trailStatusText = 'EQUIPPED';
             } else if (isOwned) {
               ctx.fillStyle = '#bbbbcc';
-              ctx.fillText('TAP TO EQUIP', cx + cardW - Math.round(12 * shopTs), cy + Math.round(32 * shopTs));
+              trailStatusText = 'TAP TO EQUIP';
             } else if (trail.cost === 0) {
               ctx.fillStyle = '#44ff88';
-              ctx.fillText('FREE', cx + cardW - Math.round(12 * shopTs), cy + Math.round(32 * shopTs));
+              trailStatusText = 'FREE';
             } else if (totalCoinsRef.current >= trail.cost) {
               ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
               ctx.fillStyle = '#44ff88';
-              ctx.fillText(`${trail.cost} coins`, cx + cardW - Math.round(12 * shopTs), cy + Math.round(32 * shopTs));
+              trailStatusText = `${trail.cost} coins`;
             } else {
               ctx.shadowBlur = 4; ctx.shadowColor = '#ff4444';
               ctx.fillStyle = '#ff6666';
-              ctx.fillText(`${trail.cost} coins`, cx + cardW - Math.round(12 * shopTs), cy + Math.round(32 * shopTs));
+              trailStatusText = `${trail.cost} coins`;
             }
+            ctx.font = `bold ${trailStatusSize}px Orbitron, Arial`;
+            while (trailStatusSize > 7 && ctx.measureText(trailStatusText).width > trailStatusMaxW) {
+              trailStatusSize--;
+              ctx.font = `bold ${trailStatusSize}px Orbitron, Arial`;
+            }
+            ctx.textAlign = 'right';
+            ctx.fillText(trailStatusText, trailRightX, cy + Math.round(32 * shopTs));
             ctx.restore();
 
             trail._shopBounds = { x: cx, y: cy, w: cardW, h: cardH, key };
