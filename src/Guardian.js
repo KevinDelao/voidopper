@@ -368,6 +368,8 @@ class Guardian {
     this.shockwaveActive = false;
     this.shockwaveRadius = 0;
     this.shockwaveMaxRadius = 0;
+    this.shockwaveGapAngle = 0; // angle of the safe gap in the ring
+    this.shockwaveGapSize = Math.PI / 2.5; // ~72 degree gap for player to dodge through
     this.vortexActive = false;
     this.vortexTimer = 0;
     this.vortexRadius = 0;
@@ -644,6 +646,8 @@ class Guardian {
         this.shockwaveActive = true;
         this.shockwaveRadius = 0;
         this.shockwaveMaxRadius = params.radius || 380;
+        // Gap faces toward player with slight random offset so it's fair but not trivial
+        this.shockwaveGapAngle = Math.atan2(playerY - this.y, playerX - this.x) + (Math.random() - 0.5) * 1.0;
         break;
       }
       case 'gravity_pull': {
@@ -706,6 +710,7 @@ class Guardian {
         this.shockwaveActive = true;
         this.shockwaveRadius = 0;
         this.shockwaveMaxRadius = params.shockwaveRadius || 380;
+        this.shockwaveGapAngle = Math.atan2(playerY - this.y, playerX - this.x) + (Math.random() - 0.5) * 1.0;
         break;
       }
       case 'multi_attack': {
@@ -808,10 +813,11 @@ class Guardian {
             });
           }
         } else if (this.multiAttackPhase === 3) {
-          // Shockwave
+          // Shockwave with gap
           this.shockwaveActive = true;
           this.shockwaveRadius = 0;
           this.shockwaveMaxRadius = params.shockwaveRadius || 400;
+          this.shockwaveGapAngle = Math.atan2(playerY - this.y, playerX - this.x) + (Math.random() - 0.5) * 1.0;
         } else {
           // Dual laser
           this.laserActive = true;
@@ -935,12 +941,22 @@ class Guardian {
       }
     }
 
-    // Shockwave ring
+    // Shockwave ring with gap — player can dodge through the opening
     if (this.shockwaveActive) {
       const sdx = player.x - this.x;
       const sdy = player.y - this.y;
       const sdist = Math.sqrt(sdx * sdx + sdy * sdy);
-      if (Math.abs(sdist - this.shockwaveRadius) < 10 + player.radius) return 'shockwave';
+      if (Math.abs(sdist - this.shockwaveRadius) < 10 + player.radius) {
+        // Check if player is in the safe gap
+        const playerAngle = Math.atan2(sdy, sdx);
+        let angleDiff = playerAngle - this.shockwaveGapAngle;
+        // Normalize to -PI..PI
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        if (Math.abs(angleDiff) > this.shockwaveGapSize / 2) {
+          return 'shockwave'; // hit — player is NOT in the gap
+        }
+      }
     }
 
     // Hydra heads
@@ -1075,15 +1091,27 @@ class Guardian {
       ctx.restore();
     });
 
-    // Draw shockwave
+    // Draw shockwave ring with visible gap
     if (this.shockwaveActive) {
       const swAlpha = 1 - (this.shockwaveRadius / this.shockwaveMaxRadius);
+      const halfGap = this.shockwaveGapSize / 2;
+      const gapAngle = this.shockwaveGapAngle;
+      // Draw the solid arc (the dangerous part)
       ctx.strokeStyle = this.color.glow;
       ctx.lineWidth = 4 * swAlpha;
       ctx.globalAlpha = swAlpha * 0.6;
       ctx.beginPath();
-      ctx.arc(this.x, this.y - cameraY, this.shockwaveRadius, 0, Math.PI * 2);
+      ctx.arc(this.x, this.y - cameraY, this.shockwaveRadius, gapAngle + halfGap, gapAngle - halfGap + Math.PI * 2);
       ctx.stroke();
+      // Draw faint gap markers so player can see the safe opening
+      ctx.globalAlpha = swAlpha * 0.2;
+      ctx.strokeStyle = '#44ff88';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.arc(this.x, this.y - cameraY, this.shockwaveRadius, gapAngle - halfGap, gapAngle + halfGap);
+      ctx.stroke();
+      ctx.setLineDash([]);
       ctx.globalAlpha = 1;
     }
 
