@@ -1212,55 +1212,44 @@ class AudioManager {
     if (this._sfxThrottled('moodIgnition')) return;
     const now = this.audioContext.currentTime;
 
-    // Rising swoosh — sweep from 200Hz to 800Hz over 0.3s with increasing gain
-    const osc = this.audioContext.createOscillator();
-    const gain = this.audioContext.createGain();
-    const filter = this.audioContext.createBiquadFilter();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(200, now);
-    osc.frequency.exponentialRampToValueAtTime(800, now + 0.3);
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(600, now);
-    filter.frequency.linearRampToValueAtTime(2000, now + 0.3);
-    filter.Q.value = 2;
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.15, now + 0.25);
-    gain.gain.linearRampToValueAtTime(0, now + 0.35);
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.onended = () => { try { osc.disconnect(); filter.disconnect(); gain.disconnect(); } catch(e){} };
-    osc.start(now);
-    osc.stop(now + 0.35);
+    // Gentle ascending chime — three soft sine notes rising in a major triad
+    // Matches the game's ethereal ambient vibe instead of harsh swooshes
+    const notes = [523.25, 659.25, 783.99]; // C5, E5, G5 — warm major chord
+    notes.forEach((freq, i) => {
+      const delay = i * 0.12;
+      const osc = this.audioContext.createOscillator();
+      const gain = this.audioContext.createGain();
+      const filter = this.audioContext.createBiquadFilter();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + delay);
+      // Gentle low-pass to keep it soft
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1200, now + delay);
+      filter.Q.value = 0.5;
+      gain.gain.setValueAtTime(0, now + delay);
+      gain.gain.linearRampToValueAtTime(0.07, now + delay + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.6);
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.onended = () => { try { osc.disconnect(); filter.disconnect(); gain.disconnect(); } catch(e){} };
+      osc.start(now + delay);
+      osc.stop(now + delay + 0.6);
 
-    // Bright pop at the end — short high-frequency burst
-    const pop = this.audioContext.createOscillator();
-    const popGain = this.audioContext.createGain();
-    pop.type = 'sine';
-    pop.frequency.setValueAtTime(1200, now + 0.28);
-    pop.frequency.exponentialRampToValueAtTime(1600, now + 0.32);
-    popGain.gain.setValueAtTime(0, now + 0.28);
-    popGain.gain.linearRampToValueAtTime(0.18, now + 0.3);
-    popGain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-    pop.connect(popGain);
-    popGain.connect(this.sfxGain);
-    pop.onended = () => { try { pop.disconnect(); popGain.disconnect(); } catch(e){} };
-    pop.start(now + 0.28);
-    pop.stop(now + 0.4);
-
-    // Pop harmonic for sparkle
-    const pop2 = this.audioContext.createOscillator();
-    const pop2Gain = this.audioContext.createGain();
-    pop2.type = 'sine';
-    pop2.frequency.setValueAtTime(2400, now + 0.29);
-    pop2Gain.gain.setValueAtTime(0, now + 0.29);
-    pop2Gain.gain.linearRampToValueAtTime(0.08, now + 0.31);
-    pop2Gain.gain.exponentialRampToValueAtTime(0.01, now + 0.38);
-    pop2.connect(pop2Gain);
-    pop2Gain.connect(this.sfxGain);
-    pop2.onended = () => { try { pop2.disconnect(); pop2Gain.disconnect(); } catch(e){} };
-    pop2.start(now + 0.29);
-    pop2.stop(now + 0.38);
+      // Soft octave shimmer for warmth
+      const shim = this.audioContext.createOscillator();
+      const shimGain = this.audioContext.createGain();
+      shim.type = 'sine';
+      shim.frequency.setValueAtTime(freq * 2, now + delay);
+      shimGain.gain.setValueAtTime(0, now + delay);
+      shimGain.gain.linearRampToValueAtTime(0.02, now + delay + 0.1);
+      shimGain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.5);
+      shim.connect(shimGain);
+      shimGain.connect(this.sfxGain);
+      shim.onended = () => { try { shim.disconnect(); shimGain.disconnect(); } catch(e){} };
+      shim.start(now + delay);
+      shim.stop(now + delay + 0.5);
+    });
   }
 
   playMoodChillSound() {
