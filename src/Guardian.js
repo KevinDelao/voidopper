@@ -369,8 +369,8 @@ class Guardian {
     this.shockwaveActive = false;
     this.shockwaveRadius = 0;
     this.shockwaveMaxRadius = 0;
-    this.shockwaveGapAngle = 0; // angle of the safe gap in the ring
-    this.shockwaveGapSize = Math.PI / 2.5; // ~72 degree gap for player to dodge through
+    this.shockwaveGaps = []; // array of gap center angles
+    this.shockwaveGapSize = Math.PI / 4.5; // ~40 degree per gap (3 gaps = ~120° total safe)
     this.vortexActive = false;
     this.vortexTimer = 0;
     this.vortexRadius = 0;
@@ -652,7 +652,9 @@ class Guardian {
         this.shockwaveRadius = 0;
         this.shockwaveMaxRadius = (params.radius || 380) * ss;
         // Gap faces toward player with slight random offset so it's fair but not trivial
-        this.shockwaveGapAngle = Math.atan2(playerY - this.y, playerX - this.x) + (Math.random() - 0.5) * 1.0;
+        // 3 evenly-spaced gaps with random offset — always one nearby
+        const baseGap = Math.random() * Math.PI * 2;
+        this.shockwaveGaps = [baseGap, baseGap + Math.PI * 2 / 3, baseGap + Math.PI * 4 / 3];
         break;
       }
       case 'gravity_pull': {
@@ -715,7 +717,9 @@ class Guardian {
         this.shockwaveActive = true;
         this.shockwaveRadius = 0;
         this.shockwaveMaxRadius = (params.shockwaveRadius || 380) * ss;
-        this.shockwaveGapAngle = Math.atan2(playerY - this.y, playerX - this.x) + (Math.random() - 0.5) * 1.0;
+        // 3 evenly-spaced gaps with random offset — always one nearby
+        const baseGap = Math.random() * Math.PI * 2;
+        this.shockwaveGaps = [baseGap, baseGap + Math.PI * 2 / 3, baseGap + Math.PI * 4 / 3];
         break;
       }
       case 'multi_attack': {
@@ -822,7 +826,9 @@ class Guardian {
           this.shockwaveActive = true;
           this.shockwaveRadius = 0;
           this.shockwaveMaxRadius = (params.shockwaveRadius || 400) * ss;
-          this.shockwaveGapAngle = Math.atan2(playerY - this.y, playerX - this.x) + (Math.random() - 0.5) * 1.0;
+          // 3 evenly-spaced gaps with random offset — always one nearby
+        const baseGap = Math.random() * Math.PI * 2;
+        this.shockwaveGaps = [baseGap, baseGap + Math.PI * 2 / 3, baseGap + Math.PI * 4 / 3];
         } else {
           // Dual laser
           this.laserActive = true;
@@ -946,21 +952,24 @@ class Guardian {
       }
     }
 
-    // Shockwave ring with gap — player can dodge through the opening
+    // Shockwave ring with gaps — player can dodge through any opening
     if (this.shockwaveActive) {
       const sdx = player.x - this.x;
       const sdy = player.y - this.y;
       const sdist = Math.sqrt(sdx * sdx + sdy * sdy);
       if (Math.abs(sdist - this.shockwaveRadius) < 10 + player.radius) {
-        // Check if player is in the safe gap
         const playerAngle = Math.atan2(sdy, sdx);
-        let angleDiff = playerAngle - this.shockwaveGapAngle;
-        // Normalize to -PI..PI
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-        if (Math.abs(angleDiff) > this.shockwaveGapSize / 2) {
-          return 'shockwave'; // hit — player is NOT in the gap
+        let inGap = false;
+        for (const gapAngle of this.shockwaveGaps) {
+          let angleDiff = playerAngle - gapAngle;
+          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+          if (Math.abs(angleDiff) < this.shockwaveGapSize / 2) {
+            inGap = true;
+            break;
+          }
         }
+        if (!inGap) return 'shockwave';
       }
     }
 
@@ -1096,26 +1105,39 @@ class Guardian {
       ctx.restore();
     });
 
-    // Draw shockwave ring with visible gap
-    if (this.shockwaveActive) {
+    // Draw shockwave ring with multiple visible gaps
+    if (this.shockwaveActive && this.shockwaveGaps.length > 0) {
       const swAlpha = 1 - (this.shockwaveRadius / this.shockwaveMaxRadius);
       const halfGap = this.shockwaveGapSize / 2;
-      const gapAngle = this.shockwaveGapAngle;
-      // Draw the solid arc (the dangerous part)
+      const sx = this.x;
+      const sy = this.y - cameraY;
+      const sr = this.shockwaveRadius;
+
+      // Sort gaps to draw solid arcs between them
+      const sorted = this.shockwaveGaps.slice().sort((a, b) => a - b);
+
+      // Draw solid arcs (dangerous segments between gaps)
       ctx.strokeStyle = this.color.glow;
       ctx.lineWidth = 4 * ts * swAlpha;
       ctx.globalAlpha = swAlpha * 0.6;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y - cameraY, this.shockwaveRadius, gapAngle + halfGap, gapAngle - halfGap + Math.PI * 2);
-      ctx.stroke();
-      // Draw faint gap markers so player can see the safe opening
-      ctx.globalAlpha = swAlpha * 0.2;
+      for (let i = 0; i < sorted.length; i++) {
+        const arcStart = sorted[i] + halfGap;
+        const arcEnd = sorted[(i + 1) % sorted.length] - halfGap;
+        ctx.beginPath();
+        ctx.arc(sx, sy, sr, arcStart, i + 1 < sorted.length ? arcEnd : arcEnd + Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Draw green dashed gap markers (safe openings)
+      ctx.globalAlpha = swAlpha * 0.25;
       ctx.strokeStyle = '#44ff88';
       ctx.lineWidth = 2 * ts;
       ctx.setLineDash([4 * ts, 6 * ts]);
-      ctx.beginPath();
-      ctx.arc(this.x, this.y - cameraY, this.shockwaveRadius, gapAngle - halfGap, gapAngle + halfGap);
-      ctx.stroke();
+      for (const gapAngle of sorted) {
+        ctx.beginPath();
+        ctx.arc(sx, sy, sr, gapAngle - halfGap, gapAngle + halfGap);
+        ctx.stroke();
+      }
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
     }
