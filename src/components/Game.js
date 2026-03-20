@@ -1682,10 +1682,10 @@ const Game = () => {
 
   // Get combo coin multiplier based on tier
   const getComboMultiplier = (combo) => {
-    if (combo >= 15) return 8;
-    if (combo >= 10) return 5;
-    if (combo >= 5) return 3;
-    if (combo >= 2) return 2;
+    if (combo >= 15) return 5;
+    if (combo >= 10) return 3;
+    if (combo >= 5) return 2;
+    if (combo >= 2) return 1.5;
     return 1;
   };
 

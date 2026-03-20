@@ -5,8 +5,8 @@ class BlackHole {
     this.radius = 18; // Kill zone
     this.active = true;
     this.isBlackHole = true;
-    this.pullRadius = 150; // Gravitational pull range
-    this.pullStrength = 300; // How hard it pulls
+    this.pullRadius = 280; // Gravitational pull range — wide enough to feel
+    this.pullStrength = 500; // How hard it pulls
 
     // Doesn't move
     this.vy = 0;
@@ -76,12 +76,13 @@ class BlackHole {
     const distance = Math.sqrt(dx * dx + dy * dy);
 
     if (distance < this.pullRadius && distance > 0) {
-      // Inverse square pull, stronger when closer
-      const force = this.pullStrength / (distance * distance) * 80;
+      // Smooth pull: strong close up, gentle at edge — inversely proportional to distance
+      const t = 1 - distance / this.pullRadius; // 0 at edge, 1 at center
+      const force = this.pullStrength * t * t; // Quadratic falloff from edge
       const nx = dx / distance;
       const ny = dy / distance;
-      player.vx += nx * force * dt * 60;
-      player.vy += ny * force * dt * 60;
+      player.vx += nx * force * dt;
+      player.vy += ny * force * dt;
     }
   }
 

@@ -10,7 +10,7 @@ const Trails = {
   // ── BASIC (cheap, gentle color trails) ───────────────
   ember: {
     name: 'Ember',
-    cost: 30,
+    cost: 50,
     desc: 'Warm orange sparks',
     type: 'particles',
     colors: ['#ff6622', '#ff9944', '#ffcc44'],
@@ -22,7 +22,7 @@ const Trails = {
   },
   frost: {
     name: 'Frost',
-    cost: 30,
+    cost: 50,
     desc: 'Icy crystal dust',
     type: 'particles',
     colors: ['#aaeeff', '#66ddff', '#ffffff'],
@@ -34,7 +34,7 @@ const Trails = {
   },
   toxic: {
     name: 'Toxic',
-    cost: 40,
+    cost: 60,
     desc: 'Green poison drip',
     type: 'particles',
     colors: ['#44ff44', '#22cc22', '#88ff88'],
@@ -46,7 +46,7 @@ const Trails = {
   },
   bubblegum: {
     name: 'Bubblegum',
-    cost: 40,
+    cost: 60,
     desc: 'Pink floating bubbles',
     type: 'bubbles',
     colors: ['#ff66aa', '#ff88cc', '#ffaadd'],
@@ -60,7 +60,7 @@ const Trails = {
   // ── MID TIER ─────────────────────────────────────────
   lightning: {
     name: 'Lightning',
-    cost: 80,
+    cost: 130,
     desc: 'Soft electric sparks',
     type: 'lightning',
     colors: ['#44ccff', '#88eeff', '#ffffff'],
@@ -72,7 +72,7 @@ const Trails = {
   },
   stardust: {
     name: 'Stardust',
-    cost: 80,
+    cost: 130,
     desc: 'Twinkling star sparkles',
     type: 'stars',
     colors: ['#ffd700', '#ffee88', '#ffffff'],
@@ -84,7 +84,7 @@ const Trails = {
   },
   shadow: {
     name: 'Shadow',
-    cost: 90,
+    cost: 150,
     desc: 'Dark afterimages linger',
     type: 'afterimage',
     colors: ['#222244', '#443366', '#665588'],
@@ -96,7 +96,7 @@ const Trails = {
   },
   petals: {
     name: 'Cherry Blossom',
-    cost: 100,
+    cost: 175,
     desc: 'Drifting sakura petals',
     type: 'petals',
     colors: ['#ffaacc', '#ff88bb', '#ffccdd', '#ffffff'],
@@ -110,7 +110,7 @@ const Trails = {
   // ── PREMIUM (animated, subtle complex effects) ──────
   rainbow: {
     name: 'Rainbow',
-    cost: 200,
+    cost: 350,
     desc: 'Shifting prismatic ribbon',
     type: 'rainbow',
     premium: true,
@@ -123,7 +123,7 @@ const Trails = {
   },
   nebula: {
     name: 'Nebula',
-    cost: 250,
+    cost: 400,
     desc: 'Swirling cosmic gas wisps',
     type: 'nebula',
     premium: true,
@@ -136,7 +136,7 @@ const Trails = {
   },
   inferno: {
     name: 'Inferno',
-    cost: 250,
+    cost: 400,
     desc: 'Gentle flame glow',
     type: 'inferno',
     premium: true,
@@ -150,7 +150,7 @@ const Trails = {
   },
   void: {
     name: 'Void Rift',
-    cost: 250,
+    cost: 400,
     desc: 'Subtle reality distortion',
     type: 'void',
     premium: true,
@@ -163,7 +163,7 @@ const Trails = {
   },
   glitch: {
     name: 'Glitch',
-    cost: 250,
+    cost: 400,
     desc: 'Digital distortion fragments',
     type: 'glitch',
     premium: true,
@@ -176,7 +176,7 @@ const Trails = {
   },
   aurora: {
     name: 'Aurora',
-    cost: 300,
+    cost: 500,
     desc: 'Soft northern lights glow',
     type: 'aurora',
     premium: true,

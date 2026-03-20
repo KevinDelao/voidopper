@@ -123,8 +123,8 @@ class Player {
 
   // Mood -> Gameplay: coin value multiplier
   getCoinMultiplier() {
-    if (this.mood >= 76) return 2.0;
-    if (this.mood >= 51) return 1.5;
+    if (this.mood >= 76) return 1.5;
+    if (this.mood >= 51) return 1.25;
     return 1.0;
   }
 

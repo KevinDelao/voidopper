@@ -13,7 +13,7 @@ const BirdSkins = {
   },
   robin: {
     name: 'Robin',
-    cost: 40,
+    cost: 60,
     birdType: 'robin',
     body: '#8B6914', bodyStroke: '#6B4F12',
     breast: '#dd3322',
@@ -25,7 +25,7 @@ const BirdSkins = {
   },
   phoenix: {
     name: 'Phoenix',
-    cost: 50,
+    cost: 80,
     birdType: 'default',
     body: '#ff6633', bodyStroke: '#cc4400',
     head: '#ff8844', wing: '#ff4411', wingStroke: '#cc3300',
@@ -36,7 +36,7 @@ const BirdSkins = {
   },
   blueJay: {
     name: 'Blue Jay',
-    cost: 65,
+    cost: 100,
     birdType: 'jay',
     body: '#4488dd', bodyStroke: '#3366aa',
     head: '#5599ee', wing: '#3377cc', wingStroke: '#2255aa',
@@ -48,7 +48,7 @@ const BirdSkins = {
   },
   ice: {
     name: 'Ice Bird',
-    cost: 75,
+    cost: 120,
     birdType: 'default',
     body: '#66ddff', bodyStroke: '#44aadd',
     head: '#88eeff', wing: '#44ccee', wingStroke: '#2299bb',
@@ -59,7 +59,7 @@ const BirdSkins = {
   },
   robot: {
     name: 'Mecha Bird',
-    cost: 100,
+    cost: 160,
     birdType: 'default',
     body: '#888899', bodyStroke: '#555566',
     head: '#aaaabb', wing: '#667788', wingStroke: '#445566',
@@ -72,7 +72,7 @@ const BirdSkins = {
   // ── MID TIER ──────────────────────────────────────────
   owl: {
     name: 'Owl',
-    cost: 120,
+    cost: 200,
     birdType: 'owl',
     body: '#8B7355', bodyStroke: '#6B5335',
     head: '#9B8365', wing: '#7B6345', wingStroke: '#5B4325',
@@ -85,7 +85,7 @@ const BirdSkins = {
   },
   ghost: {
     name: 'Ghost Bird',
-    cost: 150,
+    cost: 250,
     birdType: 'default',
     body: 'rgba(200, 200, 220, 0.7)', bodyStroke: 'rgba(180, 180, 200, 0.5)',
     head: 'rgba(220, 220, 240, 0.8)',
@@ -97,7 +97,7 @@ const BirdSkins = {
   },
   eagle: {
     name: 'Eagle',
-    cost: 175,
+    cost: 300,
     birdType: 'eagle',
     body: '#5a3a1a', bodyStroke: '#3a2a0a',
     head: '#ffffff', wing: '#4a2a0a', wingStroke: '#2a1a00',
@@ -108,7 +108,7 @@ const BirdSkins = {
   },
   golden: {
     name: 'Golden Bird',
-    cost: 200,
+    cost: 350,
     birdType: 'default',
     body: '#ffd700', bodyStroke: '#daa520',
     head: '#ffe44d', wing: '#f0c800', wingStroke: '#cc9900',
@@ -119,7 +119,7 @@ const BirdSkins = {
   },
   parrot: {
     name: 'Parrot',
-    cost: 250,
+    cost: 400,
     birdType: 'parrot',
     body: '#22bb44', bodyStroke: '#119933',
     head: '#44dd66', wing: '#dd2222', wingStroke: '#aa1111',
@@ -132,7 +132,7 @@ const BirdSkins = {
   },
   shadow: {
     name: 'Shadow Bird',
-    cost: 300,
+    cost: 500,
     birdType: 'default',
     body: '#2a1a3a', bodyStroke: '#1a0a2a',
     head: '#3a2a4a', wing: '#221133', wingStroke: '#110022',
@@ -145,7 +145,7 @@ const BirdSkins = {
   // ── PREMIUM ANIMATED ──────────────────────────────────
   shimmerParrot: {
     name: 'Prism Parrot',
-    cost: 500,
+    cost: 800,
     birdType: 'parrot',
     animated: 'shimmer',
     premium: true,
@@ -160,7 +160,7 @@ const BirdSkins = {
   },
   rainbow: {
     name: 'Rainbow Bird',
-    cost: 500,
+    cost: 800,
     birdType: 'default',
     isRainbow: true,
     animated: 'rainbow',
@@ -174,7 +174,7 @@ const BirdSkins = {
   },
   cosmicOwl: {
     name: 'Cosmic Owl',
-    cost: 750,
+    cost: 1200,
     birdType: 'owl',
     animated: 'galaxy',
     premium: true,
@@ -189,7 +189,7 @@ const BirdSkins = {
   },
   fireEagle: {
     name: 'Fire Eagle',
-    cost: 1000,
+    cost: 1600,
     birdType: 'eagle',
     animated: 'fire',
     premium: true,
@@ -202,7 +202,7 @@ const BirdSkins = {
   },
   electricFalcon: {
     name: 'Storm Falcon',
-    cost: 1200,
+    cost: 2000,
     birdType: 'eagle',
     animated: 'electric',
     premium: true,
@@ -215,7 +215,7 @@ const BirdSkins = {
   },
   celestial: {
     name: 'Celestial Phoenix',
-    cost: 2000,
+    cost: 3500,
     birdType: 'default',
     animated: 'cosmic',
     premium: true,
