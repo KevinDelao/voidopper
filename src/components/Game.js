@@ -2886,15 +2886,24 @@ const Game = () => {
     if (player.getMoodTier() === 'onfire') state.runStats.reachedOnFire = true;
     // Mood hint on first tier-up + mood tier change sounds
     // Only trigger on the first frame of a tier change (moodFlashTimer near its initial value)
+    // Use a separate 2-second cooldown to prevent rapid-fire sounds when mood oscillates at a boundary
     const moodJustChanged = player.moodFlashTimer > 0.35;
+    const now = performance.now();
+    const moodSoundCooldown = 2000; // 2 seconds between mood transition sounds
     if (moodJustChanged && player.moodFlashDir > 0 && player.getMoodTier() === 'firedup') {
       showHint(state, 'mood', 'MOOD RISING!', 'High mood = faster speed & more coins');
     }
     if (moodJustChanged && player.moodFlashDir > 0 && player.getMoodTier() === 'onfire' && audioManagerRef.current && audioManagerRef.current.playMoodIgnitionSound) {
-      audioManagerRef.current.playMoodIgnitionSound();
+      if (now - (state._lastMoodSoundTime || 0) > moodSoundCooldown) {
+        audioManagerRef.current.playMoodIgnitionSound();
+        state._lastMoodSoundTime = now;
+      }
     }
     if (moodJustChanged && player.moodFlashDir < 0 && player.getMoodTier() === 'chill' && audioManagerRef.current && audioManagerRef.current.playMoodChillSound) {
-      audioManagerRef.current.playMoodChillSound();
+      if (now - (state._lastMoodSoundTime || 0) > moodSoundCooldown) {
+        audioManagerRef.current.playMoodChillSound();
+        state._lastMoodSoundTime = now;
+      }
     }
 
     // Update background stars twinkle
@@ -3677,14 +3686,22 @@ const Game = () => {
       const scale = progress < 0.1 ? progress / 0.1 : 1;
       const fadeAlpha = state.milestoneTextTimer > 0.5 ? 1 : state.milestoneTextTimer / 0.5;
       // Scale font to fit screen width with padding
-      const maxTitleSize = Math.min(42, Math.floor(width * 0.09));
-      const titleSize = Math.floor(maxTitleSize * scale);
+      let maxTitleSize = Math.min(42, Math.floor(width * 0.09));
+      let titleSize = Math.floor(maxTitleSize * scale);
       const subSize = Math.floor(Math.min(22, width * 0.05) * scale);
       const my = height * 0.35;
       ctx.globalAlpha = fadeAlpha;
       ctx.textAlign = 'center';
-      // Title text with gold gradient (no shadowBlur for clean iOS rendering)
+      // Measure and shrink title to fit within screen width (with padding)
       ctx.font = `900 ${titleSize}px Orbitron, Arial`;
+      const maxTextWidth = width * 0.85;
+      let measured = ctx.measureText(state.milestoneText).width;
+      while (measured > maxTextWidth && titleSize > 14) {
+        titleSize -= 2;
+        ctx.font = `900 ${titleSize}px Orbitron, Arial`;
+        measured = ctx.measureText(state.milestoneText).width;
+      }
+      // Title text with gold gradient (no shadowBlur for clean iOS rendering)
       ctx.shadowBlur = 0;
       ctx.strokeStyle = '#664400';
       ctx.lineWidth = Math.max(2, Math.floor(4 * (width / 420)));
