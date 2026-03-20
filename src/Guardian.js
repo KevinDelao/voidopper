@@ -8,9 +8,9 @@ const MILESTONE_BOSSES = [
     name: 'STAR WHELP',
     desc: 'A fledgling star creature guards the lower void',
     color: { primary: '#4488cc', secondary: '#66bbff', glow: '#88ddff' },
-    attackPattern: 'slow_burst',
+    attackPattern: 'shockwave',
     attackInterval: 2.2,
-    attackParams: { count: 4, speed: 110, spread: 1.2 },
+    attackParams: { radius: 140, speed: 160 },
     movementPattern: 'hover_drift',
     movementSpeed: 40,
     size: 28,
@@ -99,11 +99,11 @@ const MILESTONE_BOSSES = [
 const EASY_GUARDIANS = [
   {
     name: 'STAR JELLY',
-    desc: 'Slow but steady!',
+    desc: 'Watch the tentacles!',
     color: { primary: '#44aadd', secondary: '#66ccff', glow: '#88eeff' },
-    attackPattern: 'slow_burst',
-    attackInterval: 2.2,
-    attackParams: { count: 3, speed: 100, spread: 1.2 },
+    attackPattern: 'orbit_mines',
+    attackInterval: 2.4,
+    attackParams: { count: 3, speed: 70, homingStrength: 30 },
     movementPattern: 'hover_drift',
     movementSpeed: 35,
     size: 26,
@@ -113,9 +113,9 @@ const EASY_GUARDIANS = [
     name: 'DUST SPRITE',
     desc: 'Tiny sparks!',
     color: { primary: '#ffaa44', secondary: '#ffcc66', glow: '#ffee88' },
-    attackPattern: 'projectile_burst',
-    attackInterval: 2.0,
-    attackParams: { count: 4, speed: 120, spread: 1.2 },
+    attackPattern: 'scatter_shot',
+    attackInterval: 1.6,
+    attackParams: { count: 5, speed: 110 },
     movementPattern: 'hover_drift',
     movementSpeed: 40,
     size: 24,
@@ -135,11 +135,11 @@ const EASY_GUARDIANS = [
   },
   {
     name: 'FROST WISP',
-    desc: 'Chill wind!',
+    desc: 'Find the gap!',
     color: { primary: '#66ddff', secondary: '#aaeeff', glow: '#ccffff' },
-    attackPattern: 'slow_burst',
-    attackInterval: 2.2,
-    attackParams: { count: 5, speed: 90, spread: 1.8 },
+    attackPattern: 'frost_wave',
+    attackInterval: 2.0,
+    attackParams: { count: 6, speed: 90 },
     movementPattern: 'orbit',
     movementSpeed: 40,
     size: 22,
@@ -150,11 +150,11 @@ const EASY_GUARDIANS = [
 const MEDIUM_GUARDIANS = [
   {
     name: 'VOID SENTINEL',
-    desc: 'Dodge the barrage!',
+    desc: 'Dodge the spiral!',
     color: { primary: '#6644aa', secondary: '#aa66ff', glow: '#cc88ff' },
-    attackPattern: 'projectile_burst',
-    attackInterval: 1.4,
-    attackParams: { count: 6, speed: 160, spread: 1.6 },
+    attackPattern: 'spiral_barrage',
+    attackInterval: 0.6,
+    attackParams: { speed: 130, radius: 4 },
     movementPattern: 'hover_drift',
     movementSpeed: 50,
     size: 32,
@@ -820,6 +820,65 @@ class Guardian {
           this.laser2Active = true;
           this.laser2Timer = 1.5;
           this.laser2Angle = this.laserAngle + Math.PI * 0.6;
+        }
+        break;
+      }
+      case 'scatter_shot': {
+        // Chaotic rapid-fire in random directions
+        const count = params.count || 4;
+        const speed = (params.speed || 120) * this.difficultyScale;
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          this.projectiles.push({
+            x: this.x + (Math.random() - 0.5) * this.radius,
+            y: this.y + (Math.random() - 0.5) * this.radius,
+            vx: Math.cos(angle) * speed * (0.7 + Math.random() * 0.6),
+            vy: Math.sin(angle) * speed * (0.7 + Math.random() * 0.6),
+            radius: 3 + Math.random() * 2, life: 2.0, phase: Math.random() * 6,
+          });
+        }
+        break;
+      }
+      case 'frost_wave': {
+        // Wide horizontal wall of slow projectiles spanning the corridor
+        const count = params.count || 6;
+        const speed = (params.speed || 80) * this.difficultyScale;
+        const cw = this.corridorRight - this.corridorLeft;
+        // Leave a random gap for the player to squeeze through
+        const gapIndex = Math.floor(Math.random() * count);
+        for (let i = 0; i < count; i++) {
+          if (i === gapIndex) continue; // gap
+          const xPos = this.corridorLeft + (i + 0.5) * (cw / count);
+          this.projectiles.push({
+            x: xPos, y: this.y,
+            vx: 0,
+            vy: speed,
+            radius: 5, life: 3.0, phase: 0,
+          });
+        }
+        break;
+      }
+      case 'orbit_mines': {
+        // Drops mines that orbit around spawn point then drift toward player
+        const count = params.count || 4;
+        const speed = (params.speed || 60) * this.difficultyScale;
+        for (let i = 0; i < count; i++) {
+          const angle = (i / count) * Math.PI * 2 + this.phase;
+          const dist = this.radius * 1.5;
+          const spawnX = this.x + Math.cos(angle) * dist;
+          const spawnY = this.y + Math.sin(angle) * dist;
+          // Mines drift slowly toward the player
+          const dx = playerX - spawnX;
+          const dy = playerY - spawnY;
+          const d = Math.sqrt(dx * dx + dy * dy) || 1;
+          this.projectiles.push({
+            x: spawnX, y: spawnY,
+            vx: (dx / d) * speed + Math.cos(angle) * speed * 0.5,
+            vy: (dy / d) * speed + Math.sin(angle) * speed * 0.5,
+            radius: 6, life: 3.5, phase: 0,
+            homing: params.homingStrength || 40,
+            maxSpeed: speed * 1.5,
+          });
         }
         break;
       }
