@@ -118,6 +118,22 @@ const Game = () => {
   );
   const getGfx = () => GFX[graphicsRef.current] || GFX.medium;
 
+  // Settings panel
+  const [showSettings, setShowSettings] = useState(false);
+  const showSettingsRef = useRef(false);
+  const settingsScrollRef = useRef(0);
+  const settingsDragRef = useRef({ active: false, startY: 0, startScroll: 0 });
+
+  // Accessibility settings (persisted)
+  const colorblindModeRef = useRef(getItem('voidHopper_colorblind') || 'none');
+  const reducedMotionRef = useRef(getItem('voidHopper_reducedMotion') === 'true');
+  const leftHandRef = useRef(getItem('voidHopper_leftHand') === 'true');
+
+  // Volume settings (persisted, 0-100 integer for display, /100 for audio)
+  const masterVolRef = useRef(parseInt(getItem('voidHopper_masterVol') || '80', 10));
+  const musicVolRef = useRef(parseInt(getItem('voidHopper_musicVol') || '60', 10));
+  const sfxVolRef = useRef(parseInt(getItem('voidHopper_sfxVol') || '80', 10));
+
   const gameStateRef = useRef({
     player: null,
     leftTerrain: null,
@@ -206,10 +222,39 @@ const Game = () => {
 
     const ctx = canvas.getContext('2d', { alpha: false });
 
+    // Apply persisted volume settings to AudioManager after each init
+    const applyPersistedVolumes = () => {
+      const am = audioManagerRef.current;
+      if (!am) return;
+      am.setMasterVolume(masterVolRef.current / 100);
+      am.setMusicVolume(musicVolRef.current / 100);
+      am.setSfxVolume(sfxVolRef.current / 100);
+    };
+
+    // Apply colorblind CSS filter to canvas
+    const applyColorblindFilter = (mode) => {
+      if (!canvas) return;
+      const filters = {
+        none: 'none',
+        deuteranopia: 'url(#cb-deuteranopia)',
+        protanopia: 'url(#cb-protanopia)',
+        tritanopia: 'url(#cb-tritanopia)',
+      };
+      canvas.style.filter = filters[mode] || 'none';
+    };
+    applyColorblindFilter(colorblindModeRef.current);
+
     // Initialize audio
     if (!audioManagerRef.current) {
       // Create AudioManager instance
-      audioManagerRef.current = new AudioManager();
+      const am = new AudioManager();
+      // Wrap initialize to apply persisted volumes after each init
+      const origInit = am.initialize.bind(am);
+      am.initialize = async function() {
+        await origInit();
+        applyPersistedVolumes();
+      };
+      audioManagerRef.current = am;
     }
     if (!progressionRef.current) {
       progressionRef.current = new ProgressionManager();
@@ -225,6 +270,8 @@ const Game = () => {
 
     // Expose graphics quality globally so entities can skip expensive effects
     window._voidHopperGfx = graphicsRef.current;
+    // Expose reduced motion globally so entities can check it
+    window._voidHopperReducedMotion = reducedMotionRef.current;
 
     // Set canvas size (account for devicePixelRatio for sharp text)
     const resizeCanvas = () => {
@@ -435,8 +482,10 @@ const Game = () => {
       if (!gameStarted || isGameOver || gameOverTimeRef.current) {
         const rect = canvas.getBoundingClientRect();
         const ty = touch.clientY - rect.top;
-        // Shop scrolling
-        if (showShopRef.current) {
+        // Shop/Settings scrolling
+        if (showSettingsRef.current) {
+          settingsDragRef.current = { active: true, startY: ty, startScroll: settingsScrollRef.current, moved: false };
+        } else if (showShopRef.current) {
           shopDragRef.current = { active: true, startY: ty, startScroll: shopScrollRef.current, moved: false };
         } else if (!gameStarted && !isGameOver && !gameOverTimeRef.current) {
           // Menu scrolling
@@ -513,6 +562,16 @@ const Game = () => {
       const touch = e.touches[0];
       if (!touch) return;
 
+      // Settings scroll drag
+      if (showSettingsRef.current && settingsDragRef.current.active) {
+        const rect = canvas.getBoundingClientRect();
+        const ty = touch.clientY - rect.top;
+        const dy = settingsDragRef.current.startY - ty;
+        if (Math.abs(dy) > 5) settingsDragRef.current.moved = true;
+        settingsScrollRef.current = Math.max(0, settingsDragRef.current.startScroll + dy);
+        return;
+      }
+
       // Shop scroll drag
       if (showShopRef.current && shopDragRef.current.active) {
         const rect = canvas.getBoundingClientRect();
@@ -547,6 +606,10 @@ const Game = () => {
     const handleTouchEnd = (e) => {
       e.preventDefault();
 
+      // End settings drag
+      if (settingsDragRef.current.active) {
+        settingsDragRef.current.active = false;
+      }
       // End shop drag
       if (shopDragRef.current.active) {
         shopDragRef.current.active = false;
@@ -666,6 +729,92 @@ const Game = () => {
         }
         // Ignore clicks when user was scrolling the menu
         if (wasMenuDragging) {
+          return;
+        }
+        if (showSettingsRef.current) {
+          // Ignore clicks when user was scrolling
+          const wasSettingsDragging = settingsDragRef.current.moved;
+          if (wasSettingsDragging) {
+            settingsDragRef.current.moved = false;
+            return;
+          }
+
+          // Back button
+          const settingsBackBnds = gameStateRef.current._settingsBackBtnBounds;
+          if (settingsBackBnds && clickX >= settingsBackBnds.x && clickX <= settingsBackBnds.x + settingsBackBnds.w &&
+              clickY >= settingsBackBnds.y && clickY <= settingsBackBnds.y + settingsBackBnds.h) {
+            selectionTap();
+            showSettingsRef.current = false;
+            setShowSettings(false);
+            return;
+          }
+
+          // Graphics toggle
+          const gfxToggleBnds = gameStateRef.current._settingsGfxBounds;
+          if (gfxToggleBnds && clickX >= gfxToggleBnds.x && clickX <= gfxToggleBnds.x + gfxToggleBnds.w &&
+              clickY >= gfxToggleBnds.y && clickY <= gfxToggleBnds.y + gfxToggleBnds.h) {
+            selectionTap();
+            const cycle = { low: 'medium', medium: 'high', high: 'low' };
+            graphicsRef.current = cycle[graphicsRef.current] || 'medium';
+            window._voidHopperGfx = graphicsRef.current;
+            setItem('voidHopper_graphics', graphicsRef.current);
+            generateBackgroundStars(getW());
+            resizeCanvas();
+            return;
+          }
+
+          // Volume bar clicks (master, music, sfx)
+          const volBars = [
+            { ref: masterVolRef, key: 'voidHopper_masterVol', bounds: gameStateRef.current._settingsMasterVolBounds, apply: () => { if (audioManagerRef.current) audioManagerRef.current.setMasterVolume(masterVolRef.current / 100); } },
+            { ref: musicVolRef, key: 'voidHopper_musicVol', bounds: gameStateRef.current._settingsMusicVolBounds, apply: () => { if (audioManagerRef.current) audioManagerRef.current.setMusicVolume(musicVolRef.current / 100); } },
+            { ref: sfxVolRef, key: 'voidHopper_sfxVol', bounds: gameStateRef.current._settingsSfxVolBounds, apply: () => { if (audioManagerRef.current) audioManagerRef.current.setSfxVolume(sfxVolRef.current / 100); } },
+          ];
+          for (const vb of volBars) {
+            if (vb.bounds && clickX >= vb.bounds.x && clickX <= vb.bounds.x + vb.bounds.w &&
+                clickY >= vb.bounds.y && clickY <= vb.bounds.y + vb.bounds.h) {
+              selectionTap();
+              const pct = Math.round(((clickX - vb.bounds.x) / vb.bounds.w) * 100);
+              vb.ref.current = Math.max(0, Math.min(100, pct));
+              setItem(vb.key, String(vb.ref.current));
+              vb.apply();
+              return;
+            }
+          }
+
+          // Colorblind mode toggle
+          const cbBnds = gameStateRef.current._settingsColorblindBounds;
+          if (cbBnds && clickX >= cbBnds.x && clickX <= cbBnds.x + cbBnds.w &&
+              clickY >= cbBnds.y && clickY <= cbBnds.y + cbBnds.h) {
+            selectionTap();
+            const modes = ['none', 'deuteranopia', 'protanopia', 'tritanopia'];
+            const idx = modes.indexOf(colorblindModeRef.current);
+            colorblindModeRef.current = modes[(idx + 1) % modes.length];
+            setItem('voidHopper_colorblind', colorblindModeRef.current);
+            applyColorblindFilter(colorblindModeRef.current);
+            return;
+          }
+
+          // Reduced motion toggle
+          const rmBnds = gameStateRef.current._settingsReducedMotionBounds;
+          if (rmBnds && clickX >= rmBnds.x && clickX <= rmBnds.x + rmBnds.w &&
+              clickY >= rmBnds.y && clickY <= rmBnds.y + rmBnds.h) {
+            selectionTap();
+            reducedMotionRef.current = !reducedMotionRef.current;
+            setItem('voidHopper_reducedMotion', String(reducedMotionRef.current));
+            window._voidHopperReducedMotion = reducedMotionRef.current;
+            return;
+          }
+
+          // Left hand toggle
+          const lhBnds = gameStateRef.current._settingsLeftHandBounds;
+          if (lhBnds && clickX >= lhBnds.x && clickX <= lhBnds.x + lhBnds.w &&
+              clickY >= lhBnds.y && clickY <= lhBnds.y + lhBnds.h) {
+            selectionTap();
+            leftHandRef.current = !leftHandRef.current;
+            setItem('voidHopper_leftHand', String(leftHandRef.current));
+            return;
+          }
+
           return;
         }
         if (showShopRef.current) {
@@ -883,19 +1032,15 @@ const Game = () => {
           return;
         }
 
-        // Check if graphics button was clicked
-        const gfxBounds = gameStateRef.current._gfxBtnBounds;
-        if (gfxBounds &&
-            clickX >= gfxBounds.x && clickX <= gfxBounds.x + gfxBounds.w &&
-            menuClickY >= gfxBounds.y && menuClickY <= gfxBounds.y + gfxBounds.h) {
+        // Check if settings button was clicked
+        const settingsBtnBounds = gameStateRef.current._settingsBtnBounds;
+        if (settingsBtnBounds &&
+            clickX >= settingsBtnBounds.x && clickX <= settingsBtnBounds.x + settingsBtnBounds.w &&
+            menuClickY >= settingsBtnBounds.y && menuClickY <= settingsBtnBounds.y + settingsBtnBounds.h) {
           selectionTap();
-          const cycle = { low: 'medium', medium: 'high', high: 'low' };
-          graphicsRef.current = cycle[graphicsRef.current] || 'medium';
-          window._voidHopperGfx = graphicsRef.current;
-          setItem('voidHopper_graphics', graphicsRef.current);
-          // Regenerate stars/dust with new particle count and update canvas DPR
-          generateBackgroundStars(getW());
-          resizeCanvas();
+          showSettingsRef.current = true;
+          settingsScrollRef.current = 0;
+          setShowSettings(true);
           return;
         }
 
@@ -1089,7 +1234,10 @@ const Game = () => {
     };
 
     const handleWheel = (e) => {
-      if (showShopRef.current) {
+      if (showSettingsRef.current) {
+        e.preventDefault();
+        settingsScrollRef.current = Math.max(0, settingsScrollRef.current + e.deltaY);
+      } else if (showShopRef.current) {
         e.preventDefault();
         shopScrollRef.current = Math.max(0, shopScrollRef.current + e.deltaY);
       } else if (!gameStarted && !isGameOver) {
@@ -2332,15 +2480,21 @@ const Game = () => {
       });
     }
 
-    // Update screen shake
+    // Update screen shake (skip if reduced motion)
     if (state.shakeIntensity > 0) {
-      state.shakeX = (Math.random() - 0.5) * state.shakeIntensity * 2;
-      state.shakeY = (Math.random() - 0.5) * state.shakeIntensity * 2;
-      state.shakeIntensity *= Math.pow(0.9, deltaTime * 60);
-      if (state.shakeIntensity < 0.3) {
+      if (reducedMotionRef.current) {
         state.shakeIntensity = 0;
         state.shakeX = 0;
         state.shakeY = 0;
+      } else {
+        state.shakeX = (Math.random() - 0.5) * state.shakeIntensity * 2;
+        state.shakeY = (Math.random() - 0.5) * state.shakeIntensity * 2;
+        state.shakeIntensity *= Math.pow(0.9, deltaTime * 60);
+        if (state.shakeIntensity < 0.3) {
+          state.shakeIntensity = 0;
+          state.shakeX = 0;
+          state.shakeY = 0;
+        }
       }
     }
 
@@ -2769,8 +2923,9 @@ const Game = () => {
       ].filter(c => c && typeof c === 'string' && c !== 'null');
       if (featherColors.length === 0) featherColors.push('#ffffff', '#cccccc');
 
-      for (let i = 0; i < 25; i++) {
-        const angle = (Math.PI * 2 * i) / 25 + (Math.random() - 0.5) * 0.3;
+      const featherCount = reducedMotionRef.current ? 6 : 25;
+      for (let i = 0; i < featherCount; i++) {
+        const angle = (Math.PI * 2 * i) / featherCount + (Math.random() - 0.5) * 0.3;
         const speed = Math.random() * 12 + 5;
 
         state.explosionParticles.push({
@@ -2784,9 +2939,9 @@ const Game = () => {
           featherColor: featherColors[Math.floor(Math.random() * featherColors.length)],
           featherSize: Math.random() * 8 + 6,
           featherRotation: Math.random() * Math.PI * 2,
-          featherRotationSpeed: (Math.random() - 0.5) * 2,
+          featherRotationSpeed: reducedMotionRef.current ? 0 : (Math.random() - 0.5) * 2,
           wobblePhase: Math.random() * Math.PI * 2,
-          wobbleSpeed: Math.random() * 2 + 1,
+          wobbleSpeed: reducedMotionRef.current ? 0 : Math.random() * 2 + 1,
         });
       }
 
@@ -3934,10 +4089,10 @@ const Game = () => {
       ctx.restore();
     }
 
-    // Draw mute toggle button (top right) — scaled for iPad
+    // Draw mute toggle button — scaled for iPad (flipped for left-hand mode)
     ctx.save();
     const btnSize = Math.round(50 * ts);
-    const btnX = width - Math.round(70 * ts);
+    const btnX = leftHandRef.current ? Math.round(20 * ts) : width - Math.round(70 * ts);
     const btnY = Math.round(20 * ts) + safeTop;
     const muted = isMutedRef.current;
     ctx.fillStyle = muted ? 'rgba(100, 100, 100, 0.8)' : 'rgba(147, 112, 219, 0.8)';
@@ -3987,10 +4142,10 @@ const Game = () => {
     }
     ctx.restore();
 
-    // Draw pause button (top right, left of music button)
+    // Draw pause button (next to mute button, flipped for left-hand mode)
     if (gameStarted && !isGameOver) {
       ctx.save();
-      const pbX = width - Math.round(130 * ts);
+      const pbX = leftHandRef.current ? Math.round(80 * ts) : width - Math.round(130 * ts);
       const pbY = Math.round(20 * ts) + safeTop;
       ctx.fillStyle = isPausedRef.current ? 'rgba(77, 204, 255, 0.8)' : 'rgba(100, 100, 100, 0.8)';
       ctx.fillRect(pbX, pbY, btnSize, btnSize);
@@ -4928,6 +5083,195 @@ const Game = () => {
         ctx.restore();
         gameStateRef.current._shopBackBtnBounds = { x: width / 2 - backBtnW / 2, y: backBtnY, w: backBtnW, h: backBtnH };
 
+      } else if (showSettingsRef.current) {
+        // === SETTINGS PANEL ===
+        const sTs = Math.max(1, width / 390);
+        const sSafeBot = gameStateRef.current.safeBottom || 0;
+        const sFooterH = Math.round(80 * sTs) + sSafeBot;
+        const sHeaderH = Math.round(80 * sTs);
+        const sVisibleH = height - sHeaderH - sFooterH;
+        const sPad = Math.round(14 * sTs);
+        const sRowH = Math.round(50 * sTs);
+        const sMaxW = Math.min(width - 30, Math.round(340 * sTs));
+        const sStartX = width / 2 - sMaxW / 2;
+
+        // Total content height for scrolling
+        const sTotalH = sRowH * 9 + sPad * 10;
+        const sMaxScroll = Math.max(0, sTotalH - sVisibleH + 10);
+        if (settingsScrollRef.current > sMaxScroll) settingsScrollRef.current = sMaxScroll;
+        if (settingsScrollRef.current < 0) settingsScrollRef.current = 0;
+        const sScrollY = settingsScrollRef.current;
+
+        // Header
+        ctx.fillStyle = 'rgba(18, 14, 41, 0.98)';
+        ctx.fillRect(0, 0, width, sHeaderH);
+        ctx.font = `bold ${Math.round(22 * sTs)}px Orbitron, Arial`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('SETTINGS', width / 2, sHeaderH / 2 + Math.round(8 * sTs));
+
+        // Scrollable content area
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, sHeaderH, width, sVisibleH);
+        ctx.clip();
+
+        let sY = sHeaderH + sPad - sScrollY;
+
+        // Helper: draw section label
+        const drawLabel = (text, y) => {
+          ctx.font = `bold ${Math.round(11 * sTs)}px Orbitron, Arial`;
+          ctx.textAlign = 'left';
+          ctx.fillStyle = '#88aacc';
+          ctx.fillText(text, sStartX, y + Math.round(14 * sTs));
+        };
+
+        // Helper: draw a volume bar
+        const drawVolBar = (label, value, y, boundsKey) => {
+          drawLabel(label, y);
+          const barX = sStartX + Math.round(90 * sTs);
+          const barW = sMaxW - Math.round(130 * sTs);
+          const barH = Math.round(20 * sTs);
+          const barY = y + Math.round(15 * sTs) - barH / 2;
+          // Background
+          ctx.fillStyle = 'rgba(40, 30, 60, 0.8)';
+          ctx.fillRect(barX, barY, barW, barH);
+          // Fill
+          const fillW = (value / 100) * barW;
+          ctx.fillStyle = '#9966cc';
+          ctx.fillRect(barX, barY, fillW, barH);
+          // Border
+          ctx.strokeStyle = '#666688';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(barX, barY, barW, barH);
+          // Value text
+          ctx.font = `bold ${Math.round(12 * sTs)}px Orbitron, Arial`;
+          ctx.textAlign = 'right';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(`${value}%`, sStartX + sMaxW, y + Math.round(18 * sTs));
+          gameStateRef.current[boundsKey] = { x: barX, y: barY, w: barW, h: barH };
+        };
+
+        // Helper: draw toggle row
+        const drawToggle = (label, value, y, boundsKey) => {
+          drawLabel(label, y);
+          const btnW = Math.round(70 * sTs);
+          const btnH = Math.round(28 * sTs);
+          const btnX = sStartX + sMaxW - btnW;
+          const btnY = y + Math.round(15 * sTs) - btnH / 2;
+          ctx.fillStyle = value ? 'rgba(68, 204, 102, 0.8)' : 'rgba(60, 40, 80, 0.8)';
+          ctx.fillRect(btnX, btnY, btnW, btnH);
+          ctx.strokeStyle = value ? '#44cc66' : '#555577';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(btnX, btnY, btnW, btnH);
+          ctx.font = `bold ${Math.round(11 * sTs)}px Orbitron, Arial`;
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(value ? 'ON' : 'OFF', btnX + btnW / 2, btnY + btnH / 2 + Math.round(4 * sTs));
+          gameStateRef.current[boundsKey] = { x: btnX, y: btnY, w: btnW, h: btnH };
+        };
+
+        // Helper: draw cycle button row
+        const drawCycle = (label, value, y, boundsKey) => {
+          drawLabel(label, y);
+          const btnW = Math.round(140 * sTs);
+          const btnH = Math.round(28 * sTs);
+          const btnX = sStartX + sMaxW - btnW;
+          const btnY = y + Math.round(15 * sTs) - btnH / 2;
+          ctx.fillStyle = 'rgba(40, 30, 60, 0.8)';
+          ctx.fillRect(btnX, btnY, btnW, btnH);
+          ctx.strokeStyle = '#88aacc';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(btnX, btnY, btnW, btnH);
+          ctx.font = `bold ${Math.round(10 * sTs)}px Orbitron, Arial`;
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(value.toUpperCase(), btnX + btnW / 2, btnY + btnH / 2 + Math.round(4 * sTs));
+          gameStateRef.current[boundsKey] = { x: btnX, y: btnY, w: btnW, h: btnH };
+        };
+
+        // --- SECTION: AUDIO ---
+        ctx.font = `bold ${Math.round(14 * sTs)}px Orbitron, Arial`;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#bb88ff';
+        ctx.fillText('AUDIO', sStartX, sY + Math.round(14 * sTs));
+        sY += Math.round(24 * sTs);
+
+        drawVolBar('MASTER', masterVolRef.current, sY, '_settingsMasterVolBounds');
+        sY += sRowH;
+        drawVolBar('MUSIC', musicVolRef.current, sY, '_settingsMusicVolBounds');
+        sY += sRowH;
+        drawVolBar('SFX', sfxVolRef.current, sY, '_settingsSfxVolBounds');
+        sY += sRowH + sPad;
+
+        // --- SECTION: DISPLAY ---
+        ctx.font = `bold ${Math.round(14 * sTs)}px Orbitron, Arial`;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#bb88ff';
+        ctx.fillText('DISPLAY', sStartX, sY + Math.round(14 * sTs));
+        sY += Math.round(24 * sTs);
+
+        const gfxColors = { low: '#44cc66', medium: '#ffaa22', high: '#ff4466' };
+        const gfxColor = gfxColors[graphicsRef.current] || '#ffaa22';
+        drawLabel('GRAPHICS', sY);
+        const gBtnW = Math.round(90 * sTs);
+        const gBtnH = Math.round(28 * sTs);
+        const gBtnX = sStartX + sMaxW - gBtnW;
+        const gBtnY = sY + Math.round(15 * sTs) - gBtnH / 2;
+        ctx.fillStyle = 'rgba(40, 30, 60, 0.8)';
+        ctx.fillRect(gBtnX, gBtnY, gBtnW, gBtnH);
+        ctx.strokeStyle = gfxColor;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(gBtnX, gBtnY, gBtnW, gBtnH);
+        ctx.font = `bold ${Math.round(12 * sTs)}px Orbitron, Arial`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = gfxColor;
+        ctx.fillText(graphicsRef.current.toUpperCase(), gBtnX + gBtnW / 2, gBtnY + gBtnH / 2 + Math.round(4 * sTs));
+        gameStateRef.current._settingsGfxBounds = { x: gBtnX, y: gBtnY, w: gBtnW, h: gBtnH };
+        sY += sRowH + sPad;
+
+        // --- SECTION: ACCESSIBILITY ---
+        ctx.font = `bold ${Math.round(14 * sTs)}px Orbitron, Arial`;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#bb88ff';
+        ctx.fillText('ACCESSIBILITY', sStartX, sY + Math.round(14 * sTs));
+        sY += Math.round(24 * sTs);
+
+        const cbLabels = { none: 'NONE', deuteranopia: 'DEUTERANOPIA', protanopia: 'PROTANOPIA', tritanopia: 'TRITANOPIA' };
+        drawCycle('COLOR BLIND', cbLabels[colorblindModeRef.current] || 'NONE', sY, '_settingsColorblindBounds');
+        sY += sRowH;
+
+        drawToggle('REDUCE MOTION', reducedMotionRef.current, sY, '_settingsReducedMotionBounds');
+        sY += sRowH;
+
+        drawToggle('LEFT HAND', leftHandRef.current, sY, '_settingsLeftHandBounds');
+
+        ctx.restore(); // end clip
+
+        // Footer background
+        ctx.fillStyle = 'rgba(18, 14, 41, 0.95)';
+        ctx.fillRect(0, height - sFooterH, width, sFooterH);
+
+        // Back button
+        ctx.save();
+        const sBackW = Math.round(160 * sTs);
+        const sBackH = Math.round(50 * sTs);
+        const sBackY = height - sSafeBot - Math.round(68 * sTs);
+        ctx.fillStyle = 'rgba(60, 40, 100, 0.9)';
+        ctx.fillRect(width / 2 - sBackW / 2, sBackY, sBackW, sBackH);
+        ctx.strokeStyle = '#9966cc';
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#9966cc';
+        ctx.strokeRect(width / 2 - sBackW / 2, sBackY, sBackW, sBackH);
+        ctx.shadowBlur = 0;
+        ctx.font = `bold ${Math.round(18 * sTs)}px Orbitron, Arial`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('BACK', width / 2, sBackY + Math.round(31 * sTs));
+        ctx.restore();
+        gameStateRef.current._settingsBackBtnBounds = { x: width / 2 - sBackW / 2, y: sBackY, w: sBackW, h: sBackH };
+
       } else {
         // === MAIN MENU ===
         const isSmallScreen = width < 420;
@@ -5170,24 +5514,18 @@ const Game = () => {
         ctx.fillText('SHOP', rowStartX + shopBtnW / 2, curY + shopBtnH / 2 + Math.round(6 * menuTs));
         gameStateRef.current._shopBtnBounds = { x: rowStartX, y: curY, w: shopBtnW, h: shopBtnH };
 
-        // Graphics button
-        const gfxLabel = graphicsRef.current.toUpperCase();
-        const gfxColors = { low: '#44cc66', medium: '#ffaa22', high: '#ff4466' };
-        const gfxColor = gfxColors[graphicsRef.current] || '#ffaa22';
-        const gfxBtnX = rowStartX + shopBtnW + 8;
+        // Settings button
+        const settingsBtnX = rowStartX + shopBtnW + 8;
         ctx.fillStyle = 'rgba(30, 20, 50, 0.9)';
-        ctx.fillRect(gfxBtnX, curY, gfxBtnW, shopBtnH);
-        ctx.strokeStyle = gfxColor;
+        ctx.fillRect(settingsBtnX, curY, gfxBtnW, shopBtnH);
+        ctx.strokeStyle = '#88aacc';
         ctx.lineWidth = 1;
-        ctx.strokeRect(gfxBtnX, curY, gfxBtnW, shopBtnH);
-        ctx.font = `bold ${Math.round((isSmallScreen ? 10 : 11) * menuTs)}px Orbitron, Arial`;
+        ctx.strokeRect(settingsBtnX, curY, gfxBtnW, shopBtnH);
+        ctx.font = `bold ${Math.round((isSmallScreen ? 14 : 16) * menuTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#aaaaaa';
-        ctx.fillText('GFX:', gfxBtnX + gfxBtnW / 2 - Math.round(20 * menuTs), curY + shopBtnH / 2 + 4);
-        ctx.fillStyle = gfxColor;
-        ctx.font = `bold ${Math.round((isSmallScreen ? 12 : 13) * menuTs)}px Orbitron, Arial`;
-        ctx.fillText(gfxLabel, gfxBtnX + gfxBtnW / 2 + Math.round(22 * menuTs), curY + shopBtnH / 2 + 4);
-        gameStateRef.current._gfxBtnBounds = { x: gfxBtnX, y: curY, w: gfxBtnW, h: shopBtnH };
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('SETTINGS', settingsBtnX + gfxBtnW / 2, curY + shopBtnH / 2 + Math.round(5 * menuTs));
+        gameStateRef.current._settingsBtnBounds = { x: settingsBtnX, y: curY, w: gfxBtnW, h: shopBtnH };
         curY += shopBtnH + menuPad;
 
         // --- Leaderboard button (Game Center) ---
@@ -5326,6 +5664,29 @@ const Game = () => {
       padding: 0,
       overscrollBehavior: 'none',
     }}>
+      {/* SVG colorblind filter definitions */}
+      <svg style={{ position: 'absolute', width: 0, height: 0 }} aria-hidden="true">
+        <defs>
+          <filter id="cb-deuteranopia">
+            <feColorMatrix type="matrix" values="0.625 0.375 0     0 0
+                                                  0.7   0.3   0     0 0
+                                                  0     0.3   0.7   0 0
+                                                  0     0     0     1 0" />
+          </filter>
+          <filter id="cb-protanopia">
+            <feColorMatrix type="matrix" values="0.567 0.433 0     0 0
+                                                  0.558 0.442 0     0 0
+                                                  0     0.242 0.758 0 0
+                                                  0     0     0     1 0" />
+          </filter>
+          <filter id="cb-tritanopia">
+            <feColorMatrix type="matrix" values="0.95  0.05  0     0 0
+                                                  0     0.433 0.567 0 0
+                                                  0     0.475 0.525 0 0
+                                                  0     0     0     1 0" />
+          </filter>
+        </defs>
+      </svg>
       <canvas
         ref={canvasRef}
         style={{
