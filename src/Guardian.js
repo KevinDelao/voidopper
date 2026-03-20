@@ -10,7 +10,7 @@ const MILESTONE_BOSSES = [
     color: { primary: '#4488cc', secondary: '#66bbff', glow: '#88ddff' },
     attackPattern: 'shockwave',
     attackInterval: 2.2,
-    attackParams: { radius: 140, speed: 160 },
+    attackParams: { radius: 400, speed: 200 },
     movementPattern: 'hover_drift',
     movementSpeed: 40,
     size: 28,
@@ -55,7 +55,7 @@ const MILESTONE_BOSSES = [
     color: { primary: '#220044', secondary: '#6600aa', glow: '#aa44ff' },
     attackPattern: 'multi_attack',
     attackInterval: 1.4,
-    attackParams: { burstCount: 5, burstSpeed: 150, laserWidth: 7, sweepSpeed: 2.5, vortexRadius: 180, vortexStrength: 140 },
+    attackParams: { burstCount: 5, burstSpeed: 150, laserWidth: 7, sweepSpeed: 2.5, vortexRadius: 380, vortexStrength: 140 },
     movementPattern: 'figure_eight',
     movementSpeed: 60,
     size: 48,
@@ -85,7 +85,7 @@ const MILESTONE_BOSSES = [
     color: { primary: '#ffd700', secondary: '#ffee44', glow: '#ffffff' },
     attackPattern: 'leviathan',
     attackInterval: 0.8,
-    attackParams: { burstCount: 8, burstSpeed: 170, spiralSpeed: 140, minionCount: 4, minionSpeed: 130, shockwaveRadius: 200, shockwaveSpeed: 260 },
+    attackParams: { burstCount: 8, burstSpeed: 170, spiralSpeed: 140, minionCount: 4, minionSpeed: 130, shockwaveRadius: 420, shockwaveSpeed: 300 },
     movementPattern: 'figure_eight',
     movementSpeed: 70,
     size: 50,
@@ -127,7 +127,7 @@ const EASY_GUARDIANS = [
     color: { primary: '#8866cc', secondary: '#aa88ee', glow: '#ccaaff' },
     attackPattern: 'shockwave',
     attackInterval: 2.5,
-    attackParams: { radius: 130, speed: 180 },
+    attackParams: { radius: 380, speed: 220 },
     movementPattern: 'figure_eight',
     movementSpeed: 45,
     size: 30,
@@ -178,7 +178,7 @@ const MEDIUM_GUARDIANS = [
     color: { primary: '#2266cc', secondary: '#44aaff', glow: '#66ccff' },
     attackPattern: 'gravity_pull',
     attackInterval: 2.5,
-    attackParams: { radius: 200, strength: 130 },
+    attackParams: { radius: 380, strength: 130 },
     movementPattern: 'orbit',
     movementSpeed: 60,
     size: 38,
@@ -202,7 +202,7 @@ const MEDIUM_GUARDIANS = [
     color: { primary: '#ff8800', secondary: '#ffaa00', glow: '#ffcc44' },
     attackPattern: 'shockwave',
     attackInterval: 1.4,
-    attackParams: { radius: 150, speed: 230 },
+    attackParams: { radius: 400, speed: 250 },
     movementPattern: 'figure_eight',
     movementSpeed: 65,
     size: 30,
@@ -241,7 +241,7 @@ const HARD_GUARDIANS = [
     color: { primary: '#666688', secondary: '#8888aa', glow: '#aaaacc' },
     attackPattern: 'multi_attack',
     attackInterval: 1.8,
-    attackParams: { burstCount: 6, burstSpeed: 150, laserWidth: 7, sweepSpeed: 2.5, vortexRadius: 170, vortexStrength: 130 },
+    attackParams: { burstCount: 6, burstSpeed: 150, laserWidth: 7, sweepSpeed: 2.5, vortexRadius: 380, vortexStrength: 130 },
     movementPattern: 'patrol',
     movementSpeed: 60,
     size: 44,
@@ -277,7 +277,7 @@ const HARD_GUARDIANS = [
     color: { primary: '#ff4400', secondary: '#ff8844', glow: '#ffcc88' },
     attackPattern: 'nova_burst',
     attackInterval: 1.8,
-    attackParams: { ringCount: 10, speed: 180, shockwaveRadius: 180, shockwaveSpeed: 280 },
+    attackParams: { ringCount: 10, speed: 180, shockwaveRadius: 400, shockwaveSpeed: 300 },
     movementPattern: 'figure_eight',
     movementSpeed: 50,
     size: 38,
@@ -424,8 +424,8 @@ class Guardian {
       return;
     }
 
-    // Track camera
-    const targetY = cameraY + screenHeight * 0.25;
+    // Track camera — position at 40% from top so attacks can reach player at 75%
+    const targetY = cameraY + screenHeight * 0.4;
     this.y = targetY;
 
     // Movement
@@ -608,7 +608,7 @@ class Guardian {
           x: this.x, y: this.y,
           vx: Math.cos(this.spiralAngle) * speed,
           vy: Math.sin(this.spiralAngle) * speed,
-          radius: r, life: 2.0, phase: 0,
+          radius: r, life: 3.0, phase: 0,
         });
         break;
       }
@@ -643,13 +643,13 @@ class Guardian {
       case 'shockwave': {
         this.shockwaveActive = true;
         this.shockwaveRadius = 0;
-        this.shockwaveMaxRadius = params.radius || 120;
+        this.shockwaveMaxRadius = params.radius || 380;
         break;
       }
       case 'gravity_pull': {
         this.vortexActive = true;
         this.vortexTimer = 2.5;
-        this.vortexRadius = params.radius || 150;
+        this.vortexRadius = params.radius || 350;
         this.vortexStrength = (params.strength || 100) * this.difficultyScale;
         break;
       }
@@ -684,7 +684,7 @@ class Guardian {
               x: this.x + ox, y: this.y,
               vx: Math.cos(angle) * speed,
               vy: Math.sin(angle) * speed,
-              radius: 4, life: 2.0, phase: 0,
+              radius: 4, life: 3.0, phase: 0,
             });
           }
         });
@@ -700,12 +700,12 @@ class Guardian {
             x: this.x, y: this.y,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
-            radius: 5, life: 2.0, phase: 0,
+            radius: 5, life: 3.0, phase: 0,
           });
         }
         this.shockwaveActive = true;
         this.shockwaveRadius = 0;
-        this.shockwaveMaxRadius = params.shockwaveRadius || 160;
+        this.shockwaveMaxRadius = params.shockwaveRadius || 380;
         break;
       }
       case 'multi_attack': {
@@ -734,7 +734,7 @@ class Guardian {
           // Vortex
           this.vortexActive = true;
           this.vortexTimer = 2.0;
-          this.vortexRadius = params.vortexRadius || 150;
+          this.vortexRadius = params.vortexRadius || 350;
           this.vortexStrength = (params.vortexStrength || 100) * this.difficultyScale;
         }
         break;
@@ -756,7 +756,7 @@ class Guardian {
                 x: hx, y: hy,
                 vx: Math.cos(angle) * speed,
                 vy: Math.sin(angle) * speed,
-                radius: 4, life: 2.0, phase: 0,
+                radius: 4, life: 3.0, phase: 0,
               });
             }
           } else {
@@ -811,7 +811,7 @@ class Guardian {
           // Shockwave
           this.shockwaveActive = true;
           this.shockwaveRadius = 0;
-          this.shockwaveMaxRadius = params.shockwaveRadius || 180;
+          this.shockwaveMaxRadius = params.shockwaveRadius || 400;
         } else {
           // Dual laser
           this.laserActive = true;
@@ -834,7 +834,7 @@ class Guardian {
             y: this.y + (Math.random() - 0.5) * this.radius,
             vx: Math.cos(angle) * speed * (0.7 + Math.random() * 0.6),
             vy: Math.sin(angle) * speed * (0.7 + Math.random() * 0.6),
-            radius: 3 + Math.random() * 2, life: 2.0, phase: Math.random() * 6,
+            radius: 3 + Math.random() * 2, life: 3.5, phase: Math.random() * 6,
           });
         }
         break;
@@ -853,7 +853,7 @@ class Guardian {
             x: xPos, y: this.y,
             vx: 0,
             vy: speed,
-            radius: 5, life: 3.0, phase: 0,
+            radius: 5, life: 4.5, phase: 0,
           });
         }
         break;
