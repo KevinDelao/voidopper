@@ -477,6 +477,12 @@ const Game = () => {
         // Consume this tap — don't let it hit menu buttons behind the overlay
         return;
       }
+      // Lightweight recovery: if AudioContext is interrupted/suspended (e.g. Control Center),
+      // resume it within this user gesture so iOS allows playback.
+      if (am && am.audioContext && am.audioContext.state !== 'running' && am.audioContext.state !== 'closed') {
+        am.audioContext.resume().catch(() => {});
+      }
+
       const touch = e.touches[0];
       if (!touch) return;
 
@@ -1140,6 +1146,17 @@ const Game = () => {
           restartGame(getW(), getH());
           setGameStarted(true);
           gameOverTimeRef.current = null;
+          // Restart game music (may have stopped during game over screen)
+          if (audioManagerRef.current) {
+            const am = audioManagerRef.current;
+            am.stopMusic();
+            am.stopMenuMusic();
+            if (am.isInitialized) {
+              am.startMusic(difficultyRef.current);
+            } else {
+              am.initialize().then(() => am.startMusic(difficultyRef.current));
+            }
+          }
         }
         return;
       } else {
@@ -1205,6 +1222,17 @@ const Game = () => {
           if (timeSinceGameOver >= 1500) {
             restartGame(getW(), getH());
             gameOverTimeRef.current = null; // Reset
+            // Restart game music
+            if (audioManagerRef.current) {
+              const am = audioManagerRef.current;
+              am.stopMusic();
+              am.stopMenuMusic();
+              if (am.isInitialized) {
+                am.startMusic(difficultyRef.current);
+              } else {
+                am.initialize().then(() => am.startMusic(difficultyRef.current));
+              }
+            }
           }
         }
         return;

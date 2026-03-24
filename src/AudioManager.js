@@ -88,6 +88,14 @@ class AudioManager {
         nearMiss: this._createNoiseBuffer(0.15),
       };
 
+      // Listen for AudioContext state changes — iOS fires this when returning
+      // from Control Center, Siri, phone calls, etc. without full backgrounding.
+      this.audioContext.onstatechange = () => {
+        if (this.audioContext && this.audioContext.state === 'running') {
+          this._recoverAfterInterruption();
+        }
+      };
+
       this.isInitialized = true;
     } catch (error) {
       if (this.audioContext) {
@@ -903,22 +911,35 @@ class AudioManager {
     // actively touching the screen so the resume call is allowed on iOS.
     if (this.audioContext.state === 'suspended' || this.audioContext.state === 'interrupted') {
       this.audioContext.resume().then(() => {
-        // Kill all existing oscillators — their scheduled params are broken
-        // after an interruption and will cause stuck/droning sounds
-        if (this.musicIntervalId) {
-          clearInterval(this.musicIntervalId);
-          this.musicIntervalId = null;
-        }
-        this._replaceMusicGain();
-        // Restart music cleanly
-        if (this.isMusicPlaying) {
-          this.isMusicPlaying = false;
-          this.startMusic(this.currentDifficulty);
-        }
+        this._recoverAfterInterruption();
       }).catch(() => {});
       return false;
     }
     return this.audioContext.state === 'running';
+  }
+
+  // Recover music after an AudioContext interruption (Control Center, Siri, phone call, etc.)
+  _recoverAfterInterruption() {
+    if (!this.audioContext || this.audioContext.state !== 'running') return;
+    // Kill all existing oscillators — their scheduled params are broken
+    // after an interruption and will cause stuck/droning sounds
+    if (this.musicIntervalId) {
+      clearInterval(this.musicIntervalId);
+      this.musicIntervalId = null;
+    }
+    if (this.menuMusicIntervalId) {
+      clearInterval(this.menuMusicIntervalId);
+      this.menuMusicIntervalId = null;
+    }
+    this._replaceMusicGain();
+    // Restart whichever music was active
+    if (this.isMusicPlaying) {
+      this.isMusicPlaying = false;
+      this.startMusic(this.currentDifficulty);
+    } else if (this.isMenuMusicPlaying) {
+      this.isMenuMusicPlaying = false;
+      this.startMenuMusic();
+    }
   }
 
   _restartActiveMusic() {
