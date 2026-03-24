@@ -83,6 +83,7 @@ const Game = () => {
   const audioManagerRef = useRef(null);
   const gameOverTimeRef = useRef(null);
   const progressionRef = useRef(null);
+  const appStateListenerRef = useRef(null);
 
   // Persistent data from localStorage
   const [totalCoins, setTotalCoins] = useState(() => {
@@ -1281,7 +1282,7 @@ const Game = () => {
       if (_audioSuspended) return;
       _audioSuspended = true;
       // Auto-pause the game if in an active level
-      if (gameStateRef.current.isRunning && !isPausedRef.current) {
+      if (gameStarted && !isGameOver) {
         isPausedRef.current = true;
         setIsPaused(true);
       }
@@ -1323,10 +1324,14 @@ const Game = () => {
     };
     document.addEventListener('visibilitychange', handleVisibility);
     // Capacitor App plugin fires appStateChange reliably on iOS native
-    let appStateListener = null;
+    // Clean up previous listener before adding a new one (effect re-fires on deps change)
+    if (appStateListenerRef.current) {
+      appStateListenerRef.current.remove();
+      appStateListenerRef.current = null;
+    }
     App.addListener('appStateChange', ({ isActive }) => {
       if (isActive) resumeAudio(); else suspendAudio();
-    }).then(handle => { appStateListener = handle; }).catch(() => {});
+    }).then(handle => { appStateListenerRef.current = handle; }).catch(() => {});
 
     return () => {
       window.removeEventListener('resize', resizeCanvas);
@@ -1344,11 +1349,10 @@ const Game = () => {
       window.removeEventListener('keyup', handleKeyUp);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('memorywarning', handleMemoryWarning);
-      if (appStateListener) appStateListener.remove();
+      if (appStateListenerRef.current) { appStateListenerRef.current.remove(); appStateListenerRef.current = null; }
       cancelAnimationFrame(animationFrameId);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isGameOver, gameStarted]);
 
   // Dispose audio only on true component unmount
   useEffect(() => {
