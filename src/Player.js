@@ -194,10 +194,13 @@ class Player {
       const targetRotation = Math.atan2(this.vx, -this.vy);
       this.rotation = this.rotation * 0.8 + targetRotation * 0.2;
 
-      // Add to trail
+      // Add to trail (compact in-place to avoid GC pressure from slice)
       this.trail.push({ x: this.x, y: this.y });
       if (this.trail.length > this.maxTrailLength * 2) {
-        this.trail = this.trail.slice(-this.maxTrailLength);
+        const keep = this.maxTrailLength;
+        const start = this.trail.length - keep;
+        for (let i = 0; i < keep; i++) this.trail[i] = this.trail[start + i];
+        this.trail.length = keep;
       }
     } else {
       // When stuck, face the opposite wall with slight upward tilt
@@ -265,8 +268,9 @@ class Player {
   }
 
   _updateTrailParticles(deltaTime) {
-    // Update existing trail particles
-    for (let i = this.trailParticles.length - 1; i >= 0; i--) {
+    // Update existing trail particles (in-place compaction to avoid splice GC)
+    let w = 0;
+    for (let i = 0; i < this.trailParticles.length; i++) {
       const p = this.trailParticles[i];
       p.x += p.vx * deltaTime;
       p.y += p.vy * deltaTime;
@@ -274,10 +278,9 @@ class Player {
       p.life -= deltaTime;
       p.age += deltaTime;
       if (p.rotation !== undefined) p.rotation += p.rotSpeed * deltaTime;
-      if (p.life <= 0) {
-        this.trailParticles.splice(i, 1);
-      }
+      if (p.life > 0) this.trailParticles[w++] = p;
     }
+    this.trailParticles.length = w;
 
     // Spawn new trail particles only when flying
     const t = this.activeTrail;
@@ -626,14 +629,12 @@ class Player {
       }
     }
 
-    // Update existing
-    for (let i = this.animParticles.length - 1; i >= 0; i--) {
+    // Update existing (in-place compaction)
+    let aw = 0;
+    for (let i = 0; i < this.animParticles.length; i++) {
       const p = this.animParticles[i];
       p.life -= deltaTime;
-      if (p.life <= 0) {
-        this.animParticles.splice(i, 1);
-        continue;
-      }
+      if (p.life <= 0) continue;
       if (p.type === 'fire' || p.type === 'shimmer') {
         p.ox += p.vx * deltaTime;
         p.oy += p.vy * deltaTime;
@@ -641,7 +642,9 @@ class Player {
       if (p.type === 'star') {
         p.orbitAngle += p.orbitSpeed * deltaTime;
       }
+      this.animParticles[aw++] = p;
     }
+    this.animParticles.length = aw;
 
     // Cap particles
     if (this.animParticles.length > 30) {

@@ -119,10 +119,14 @@ class SpaceJellyfish {
     const bellWidth = 18 * pulseScale;
     const bellHeight = 14 * (1 + (1 - pulseScale) * 0.5); // Inverse squash
 
-    const bodyGrad = ctx.createRadialGradient(0, -3, 0, 0, 0, bellWidth);
-    bodyGrad.addColorStop(0, this.innerGlow);
-    bodyGrad.addColorStop(0.4, this.bodyColor);
-    bodyGrad.addColorStop(1, `hsla(${this.hue}, 70%, 50%, 0.5)`);
+    if (!this._bodyGrad || this._bodyGradW !== bellWidth) {
+      this._bodyGrad = ctx.createRadialGradient(0, -3, 0, 0, 0, bellWidth);
+      this._bodyGrad.addColorStop(0, this.innerGlow);
+      this._bodyGrad.addColorStop(0.4, this.bodyColor);
+      this._bodyGrad.addColorStop(1, `hsla(${this.hue}, 70%, 50%, 0.5)`);
+      this._bodyGradW = bellWidth;
+    }
+    const bodyGrad = this._bodyGrad;
 
     ctx.fillStyle = bodyGrad;
     ctx.beginPath();

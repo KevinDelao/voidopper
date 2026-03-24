@@ -43,7 +43,7 @@ const GFX = {
     enableParticleShadows: false,
   },
   high: {
-    dprCap: Infinity, stars: 100, dust: 40, wallParticles: 12, coinSparkles: 6,
+    dprCap: 3, stars: 100, dust: 40, wallParticles: 12, coinSparkles: 6,
     shadowBlurSmall: 5, shadowBlurMed: 12, shadowBlurLarge: 30,
     enableParticleShadows: true,
   },
@@ -1246,6 +1246,25 @@ const Game = () => {
       }
     };
 
+    // iOS memory pressure handler — reduce allocations to avoid WKWebView OOM kill
+    const handleMemoryWarning = () => {
+      const state = gameStateRef.current;
+      if (!state) return;
+      // Aggressively trim entity arrays
+      if (state.explosionParticles.length > 5) state.explosionParticles.length = 5;
+      if (state.wallParticles.length > 5) state.wallParticles.length = 5;
+      if (state.dustParticles.length > 5) state.dustParticles.length = 5;
+      if (state.floatingTexts.length > 3) state.floatingTexts.length = 3;
+      if (state.coinCollectAnims.length > 3) state.coinCollectAnims.length = 3;
+      // Clear player trail particles
+      if (state.player) {
+        state.player.trailParticles = [];
+        state.player.animParticles = [];
+        state.player.trail = [];
+      }
+    };
+    window.addEventListener('memorywarning', handleMemoryWarning);
+
     canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
     canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
     canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
@@ -1262,7 +1281,7 @@ const Game = () => {
       if (_audioSuspended) return;
       _audioSuspended = true;
       // Auto-pause the game if in an active level
-      if (gameStarted && !isGameOver) {
+      if (gameStateRef.current.isRunning && !isPausedRef.current) {
         isPausedRef.current = true;
         setIsPaused(true);
       }
@@ -1324,10 +1343,12 @@ const Game = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('memorywarning', handleMemoryWarning);
       if (appStateListener) appStateListener.remove();
       cancelAnimationFrame(animationFrameId);
     };
-  }, [isGameOver, gameStarted]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Dispose audio only on true component unmount
   useEffect(() => {
@@ -2674,12 +2695,9 @@ const Game = () => {
           }
         }
       }
-      // Clean up references to removed enemies periodically
-      if (state._nearMissedEnemies.size > 20) {
-        const activeSet = new Set(enemies);
-        for (const e of state._nearMissedEnemies) {
-          if (!activeSet.has(e)) state._nearMissedEnemies.delete(e);
-        }
+      // Clean up references to removed enemies when Set grows
+      if (state._nearMissedEnemies.size > 10) {
+        state._nearMissedEnemies.clear();
       }
     }
 
@@ -3367,7 +3385,7 @@ const Game = () => {
       if (s.life <= 0) continue;
 
       const alpha = s.life / s.maxLife;
-      const speed = Math.sqrt(s.vx * s.vx + s.vy * s.vy);
+      const speed = Math.sqrt(s.vx * s.vx + s.vy * s.vy) || 1;
       const tailX = s.x - (s.vx / speed) * s.length;
       const tailY = s.y - (s.vy / speed) * s.length;
 

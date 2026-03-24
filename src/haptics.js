@@ -11,7 +11,7 @@ function vibrate(ms) {
 
 export function lightTap() {
   try {
-    Haptics.impact({ style: ImpactStyle.Light });
+    Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
   } catch {
     vibrate(10);
   }
@@ -19,7 +19,7 @@ export function lightTap() {
 
 export function mediumTap() {
   try {
-    Haptics.impact({ style: ImpactStyle.Medium });
+    Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {});
   } catch {
     vibrate(20);
   }
@@ -27,7 +27,7 @@ export function mediumTap() {
 
 export function heavyTap() {
   try {
-    Haptics.impact({ style: ImpactStyle.Heavy });
+    Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => {});
   } catch {
     vibrate(40);
   }
@@ -41,7 +41,7 @@ export function notifyTap(type = 'SUCCESS') {
     ERROR: NotificationType.Error,
   };
   try {
-    Haptics.notification({ type: typeMap[type] || NotificationType.Success });
+    Haptics.notification({ type: typeMap[type] || NotificationType.Success }).catch(() => {});
   } catch {
     vibrate(type === 'ERROR' ? 60 : type === 'WARNING' ? 40 : 30);
   }
@@ -50,7 +50,7 @@ export function notifyTap(type = 'SUCCESS') {
 // Selection click for UI interactions (menu taps, toggles)
 export function selectionTap() {
   try {
-    Haptics.impact({ style: ImpactStyle.Light });
+    Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
   } catch {
     vibrate(5);
   }

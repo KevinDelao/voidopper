@@ -469,7 +469,7 @@ class Guardian {
       p.life -= deltaTime;
       p.phase = (p.phase || 0) + 0.1;
     });
-    this.projectiles = this.projectiles.filter(p => p.life > 0);
+    { let w = 0; for (let i = 0; i < this.projectiles.length; i++) { if (this.projectiles[i].life > 0) this.projectiles[w++] = this.projectiles[i]; } this.projectiles.length = w; }
 
     // Update minions
     this.minions.forEach(m => {
@@ -483,7 +483,7 @@ class Guardian {
       m.life -= deltaTime;
       m.phase = (m.phase || 0) + 0.08;
     });
-    this.minions = this.minions.filter(m => m.life > 0);
+    { let w = 0; for (let i = 0; i < this.minions.length; i++) { if (this.minions[i].life > 0) this.minions[w++] = this.minions[i]; } this.minions.length = w; }
 
     // Update laser
     if (this.laserActive) {

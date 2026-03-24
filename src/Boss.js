@@ -145,7 +145,7 @@ class Boss {
       p.life -= deltaTime;
       p.phase = (p.phase || 0) + 0.1;
     });
-    this.projectiles = this.projectiles.filter(p => p.life > 0);
+    { let w = 0; for (let i = 0; i < this.projectiles.length; i++) { if (this.projectiles[i].life > 0) this.projectiles[w++] = this.projectiles[i]; } this.projectiles.length = w; }
 
     // Update minions
     this.minions.forEach(m => {
@@ -159,7 +159,7 @@ class Boss {
       m.life -= deltaTime;
       m.phase = (m.phase || 0) + 0.08;
     });
-    this.minions = this.minions.filter(m => m.life > 0);
+    { let w = 0; for (let i = 0; i < this.minions.length; i++) { if (this.minions[i].life > 0) this.minions[w++] = this.minions[i]; } this.minions.length = w; }
 
     // Update laser
     if (this.laserActive) {
@@ -184,7 +184,7 @@ class Boss {
       c.phase += 0.06;
       c.x += Math.sin(c.phase * 3) * 30 * deltaTime;
     });
-    this.clones = this.clones.filter(c => c.life > 0);
+    { let w = 0; for (let i = 0; i < this.clones.length; i++) { if (this.clones[i].life > 0) this.clones[w++] = this.clones[i]; } this.clones.length = w; }
 
     // Vortex pull
     if (this.vortexActive) {

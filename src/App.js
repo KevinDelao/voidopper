@@ -11,6 +11,7 @@ function App() {
       import('@capacitor/status-bar').then(({ StatusBar, Style }) => {
         StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
         StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
+        StatusBar.hide().catch(() => {});
       });
 
       // Lock to portrait

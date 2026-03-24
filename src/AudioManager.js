@@ -1319,20 +1319,21 @@ class AudioManager {
 
   stopVoidStormAmbience() {
     if (!this.voidStormOsc) return;
+    const osc = this.voidStormOsc;
+    const gain = this.voidStormGain;
+    this.voidStormOsc = null;
+    this.voidStormGain = null;
     const now = this.audioContext.currentTime;
     try {
-      this.voidStormGain.gain.cancelScheduledValues(now);
-      this.voidStormGain.gain.setValueAtTime(this.voidStormGain.gain.value, now);
-      this.voidStormGain.gain.linearRampToValueAtTime(0, now + 0.3);
-      this.voidStormOsc.stop(now + 0.35);
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.linearRampToValueAtTime(0, now + 0.3);
+      osc.stop(now + 0.35);
       setTimeout(() => {
-        try { this.voidStormOsc.disconnect(); this.voidStormGain.disconnect(); } catch (e) {}
-        this.voidStormOsc = null;
-        this.voidStormGain = null;
+        try { osc.disconnect(); gain.disconnect(); } catch (e) {}
       }, 400);
     } catch (e) {
-      this.voidStormOsc = null;
-      this.voidStormGain = null;
+      try { osc.disconnect(); gain.disconnect(); } catch (e2) {}
     }
   }
 

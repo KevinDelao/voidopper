@@ -126,12 +126,14 @@ class WallTrap {
     ctx.translate(this.armLength, 0);
     ctx.rotate(this.rotationAngle);
 
-    // Blade body
-    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
-    grad.addColorStop(0, '#888899');
-    grad.addColorStop(0.6, '#666677');
-    grad.addColorStop(1, '#444455');
-    ctx.fillStyle = grad;
+    // Blade body (cached)
+    if (!this._bladeGrad) {
+      this._bladeGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+      this._bladeGrad.addColorStop(0, '#888899');
+      this._bladeGrad.addColorStop(0.6, '#666677');
+      this._bladeGrad.addColorStop(1, '#444455');
+    }
+    ctx.fillStyle = this._bladeGrad;
 
     // Draw toothed circle
     ctx.beginPath();
@@ -286,12 +288,14 @@ class WallTrap {
       ctx.fill();
     }
 
-    // Inner void darkness
-    const voidGrad = ctx.createRadialGradient(r * 0.5, 0, 0, r * 0.5, 0, r * 0.8);
-    voidGrad.addColorStop(0, 'rgba(0, 0, 0, 0.9)');
-    voidGrad.addColorStop(0.5, 'rgba(40, 0, 60, 0.6)');
-    voidGrad.addColorStop(1, 'rgba(40, 0, 60, 0)');
-    ctx.fillStyle = voidGrad;
+    // Inner void darkness (cached)
+    if (!this._voidGrad) {
+      this._voidGrad = ctx.createRadialGradient(r * 0.5, 0, 0, r * 0.5, 0, r * 0.8);
+      this._voidGrad.addColorStop(0, 'rgba(0, 0, 0, 0.9)');
+      this._voidGrad.addColorStop(0.5, 'rgba(40, 0, 60, 0.6)');
+      this._voidGrad.addColorStop(1, 'rgba(40, 0, 60, 0)');
+    }
+    ctx.fillStyle = this._voidGrad;
     ctx.beginPath();
     ctx.ellipse(r * 0.5, 0, r * 0.6, r * 0.4 * (0.3 + this.jawAngle), 0, 0, Math.PI * 2);
     ctx.fill();

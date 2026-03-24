@@ -718,7 +718,9 @@ class Terrain {
       if (y >= this.hillPoints[i].y && y <= this.hillPoints[i + 1].y) {
         const p1 = this.hillPoints[i];
         const p2 = this.hillPoints[i + 1];
-        return (p2.y - p1.y) / (p2.x - p1.x);
+        const dx = p2.x - p1.x;
+        if (Math.abs(dx) < 0.001) return 0;
+        return (p2.y - p1.y) / dx;
       }
     }
     return 0;
@@ -749,7 +751,9 @@ class Terrain {
     if (i !== -1) {
       const p1 = this.hillPoints[i];
       const p2 = this.hillPoints[i + 1];
-      const t = (y - p1.y) / (p2.y - p1.y);
+      const dy = p2.y - p1.y;
+      if (Math.abs(dy) < 0.001) return (p1.x + p2.x) / 2;
+      const t = (y - p1.y) / dy;
       return p1.x + t * (p2.x - p1.x);
     }
     return this.side === 'left' ? 60 : this.width - 60;
@@ -760,7 +764,9 @@ class Terrain {
     if (i !== -1) {
       const p1 = this.hillPoints[i];
       const p2 = this.hillPoints[i + 1];
-      const t = (y - p1.y) / (p2.y - p1.y);
+      const dy = p2.y - p1.y;
+      if (Math.abs(dy) < 0.001) return (p1.x + p2.x) / 2;
+      const t = (y - p1.y) / dy;
       return p1.x + t * (p2.x - p1.x);
     }
     return this.side === 'right' ? this.width - 60 : 60;

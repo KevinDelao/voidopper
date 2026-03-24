@@ -95,12 +95,15 @@ class Spike {
     ctx.ellipse(-embedDepth / 2, 0, embedDepth / 2 + 2, baseH / 2 + 2, 0, Math.PI / 2, Math.PI * 1.5);
     ctx.fill();
 
-    // Base mount with biome color
-    const mountGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, baseH / 2);
-    mountGrad.addColorStop(0, mid);
-    mountGrad.addColorStop(0.7, dark);
-    mountGrad.addColorStop(1, 'rgba(0,0,0,0.6)');
-    ctx.fillStyle = mountGrad;
+    // Base mount with biome color (cached)
+    if (!this._mountGrad || this._mountGradMid !== mid) {
+      this._mountGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, baseH / 2);
+      this._mountGrad.addColorStop(0, mid);
+      this._mountGrad.addColorStop(0.7, dark);
+      this._mountGrad.addColorStop(1, 'rgba(0,0,0,0.6)');
+      this._mountGradMid = mid;
+    }
+    ctx.fillStyle = this._mountGrad;
     ctx.beginPath();
     ctx.arc(0, 0, baseH / 2, Math.PI / 2, Math.PI * 1.5);
     ctx.lineTo(8, -baseH / 3);
@@ -212,12 +215,17 @@ class Spike {
     const tipX = mainLen + 2;
     const glowSize = 6 + Math.sin(this.phase * 2) * 2;
 
-    // Outer glow
-    const tipGlow = ctx.createRadialGradient(tipX, 0, 0, tipX, 0, glowSize * 2);
-    tipGlow.addColorStop(0, accent);
-    tipGlow.addColorStop(0.4, accent + '66');
-    tipGlow.addColorStop(1, accent + '00');
-    ctx.fillStyle = tipGlow;
+    // Outer glow (cached per accent color)
+    if (!this._tipGlow || this._tipGlowAccent !== accent || this._tipGlowX !== tipX || this._tipGlowSize !== glowSize) {
+      this._tipGlow = ctx.createRadialGradient(tipX, 0, 0, tipX, 0, glowSize * 2);
+      this._tipGlow.addColorStop(0, accent);
+      this._tipGlow.addColorStop(0.4, accent + '66');
+      this._tipGlow.addColorStop(1, accent + '00');
+      this._tipGlowAccent = accent;
+      this._tipGlowX = tipX;
+      this._tipGlowSize = glowSize;
+    }
+    ctx.fillStyle = this._tipGlow;
     ctx.globalAlpha = 0.6 * pulse;
     ctx.beginPath();
     ctx.arc(tipX, 0, glowSize * 2, 0, Math.PI * 2);
