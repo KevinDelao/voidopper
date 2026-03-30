@@ -1,4 +1,5 @@
 import React from 'react';
+import { t } from '../i18n';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -30,10 +31,10 @@ class ErrorBoundary extends React.Component {
         }}>
           <div style={{ fontSize: 48, marginBottom: 20 }}>!</div>
           <h2 style={{ fontSize: 20, color: '#cc66ff', marginBottom: 12 }}>
-            SOMETHING WENT WRONG
+            {t('error.title')}
           </h2>
           <p style={{ fontSize: 13, color: '#aaaacc', lineHeight: 1.6, marginBottom: 30 }}>
-            The game encountered an unexpected error.
+            {t('error.desc')}
           </p>
           <button
             onClick={this.handleRestart}
@@ -45,7 +46,7 @@ class ErrorBoundary extends React.Component {
               cursor: 'pointer', boxShadow: '0 0 20px rgba(153,68,255,0.4)',
             }}
           >
-            TAP TO RESTART
+            {t('error.restart')}
           </button>
         </div>
       );

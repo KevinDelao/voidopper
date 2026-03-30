@@ -1,52 +1,70 @@
 import { getItem, setItem } from './storage';
+import { t } from './i18n';
+
+// Mission description key mapping by type
+const MISSION_DESC_KEYS = {
+  distance: 'mission.climb',
+  coins: 'mission.collectCoins',
+  bounces: 'mission.bounce',
+  combo: 'mission.combo',
+  nearMiss: 'mission.nearMiss',
+  onfire: 'mission.onfire',
+  guardian: 'mission.guardian',
+};
 
 const MISSION_POOL = [
-  { id: 'd200', type: 'distance', target: 200, desc: 'Climb 200m', reward: 5, tier: 0 },
-  { id: 'c5', type: 'coins', target: 5, desc: 'Collect 5 coins', reward: 3, tier: 0 },
-  { id: 'b15', type: 'bounces', target: 15, desc: 'Bounce 15 times', reward: 4, tier: 0 },
-  { id: 'd500', type: 'distance', target: 500, desc: 'Climb 500m', reward: 8, tier: 1 },
-  { id: 'c15', type: 'coins', target: 15, desc: 'Collect 15 coins', reward: 6, tier: 1 },
-  { id: 'x5', type: 'combo', target: 5, desc: 'Reach 5x combo', reward: 8, tier: 1 },
-  { id: 'nm3', type: 'nearMiss', target: 3, desc: 'Near-miss 3 enemies', reward: 8, tier: 1 },
-  { id: 'b30', type: 'bounces', target: 30, desc: 'Bounce 30 times', reward: 6, tier: 1 },
-  { id: 'd1k', type: 'distance', target: 1000, desc: 'Climb 1,000m', reward: 12, tier: 2 },
-  { id: 'c30', type: 'coins', target: 30, desc: 'Collect 30 coins', reward: 10, tier: 2 },
-  { id: 'x10', type: 'combo', target: 10, desc: 'Reach 10x combo', reward: 15, tier: 2 },
-  { id: 'fire', type: 'onfire', target: 1, desc: 'Reach ON FIRE mood', reward: 10, tier: 2 },
-  { id: 'b50', type: 'bounces', target: 50, desc: 'Bounce 50 times', reward: 8, tier: 2 },
-  { id: 'd2k', type: 'distance', target: 2000, desc: 'Climb 2,000m', reward: 20, tier: 3 },
-  { id: 'c50', type: 'coins', target: 50, desc: 'Collect 50 coins', reward: 18, tier: 3 },
-  { id: 'x15', type: 'combo', target: 15, desc: 'Reach UNSTOPPABLE', reward: 25, tier: 3 },
-  { id: 'g1', type: 'guardian', target: 1, desc: 'Survive a Guardian', reward: 15, tier: 3 },
-  { id: 'nm8', type: 'nearMiss', target: 8, desc: 'Near-miss 8 enemies', reward: 18, tier: 3 },
+  { id: 'd200', type: 'distance', target: 200, descKey: 'mission.climb', reward: 5, tier: 0 },
+  { id: 'c5', type: 'coins', target: 5, descKey: 'mission.collectCoins', reward: 3, tier: 0 },
+  { id: 'b15', type: 'bounces', target: 15, descKey: 'mission.bounce', reward: 4, tier: 0 },
+  { id: 'd500', type: 'distance', target: 500, descKey: 'mission.climb', reward: 8, tier: 1 },
+  { id: 'c15', type: 'coins', target: 15, descKey: 'mission.collectCoins', reward: 6, tier: 1 },
+  { id: 'x5', type: 'combo', target: 5, descKey: 'mission.combo', reward: 8, tier: 1 },
+  { id: 'nm3', type: 'nearMiss', target: 3, descKey: 'mission.nearMiss', reward: 8, tier: 1 },
+  { id: 'b30', type: 'bounces', target: 30, descKey: 'mission.bounce', reward: 6, tier: 1 },
+  { id: 'd1k', type: 'distance', target: 1000, descKey: 'mission.climb', reward: 12, tier: 2 },
+  { id: 'c30', type: 'coins', target: 30, descKey: 'mission.collectCoins', reward: 10, tier: 2 },
+  { id: 'x10', type: 'combo', target: 10, descKey: 'mission.combo', reward: 15, tier: 2 },
+  { id: 'fire', type: 'onfire', target: 1, descKey: 'mission.onfire', reward: 10, tier: 2 },
+  { id: 'b50', type: 'bounces', target: 50, descKey: 'mission.bounce', reward: 8, tier: 2 },
+  { id: 'd2k', type: 'distance', target: 2000, descKey: 'mission.climb', reward: 20, tier: 3 },
+  { id: 'c50', type: 'coins', target: 50, descKey: 'mission.collectCoins', reward: 18, tier: 3 },
+  { id: 'x15', type: 'combo', target: 15, descKey: 'mission.unstoppable', reward: 25, tier: 3 },
+  { id: 'g1', type: 'guardian', target: 1, descKey: 'mission.guardian', reward: 15, tier: 3 },
+  { id: 'nm8', type: 'nearMiss', target: 8, descKey: 'mission.nearMiss', reward: 18, tier: 3 },
 ];
 
 // Cumulative lifetime missions (persist across runs)
 const CUMULATIVE_MISSIONS = [
-  { id: 'lt_c500', type: 'lt_coins', target: 500, desc: 'Collect 500 lifetime coins', reward: 30 },
-  { id: 'lt_c2000', type: 'lt_coins', target: 2000, desc: 'Collect 2,000 lifetime coins', reward: 75 },
-  { id: 'lt_b1000', type: 'lt_bounces', target: 1000, desc: 'Bounce 1,000 times total', reward: 40 },
-  { id: 'lt_d50k', type: 'lt_distance', target: 50000, desc: 'Climb 50,000m total', reward: 50 },
-  { id: 'lt_g10', type: 'lt_guardians', target: 10, desc: 'Defeat 10 guardians', reward: 60 },
-  { id: 'lt_nm50', type: 'lt_nearMisses', target: 50, desc: '50 near-misses total', reward: 35 },
-  { id: 'lt_g50', type: 'lt_games', target: 50, desc: 'Play 50 games', reward: 50 },
-  { id: 'lt_g200', type: 'lt_games', target: 200, desc: 'Play 200 games', reward: 100 },
-  { id: 'lt_fire10', type: 'lt_onfire', target: 10, desc: 'Reach ON FIRE 10 times', reward: 45 },
-  { id: 'lt_x10', type: 'lt_maxCombo', target: 10, desc: 'Reach 10x combo in 10 games', reward: 55 },
-  { id: 'lt_c5000', type: 'lt_coins', target: 5000, desc: 'Collect 5,000 lifetime coins', reward: 150 },
-  { id: 'lt_d200k', type: 'lt_distance', target: 200000, desc: 'Climb 200,000m total', reward: 120 },
+  { id: 'lt_c500', type: 'lt_coins', target: 500, descKey: 'mission.lt_coins', reward: 30 },
+  { id: 'lt_c2000', type: 'lt_coins', target: 2000, descKey: 'mission.lt_coins', reward: 75 },
+  { id: 'lt_b1000', type: 'lt_bounces', target: 1000, descKey: 'mission.lt_bounces', reward: 40 },
+  { id: 'lt_d50k', type: 'lt_distance', target: 50000, descKey: 'mission.lt_distance', reward: 50 },
+  { id: 'lt_g10', type: 'lt_guardians', target: 10, descKey: 'mission.lt_guardians', reward: 60 },
+  { id: 'lt_nm50', type: 'lt_nearMisses', target: 50, descKey: 'mission.lt_nearMisses', reward: 35 },
+  { id: 'lt_g50', type: 'lt_games', target: 50, descKey: 'mission.lt_games', reward: 50 },
+  { id: 'lt_g200', type: 'lt_games', target: 200, descKey: 'mission.lt_games', reward: 100 },
+  { id: 'lt_fire10', type: 'lt_onfire', target: 10, descKey: 'mission.lt_onfire', reward: 45 },
+  { id: 'lt_x10', type: 'lt_maxCombo', target: 10, descKey: 'mission.lt_maxCombo', reward: 55 },
+  { id: 'lt_c5000', type: 'lt_coins', target: 5000, descKey: 'mission.lt_coins', reward: 150 },
+  { id: 'lt_d200k', type: 'lt_distance', target: 200000, descKey: 'mission.lt_distance', reward: 120 },
 ];
 
 // Daily challenge templates
 const DAILY_CHALLENGES = [
-  { type: 'distance', target: 1000, desc: 'Climb 1,000m in a single run', reward: 30 },
-  { type: 'coins', target: 20, desc: 'Collect 20 coins in a single run', reward: 25 },
-  { type: 'combo', target: 8, desc: 'Reach 8x combo', reward: 30 },
-  { type: 'nearMiss', target: 5, desc: 'Near-miss 5 enemies in one run', reward: 30 },
-  { type: 'bounces', target: 40, desc: 'Bounce 40 times in one run', reward: 25 },
-  { type: 'guardian', target: 2, desc: 'Survive 2 guardians in one run', reward: 35 },
-  { type: 'distance', target: 500, desc: 'Climb 500m without a shield', reward: 35 },
+  { type: 'distance', target: 1000, descKey: 'daily.climb', reward: 30 },
+  { type: 'coins', target: 20, descKey: 'daily.collectCoins', reward: 25 },
+  { type: 'combo', target: 8, descKey: 'daily.combo', reward: 30 },
+  { type: 'nearMiss', target: 5, descKey: 'daily.nearMiss', reward: 30 },
+  { type: 'bounces', target: 40, descKey: 'daily.bounce', reward: 25 },
+  { type: 'guardian', target: 2, descKey: 'daily.guardian', reward: 35 },
+  { type: 'distance', target: 500, descKey: 'daily.climbNoShield', reward: 35 },
 ];
+
+// Helper: translate a mission description
+function translateDesc(descKey, target) {
+  if (!descKey) return '';
+  return t(descKey, { target: target.toLocaleString() });
+}
 
 class ProgressionManager {
   constructor() {
@@ -171,7 +189,15 @@ class ProgressionManager {
     this._save();
   }
 
-  getDailyChallenge() { return this.dailyChallenge; }
+  getDailyChallenge() {
+    if (!this.dailyChallenge) return null;
+    return {
+      ...this.dailyChallenge,
+      desc: this.dailyChallenge.descKey
+        ? translateDesc(this.dailyChallenge.descKey, this.dailyChallenge.target)
+        : (this.dailyChallenge.desc || ''),
+    };
+  }
 
   updateDailyChallenge(runStats) {
     if (!this.dailyChallenge || this.dailyChallenge.completed) return false;
@@ -274,6 +300,7 @@ class ProgressionManager {
       }
       return {
         ...cm,
+        desc: cm.descKey ? translateDesc(cm.descKey, cm.target) : (cm.desc || ''),
         progress: Math.min(current, cm.target),
         completed: this.completedCumulativeIds.has(cm.id),
       };
@@ -300,7 +327,7 @@ class ProgressionManager {
     const pick = eligible[Math.floor(Math.random() * eligible.length)];
     this.missions.push({
       id: pick.id, type: pick.type, target: pick.target,
-      desc: pick.desc, reward: pick.reward, tier: pick.tier,
+      descKey: pick.descKey, reward: pick.reward, tier: pick.tier,
       progress: 0, completed: false,
     });
   }
@@ -343,7 +370,12 @@ class ProgressionManager {
     return total;
   }
 
-  getMissions() { return this.missions; }
+  getMissions() {
+    return this.missions.map(m => ({
+      ...m,
+      desc: m.descKey ? translateDesc(m.descKey, m.target) : (m.desc || ''),
+    }));
+  }
   getStreak() { return this.streak; }
 }
 

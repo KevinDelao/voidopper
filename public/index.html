@@ -234,13 +234,13 @@
         <div class="loading-bar-container">
           <div class="loading-bar"></div>
         </div>
-        <p class="loading-tip">Preparing the void...</p>
+        <p class="loading-tip" id="loading-tip">Preparing the void...</p>
       </div>
     </div>
     <div id="landscape-warning">
       <div class="rotate-icon"></div>
-      <h2>ROTATE YOUR DEVICE</h2>
-      <p>Void Hopper is best played in portrait mode.<br/>Please rotate your phone vertically.</p>
+      <h2 id="landscape-title">ROTATE YOUR DEVICE</h2>
+      <p id="landscape-msg">Void Hopper is best played in portrait mode.<br/>Please rotate your phone vertically.</p>
     </div>
     <div id="root"></div>
     <script>
@@ -265,6 +265,31 @@
         if (now - lastTouchEnd <= 300) { e.preventDefault(); }
         lastTouchEnd = now;
       }, { passive: false });
+
+      // Localize static loading screen elements
+      (function() {
+        var lang = (navigator.language || 'en').split('-')[0];
+        var i18n = {
+          es: {
+            loadingTip: 'Preparando el vac\u00edo...',
+            landscapeTitle: 'GIRA TU DISPOSITIVO',
+            landscapeMsg: 'Void Hopper se juega mejor en modo vertical.<br/>Por favor, gira tu tel\u00e9fono verticalmente.'
+          },
+          hi: {
+            loadingTip: '\u0936\u0942\u0928\u094d\u092f \u0924\u0948\u092f\u093e\u0930 \u0939\u094b \u0930\u0939\u093e \u0939\u0948...',
+            landscapeTitle: '\u0905\u092a\u0928\u093e \u0921\u093f\u0935\u093e\u0907\u0938 \u0918\u0941\u092e\u093e\u090f\u0902',
+            landscapeMsg: 'Void Hopper \u092a\u094b\u0930\u094d\u091f\u094d\u0930\u0947\u091f \u092e\u094b\u0921 \u092e\u0947\u0902 \u0938\u092c\u0938\u0947 \u0905\u091a\u094d\u091b\u093e \u091a\u0932\u0924\u093e \u0939\u0948\u0964<br/>\u0915\u0943\u092a\u092f\u093e \u0905\u092a\u0928\u093e \u092b\u093c\u094b\u0928 \u0932\u0902\u092c\u0935\u0924 \u0918\u0941\u092e\u093e\u090f\u0902\u0964'
+          }
+        };
+        if (i18n[lang]) {
+          var tip = document.getElementById('loading-tip');
+          var lt = document.getElementById('landscape-title');
+          var lm = document.getElementById('landscape-msg');
+          if (tip) tip.textContent = i18n[lang].loadingTip;
+          if (lt) lt.textContent = i18n[lang].landscapeTitle;
+          if (lm) lm.innerHTML = i18n[lang].landscapeMsg;
+        }
+      })();
 
       // Register service worker for offline support (web only, not native iOS)
       if ('serviceWorker' in navigator && !(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())) {

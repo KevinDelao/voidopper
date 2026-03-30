@@ -21,6 +21,7 @@ import Trails from '../Trails';
 import { getItem, setItem, getJSON, setJSON } from '../storage';
 import { lightTap, mediumTap, heavyTap, notifyTap, selectionTap } from '../haptics';
 import { authenticateGameCenter, submitScore as submitGCScore, showLeaderboard, isAuthenticated as isGCAuthenticated } from '../GameCenter';
+import { t } from '../i18n';
 
 // Detect iPad for performance tuning
 const isIPad = /iPad/i.test(navigator.userAgent) ||
@@ -359,7 +360,7 @@ const Game = () => {
       setTimeout(() => {
         if (bar) bar.style.display = 'none';
         if (tip) {
-          tip.textContent = 'Tap to start';
+          tip.textContent = t('tapToStart');
           tip.style.color = 'rgba(255, 255, 255, 0.7)';
           tip.style.animation = 'twinkle 1.5s ease-in-out infinite alternate';
         }
@@ -1744,10 +1745,10 @@ const Game = () => {
 
   // Get combo tier label
   const getComboLabel = (combo) => {
-    if (combo >= 15) return 'UNSTOPPABLE';
-    if (combo >= 10) return 'AMAZING';
-    if (combo >= 5) return 'GREAT';
-    if (combo >= 2) return 'NICE';
+    if (combo >= 15) return t('combo.unstoppable');
+    if (combo >= 10) return t('combo.amazing');
+    if (combo >= 5) return t('combo.great');
+    if (combo >= 2) return t('combo.nice');
     return '';
   };
 
@@ -1808,7 +1809,7 @@ const Game = () => {
 
     // First-run hint: launch tutorial
     if (player.isStuck && state.runStats.wallBounces === 0 && state.runStats.distance === 0) {
-      showHint(state, 'launch', 'DRAG TO AIM, RELEASE TO LAUNCH', 'Hop between walls to climb higher');
+      showHint(state, 'launch', t('hint.dragText'), t('hint.dragSub'));
     }
 
     // Update active hint timer (pause while milestone text is showing)
@@ -1909,7 +1910,7 @@ const Game = () => {
         player.addMood(3);
         state.runStats.wallBounces++;
         if (state.runStats.wallBounces === 1) {
-          showHint(state, 'wallBounce', 'WALL BOUNCES BUILD COMBOS', 'Chain bounces for coin multipliers');
+          showHint(state, 'wallBounce', t('hint.comboText'), t('hint.comboSub'));
         }
         mediumTap();
         if (audioManagerRef.current) {
@@ -1923,7 +1924,7 @@ const Game = () => {
         player.addMood(3);
         state.runStats.wallBounces++;
         if (state.runStats.wallBounces === 1) {
-          showHint(state, 'wallBounce', 'WALL BOUNCES BUILD COMBOS', 'Chain bounces for coin multipliers');
+          showHint(state, 'wallBounce', t('hint.comboText'), t('hint.comboSub'));
         }
         mediumTap();
         if (audioManagerRef.current) {
@@ -1951,22 +1952,8 @@ const Game = () => {
       if (currentHeightForMilestone >= m && state.lastMilestone < m) {
         state.lastMilestone = m;
         state.milestoneFlash = 1.0;
-        const titles = {
-          100: 'LIFTOFF!',
-          250: 'STRATOSPHERE',
-          500: 'ORBIT REACHED',
-          750: 'DEEP SPACE',
-          1000: 'COSMIC VOYAGER',
-          1500: 'STAR TRAVELER',
-          2000: 'GALAXY WANDERER',
-          3000: 'VOID WALKER',
-          5000: 'LEGEND',
-          7500: 'MYTHIC',
-          10000: 'TRANSCENDENT',
-          15000: 'ETERNAL',
-          20000: 'VOID GOD',
-        };
-        state.milestoneText = titles[m] || `${m}m!`;
+        const titleKey = `milestone.${m}`;
+        state.milestoneText = t(titleKey) !== titleKey ? t(titleKey) : `${m}m!`;
         state.milestoneTextTimer = 3.0;
         state.shakeIntensity = 4;
         player.addMood(15);
@@ -2194,7 +2181,7 @@ const Game = () => {
         addCombo(state, 1, 'COIN');
         state.runStats.coins++;
         if (state.runStats.coins === 1) {
-          showHint(state, 'coin', 'COINS COLLECTED!', 'Spend them in the shop for skins & trails');
+          showHint(state, 'coin', t('hint.coinText'), t('hint.coinSub'));
         }
         if (coin.type === 'purple') state.runStats.purpleCoins++;
         player.addMood(4);
@@ -2431,7 +2418,7 @@ const Game = () => {
 
       if (pu.checkCollision(player)) {
         pu.collected = true;
-        showHint(state, 'powerup', 'POWER-UP!', 'Grab glowing orbs for special abilities');
+        showHint(state, 'powerup', t('hint.powerupText'), t('hint.powerupSub'));
         const duration = pu.durations[pu.type];
         const cfg = pu.config[pu.type];
 
@@ -2451,10 +2438,10 @@ const Game = () => {
 
         // Floating text descriptions
         const descriptions = {
-          shield: 'Absorbs one hit!',
-          magnet: 'Attracts nearby coins!',
-          slowmo: 'Slows everything down!',
-          speedboost: 'Faster climbing speed!',
+          shield: t('powerup.shieldDesc'),
+          magnet: t('powerup.magnetDesc'),
+          slowmo: t('powerup.slowmoDesc'),
+          speedboost: t('powerup.speedDesc'),
         };
 
         // Add floating text popup
@@ -2941,7 +2928,7 @@ const Game = () => {
     const now = performance.now();
     const moodSoundCooldown = 2000; // 2 seconds between mood transition sounds
     if (moodJustChanged && player.moodFlashDir > 0 && player.getMoodTier() === 'firedup') {
-      showHint(state, 'mood', 'MOOD RISING!', 'High mood = faster speed & more coins');
+      showHint(state, 'mood', t('hint.moodText'), t('hint.moodSub'));
     }
     if (moodJustChanged && player.moodFlashDir > 0 && player.getMoodTier() === 'onfire' && audioManagerRef.current && audioManagerRef.current.playMoodIgnitionSound) {
       if (now - (state._lastMoodSoundTime || 0) > moodSoundCooldown) {
@@ -3149,7 +3136,7 @@ const Game = () => {
     state.shakeIntensity = 8;
     state.floatingTexts.push({
       x: state.player.x, y: state.player.y,
-      label: 'REVIVED!', desc: 'Shield active!',
+      label: t('revive.revived'), desc: t('revive.shieldActive'),
       color: '#44ff88', life: 2.5, maxLife: 2.5, vy: -60,
     });
     if (audioManagerRef.current) audioManagerRef.current.playScoreMilestoneSound();
@@ -3263,7 +3250,7 @@ const Game = () => {
         state.floatingTexts.push({
           x: canvasRef.current ? canvasRef.current.logicalWidth / 2 : 200,
           y: canvasRef.current ? canvasRef.current.logicalHeight / 2 : 300,
-          label: 'COPIED TO CLIPBOARD!', desc: '',
+          label: t('misc.copiedToClipboard'), desc: '',
           color: '#44ff88', life: 2.0, maxLife: 2.0, vy: -40,
         });
       }).catch(() => {});
@@ -3477,13 +3464,13 @@ const Game = () => {
       ctx.textAlign = 'center';
       ctx.strokeStyle = '#1a3366';
       ctx.lineWidth = 5;
-      ctx.strokeText('PAUSED', width / 2, height / 2);
+      ctx.strokeText(t('pause.title'), width / 2, height / 2);
       const pauseGrad = ctx.createLinearGradient(width / 2 - 100, height / 2 - 25, width / 2 + 100, height / 2 + 10);
       pauseGrad.addColorStop(0, '#44ccff');
       pauseGrad.addColorStop(0.5, '#ffffff');
       pauseGrad.addColorStop(1, '#44ccff');
       ctx.fillStyle = pauseGrad;
-      ctx.fillText('PAUSED', width / 2, height / 2);
+      ctx.fillText(t('pause.title'), width / 2, height / 2);
 
       // Resume button
       const pBtnW = Math.min(Math.round(200 * pauseTs), width - 40);
@@ -3496,9 +3483,9 @@ const Game = () => {
       ctx.lineWidth = 2;
       ctx.strokeRect(resumeBtnX, resumeBtnY, pBtnW, pBtnH);
       ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${Math.round(20 * pauseTs)}px Orbitron, Arial`;
+      ctx.font = `bold ${Math.round(20 * pauseTs)}px Orbitron, Arial, sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText('RESUME', width / 2, resumeBtnY + pBtnH / 2 + 7);
+      ctx.fillText(t('pause.resume'), width / 2, resumeBtnY + pBtnH / 2 + 7);
       state._resumeBtnBounds = { x: resumeBtnX, y: resumeBtnY, w: pBtnW, h: pBtnH };
 
       // Main Menu button
@@ -3510,9 +3497,9 @@ const Game = () => {
       ctx.lineWidth = 2;
       ctx.strokeRect(menuBtnX, menuBtnY, pBtnW, pBtnH);
       ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${Math.round(18 * pauseTs)}px Orbitron, Arial`;
+      ctx.font = `bold ${Math.round(18 * pauseTs)}px Orbitron, Arial, sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText('MAIN MENU', width / 2, menuBtnY + pBtnH / 2 + 6);
+      ctx.fillText(t('pause.mainMenu'), width / 2, menuBtnY + pBtnH / 2 + 6);
       state._pauseMenuBtnBounds = { x: menuBtnX, y: menuBtnY, w: pBtnW, h: pBtnH };
 
       return;
@@ -3543,9 +3530,9 @@ const Game = () => {
         ctx.fillStyle = `rgba(170, 136, 255, ${0.6 + pulse * 0.4})`;
         ctx.fillText('\u266B', width / 2, height / 2 - 20);
         // Text
-        ctx.font = `bold ${Math.round(20 * arTs)}px Orbitron, Arial`;
+        ctx.font = `bold ${Math.round(20 * arTs)}px Orbitron, Arial, sans-serif`;
         ctx.fillStyle = `rgba(255, 255, 255, ${0.7 + pulse * 0.3})`;
-        ctx.fillText('Tap to resume audio', width / 2, height / 2 + 20);
+        ctx.fillText(t('pause.tapResumeAudio'), width / 2, height / 2 + 20);
         ctx.restore();
       }
 
@@ -3839,8 +3826,10 @@ const Game = () => {
     // Only draw gameplay HUD when game is active (not on start menu)
     if (gameStarted && !isGameOver) {
       // Draw difficulty badge (top left)
-      const diffLabel = (state.difficulty || 'medium').toUpperCase();
-      const diffColor = diffLabel === 'EASY' ? '#44cc66' : diffLabel === 'HARD' ? '#ff4444' : '#ffaa22';
+      const diffKey = state.difficulty || 'medium';
+      const diffLabelMap = { easy: t('diff.easy'), medium: t('diff.med'), hard: t('diff.hard') };
+      const diffLabel = diffLabelMap[diffKey] || diffKey.toUpperCase();
+      const diffColor = diffKey === 'easy' ? '#44cc66' : diffKey === 'hard' ? '#ff4444' : '#ffaa22';
       ctx.save();
       ctx.font = `bold ${Math.round(12 * ts)}px Orbitron, Arial`;
       ctx.textAlign = 'left';
@@ -3942,7 +3931,7 @@ const Game = () => {
 
       // Tier label (only when not neutral)
       if (tier !== 'neutral') {
-        const tierLabels = { chill: 'CHILL', firedup: 'FIRED UP', onfire: 'ON FIRE' };
+        const tierLabels = { chill: t('mood.chill'), firedup: t('mood.firedUp'), onfire: t('mood.onFire') };
         const tierColors = { chill: '#6688cc', firedup: '#ffaa44', onfire: '#ff4400' };
         ctx.font = `bold ${Math.round(10 * ts)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
@@ -3953,9 +3942,9 @@ const Game = () => {
         ctx.shadowBlur = 0;
         // Effect hint
         const effects = {
-          chill: '-5% speed',
-          firedup: '+5% speed, coins x1.5',
-          onfire: '+10% speed, coins x2',
+          chill: t('mood.chillEffect'),
+          firedup: t('mood.firedUpEffect'),
+          onfire: t('mood.onFireEffect'),
         };
         ctx.font = `${Math.round(8 * ts)}px Orbitron, Arial`;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
@@ -3989,7 +3978,7 @@ const Game = () => {
         ctx.fillStyle = '#ffd700';
         ctx.shadowBlur = 8;
         ctx.shadowColor = '#ffd700';
-        ctx.fillText('APPROACHING BEST!', width / 2, hudFlowY);
+        ctx.fillText(t('hud.approachingBest'), width / 2, hudFlowY);
         ctx.shadowBlur = 0;
         ctx.restore();
         hudFlowY += 18;
@@ -4040,7 +4029,7 @@ const Game = () => {
         ctx.fillStyle = '#ffd700';
         ctx.shadowBlur = 4;
         ctx.shadowColor = '#ffaa00';
-        ctx.fillText(`coins x${comboMult}`, width / 2, comboY + 16 * ts);
+        ctx.fillText(t('hud.coinsMultiplier', { mult: comboMult }), width / 2, comboY + 16 * ts);
         ctx.shadowBlur = 0;
       }
 
@@ -4064,10 +4053,10 @@ const Game = () => {
       const puBoxW = Math.round(90 * ts);
       const puBoxH = Math.round(22 * ts);
       const puConfigs = [
-        { active: player.hasShield, timer: player.shieldTimer, label: 'SHIELD', color: '#44aaff' },
-        { active: player.hasMagnet, timer: player.magnetTimer, label: 'MAGNET', color: '#ff44aa' },
-        { active: player.hasSlowmo, timer: player.slowmoTimer, label: 'SLOW-MO', color: '#aa44ff' },
-        { active: player.hasSpeedBoost, timer: player.speedBoostTimer, label: 'BOOST', color: '#ffaa00' },
+        { active: player.hasShield, timer: player.shieldTimer, label: t('powerup.shield'), color: '#44aaff' },
+        { active: player.hasMagnet, timer: player.magnetTimer, label: t('powerup.magnet'), color: '#ff44aa' },
+        { active: player.hasSlowmo, timer: player.slowmoTimer, label: t('powerup.slowmo'), color: '#aa44ff' },
+        { active: player.hasSpeedBoost, timer: player.speedBoostTimer, label: t('powerup.speed'), color: '#ffaa00' },
       ];
       puConfigs.forEach((pu, idx) => {
         if (pu.active) {
@@ -4256,13 +4245,13 @@ const Game = () => {
       ctx.textAlign = 'center';
       ctx.strokeStyle = '#1a3366';
       ctx.lineWidth = 5;
-      ctx.strokeText('PAUSED', width / 2, height / 2);
+      ctx.strokeText(t('pause.title'), width / 2, height / 2);
       const pauseGrad = ctx.createLinearGradient(width / 2 - 100, height / 2 - 25, width / 2 + 100, height / 2 + 10);
       pauseGrad.addColorStop(0, '#44ccff');
       pauseGrad.addColorStop(0.5, '#ffffff');
       pauseGrad.addColorStop(1, '#44ccff');
       ctx.fillStyle = pauseGrad;
-      ctx.fillText('PAUSED', width / 2, height / 2);
+      ctx.fillText(t('pause.title'), width / 2, height / 2);
       ctx.restore();
 
       // Resume button
@@ -4276,9 +4265,9 @@ const Game = () => {
       ctx.lineWidth = 2;
       ctx.strokeRect(resumeBtnX, resumeBtnY, pBtnW, pBtnH);
       ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${Math.round(20 * pauseTs2)}px Orbitron, Arial`;
+      ctx.font = `bold ${Math.round(20 * pauseTs2)}px Orbitron, Arial, sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText('RESUME', width / 2, resumeBtnY + pBtnH / 2 + 7);
+      ctx.fillText(t('pause.resume'), width / 2, resumeBtnY + pBtnH / 2 + 7);
       gameStateRef.current._resumeBtnBounds = { x: resumeBtnX, y: resumeBtnY, w: pBtnW, h: pBtnH };
 
       // Main Menu button
@@ -4290,9 +4279,9 @@ const Game = () => {
       ctx.lineWidth = 2;
       ctx.strokeRect(menuBtnX, menuBtnY, pBtnW, pBtnH);
       ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${Math.round(18 * pauseTs2)}px Orbitron, Arial`;
+      ctx.font = `bold ${Math.round(18 * pauseTs2)}px Orbitron, Arial, sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText('MAIN MENU', width / 2, menuBtnY + pBtnH / 2 + 6);
+      ctx.fillText(t('pause.mainMenu'), width / 2, menuBtnY + pBtnH / 2 + 6);
       gameStateRef.current._pauseMenuBtnBounds = { x: menuBtnX, y: menuBtnY, w: pBtnW, h: pBtnH };
       ctx.restore();
     }
@@ -4350,13 +4339,13 @@ const Game = () => {
       ctx.font = `900 ${Math.round(32 * rvTs)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ffffff';
-      ctx.fillText('SECOND CHANCE?', width / 2, height / 2 - Math.round(110 * rvTs));
+      ctx.fillText(t('revive.title'), width / 2, height / 2 - Math.round(110 * rvTs));
 
       // Show wallet balance (below title, above ring)
-      ctx.font = `bold ${Math.round(14 * rvTs)}px Orbitron, Arial`;
+      ctx.font = `bold ${Math.round(14 * rvTs)}px Orbitron, Arial, sans-serif`;
       ctx.fillStyle = '#ffd700';
       ctx.textAlign = 'center';
-      ctx.fillText(`Your coins: ${totalCoinsRef.current}`, width / 2, height / 2 - Math.round(80 * rvTs));
+      ctx.fillText(t('revive.yourCoins', { coins: totalCoinsRef.current }), width / 2, height / 2 - Math.round(80 * rvTs));
 
       // Countdown ring
       const ringX = width / 2;
@@ -4401,16 +4390,16 @@ const Game = () => {
       ctx.font = `bold ${Math.round(20 * rvTs)}px Orbitron, Arial`;
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
-      ctx.fillText('REVIVE', width / 2, revBtnY + Math.round(23 * rvTs));
-      ctx.font = `bold ${Math.round(13 * rvTs)}px Orbitron, Arial`;
+      ctx.fillText(t('revive.revive'), width / 2, revBtnY + Math.round(23 * rvTs));
+      ctx.font = `bold ${Math.round(13 * rvTs)}px Orbitron, Arial, sans-serif`;
       ctx.fillStyle = '#aaffcc';
-      ctx.fillText(`Cost: ${state.reviveCost} coins`, width / 2, revBtnY + Math.round(42 * rvTs));
+      ctx.fillText(t('revive.cost', { cost: state.reviveCost }), width / 2, revBtnY + Math.round(42 * rvTs));
       ctx.restore();
 
       ctx.font = `${Math.round(15 * rvTs)}px Orbitron, Arial`;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
       ctx.textAlign = 'center';
-      ctx.fillText('TAP ELSEWHERE TO SKIP', width / 2, height / 2 + Math.round(100 * rvTs));
+      ctx.fillText(t('revive.skip'), width / 2, height / 2 + Math.round(100 * rvTs));
 
       state._reviveBtnBounds = { x: revBtnX, y: revBtnY, w: revBtnW, h: revBtnH };
 
@@ -4511,13 +4500,13 @@ const Game = () => {
       ctx.shadowBlur = 0;
       ctx.strokeStyle = '#660022';
       ctx.lineWidth = 5;
-      ctx.strokeText('GAME OVER', cx, goY);
+      ctx.strokeText(t('gameover.title'), cx, goY);
       const goGrad = ctx.createLinearGradient(cx - 140, goY - 25, cx + 140, goY + 10);
       goGrad.addColorStop(0, '#ff4466');
       goGrad.addColorStop(0.5, '#ffffff');
       goGrad.addColorStop(1, '#ff4466');
       ctx.fillStyle = goGrad;
-      ctx.fillText('GAME OVER', cx, goY);
+      ctx.fillText(t('gameover.title'), cx, goY);
       ctx.restore();
       goY += goGap;
 
@@ -4528,7 +4517,7 @@ const Game = () => {
         ctx.font = `900 ${Math.floor(20 * nbPulse * goScale)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffd700';
-        ctx.fillText('NEW BEST!', cx, goY);
+        ctx.fillText(t('gameover.newBest'), cx, goY);
         ctx.restore();
         goY += Math.round(28 * goScale);
       }
@@ -4538,7 +4527,7 @@ const Game = () => {
       ctx.font = `bold ${Math.round(28 * goScale)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(`Distance: ${score}m`, cx, goY);
+      ctx.fillText(t('gameover.distance', { score }), cx, goY);
       ctx.restore();
       goY += Math.round(36 * goScale);
 
@@ -4546,14 +4535,14 @@ const Game = () => {
       ctx.textAlign = 'center';
       ctx.font = `${Math.round(22 * goScale)}px Orbitron, Arial`;
       ctx.fillStyle = '#ffd700';
-      ctx.fillText(`Coins: +${gameStateRef.current.currentCoinScore}`, cx, goY);
+      ctx.fillText(t('gameover.coins', { coins: gameStateRef.current.currentCoinScore }), cx, goY);
       goY += Math.round(34 * goScale);
 
       // Max combo
       if (gameStateRef.current.maxCombo >= 2) {
         ctx.fillStyle = '#44ddff';
         ctx.font = `${Math.round(20 * goScale)}px Orbitron, Arial`;
-        ctx.fillText(`Best Combo: ${gameStateRef.current.maxCombo}x`, cx, goY);
+        ctx.fillText(t('gameover.bestCombo', { combo: gameStateRef.current.maxCombo }), cx, goY);
         goY += Math.round(30 * goScale);
       }
 
@@ -4576,7 +4565,7 @@ const Game = () => {
         ctx.font = `${Math.round(14 * goScale)}px Orbitron, Arial`;
         ctx.fillStyle = '#44ff88';
         ctx.textAlign = 'center';
-        ctx.fillText(`+${gameStateRef.current.missionRewardsThisRun} mission bonus`, cx, goY);
+        ctx.fillText(t('gameover.missionBonus', { amount: gameStateRef.current.missionRewardsThisRun }), cx, goY);
         goY += Math.round(26 * goScale);
       }
       if (gameStateRef.current.streakBonusThisRun > 0) {
@@ -4584,7 +4573,7 @@ const Game = () => {
         ctx.fillStyle = '#ffaa44';
         ctx.textAlign = 'center';
         const streakDays = progressionRef.current ? progressionRef.current.getStreak() : 0;
-        ctx.fillText(`+${gameStateRef.current.streakBonusThisRun} streak bonus (day ${streakDays})`, cx, goY);
+        ctx.fillText(t('gameover.streakBonus', { amount: gameStateRef.current.streakBonusThisRun, days: streakDays }), cx, goY);
         goY += Math.round(26 * goScale);
       }
 
@@ -4594,7 +4583,8 @@ const Game = () => {
       if (goBest > 0) {
         ctx.font = `${Math.round(20 * goScale)}px Orbitron, Arial`;
         ctx.fillStyle = '#4dccff';
-        ctx.fillText(`Best (${goDiff.toUpperCase()}): ${goBest}m`, cx, goY);
+        const goDiffLabels = { easy: t('diff.easy'), medium: t('diff.med'), hard: t('diff.hard') };
+        ctx.fillText(t('gameover.best', { diff: goDiffLabels[goDiff] || goDiff.toUpperCase(), score: goBest }), cx, goY);
       }
 
       // Buttons — flow after stats content
@@ -4624,7 +4614,7 @@ const Game = () => {
         ctx.fillStyle = '#ffffff';
         ctx.font = `bold ${Math.round(18 * goScale)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText('RESTART', cx, goRestartY + goBtnH / 2 + 7);
+        ctx.fillText(t('gameover.restart'), cx, goRestartY + goBtnH / 2 + 7);
         ctx.restore();
       } else {
         ctx.fillStyle = 'rgba(40, 40, 60, 0.7)';
@@ -4635,7 +4625,7 @@ const Game = () => {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
         ctx.font = `bold ${Math.round(16 * goScale)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText(`RESTART (${Math.ceil((1500 - timeSinceGO) / 1000)}s)`, cx, goRestartY + goBtnH / 2 + 6);
+        ctx.fillText(t('gameover.restartTimer', { seconds: Math.ceil((1500 - timeSinceGO) / 1000) }), cx, goRestartY + goBtnH / 2 + 6);
       }
       gameStateRef.current._restartBtnBounds = { x: goRestartX, y: goRestartY, w: goBtnW, h: goBtnH };
 
@@ -4650,7 +4640,7 @@ const Game = () => {
       ctx.font = `bold ${Math.round(16 * goScale)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.globalAlpha = 1;
-      ctx.fillText('MAIN MENU', cx, goMenuY + goBtnH / 2 + 6);
+      ctx.fillText(t('gameover.mainMenu'), cx, goMenuY + goBtnH / 2 + 6);
       gameStateRef.current._goMenuBtnBounds = { x: goMenuX, y: goMenuY, w: goBtnW, h: goBtnH };
 
       // Share Score button
@@ -4664,7 +4654,7 @@ const Game = () => {
       ctx.fillStyle = '#ffffff';
       ctx.font = `bold ${Math.round(14 * goScale)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
-      ctx.fillText('SHARE SCORE', cx, goShareY + Math.round(goBtnH * 0.4) + 5);
+      ctx.fillText(t('gameover.share'), cx, goShareY + Math.round(goBtnH * 0.4) + 5);
       gameStateRef.current._shareBtnBounds = { x: goShareX, y: goShareY, w: goBtnW, h: Math.round(goBtnH * 0.8) };
 
       // Leaderboard button (Game Center)
@@ -4680,7 +4670,7 @@ const Game = () => {
         ctx.fillStyle = '#ffffff';
         ctx.font = `bold ${Math.round(14 * goScale)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText('LEADERBOARD', cx, goLbY + goLbH / 2 + 5);
+        ctx.fillText(t('menu.leaderboard'), cx, goLbY + goLbH / 2 + 5);
         gameStateRef.current._leaderboardBtnBounds = { x: goLbX, y: goLbY, w: goBtnW, h: goLbH };
       }
 
@@ -4857,7 +4847,7 @@ const Game = () => {
               ctx.fillStyle = '#ffaa00';
               ctx.shadowBlur = 4;
               ctx.shadowColor = '#ffaa00';
-              ctx.fillText('PREMIUM', cx + Math.round(30 * shopTs), cy + Math.round(12 * shopTs));
+              ctx.fillText(t('shop.premium'), cx + Math.round(30 * shopTs), cy + Math.round(12 * shopTs));
               ctx.shadowBlur = 0;
               ctx.restore();
             }
@@ -4886,18 +4876,18 @@ const Game = () => {
             if (isSelected) {
               ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
               ctx.fillStyle = '#44ff88';
-              skinStatusText = 'EQUIPPED';
+              skinStatusText = t('shop.equipped');
             } else if (isUnlocked) {
               ctx.fillStyle = '#bbbbcc';
-              skinStatusText = 'TAP TO EQUIP';
+              skinStatusText = t('shop.equip');
             } else if (totalCoinsRef.current >= skin.cost) {
               ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
               ctx.fillStyle = '#44ff88';
-              skinStatusText = `${skin.cost} coins`;
+              skinStatusText = t('shop.cost', { cost: skin.cost });
             } else {
               ctx.shadowBlur = 4; ctx.shadowColor = '#ff4444';
               ctx.fillStyle = '#ff6666';
-              skinStatusText = `${skin.cost} coins`;
+              skinStatusText = t('shop.cost', { cost: skin.cost });
             }
             ctx.font = `bold ${skinStatusSize}px Orbitron, Arial`;
             while (skinStatusSize > 7 && ctx.measureText(skinStatusText).width > skinMaxW) {
@@ -5017,7 +5007,7 @@ const Game = () => {
               ctx.fillStyle = '#ffaa00';
               ctx.shadowBlur = 4;
               ctx.shadowColor = '#ffaa00';
-              ctx.fillText('PREMIUM', cx + Math.round(52 * shopTs), cy + Math.round(14 * shopTs));
+              ctx.fillText(t('shop.premium'), cx + Math.round(52 * shopTs), cy + Math.round(14 * shopTs));
               ctx.shadowBlur = 0;
               ctx.restore();
             }
@@ -5060,21 +5050,21 @@ const Game = () => {
             if (isEquipped) {
               ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
               ctx.fillStyle = '#44ff88';
-              trailStatusText = 'EQUIPPED';
+              trailStatusText = t('shop.equipped');
             } else if (isOwned) {
               ctx.fillStyle = '#bbbbcc';
-              trailStatusText = 'TAP TO EQUIP';
+              trailStatusText = t('shop.equip');
             } else if (trail.cost === 0) {
               ctx.fillStyle = '#44ff88';
-              trailStatusText = 'FREE';
+              trailStatusText = t('shop.cost', { cost: 0 });
             } else if (totalCoinsRef.current >= trail.cost) {
               ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
               ctx.fillStyle = '#44ff88';
-              trailStatusText = `${trail.cost} coins`;
+              trailStatusText = t('shop.cost', { cost: trail.cost });
             } else {
               ctx.shadowBlur = 4; ctx.shadowColor = '#ff4444';
               ctx.fillStyle = '#ff6666';
-              trailStatusText = `${trail.cost} coins`;
+              trailStatusText = t('shop.cost', { cost: trail.cost });
             }
             ctx.font = `bold ${trailStatusSize}px Orbitron, Arial`;
             while (trailStatusSize > 7 && ctx.measureText(trailStatusText).width > trailStatusMaxW) {
@@ -5122,7 +5112,7 @@ const Game = () => {
         shopGrad.addColorStop(0.5, '#ffffff');
         shopGrad.addColorStop(1, '#ee88ff');
         ctx.fillStyle = shopGrad;
-        ctx.fillText('SHOP', width / 2, Math.round(38 * shopTs));
+        ctx.fillText(t('shop.title'), width / 2, Math.round(38 * shopTs));
         ctx.restore();
 
         // Coins
@@ -5132,7 +5122,7 @@ const Game = () => {
         ctx.shadowBlur = 10;
         ctx.shadowColor = '#ffaa00';
         ctx.fillStyle = '#ffd700';
-        ctx.fillText(`Coins: ${totalCoinsRef.current}`, width / 2, Math.round(62 * shopTs));
+        ctx.fillText(t('shop.coins', { coins: totalCoinsRef.current }), width / 2, Math.round(62 * shopTs));
         ctx.restore();
 
         // Tab buttons
@@ -5141,8 +5131,8 @@ const Game = () => {
         const tabY = headerH - tabH - Math.round(10 * shopTs);
         const tabGap = Math.round(12 * shopTs);
         const tabs = [
-          { tab: 'skins', label: 'BIRDS' },
-          { tab: 'trails', label: 'TRAILS' },
+          { tab: 'skins', label: t('shop.birds') },
+          { tab: 'trails', label: t('shop.trails') },
         ];
         const totalTabW = tabs.length * tabW + (tabs.length - 1) * tabGap;
         const tabStartX = width / 2 - totalTabW / 2;
@@ -5186,7 +5176,7 @@ const Game = () => {
         ctx.font = `bold ${Math.round(18 * shopTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText('BACK', width / 2, backBtnY + Math.round(31 * shopTs));
+        ctx.fillText(t('menu.back'), width / 2, backBtnY + Math.round(31 * shopTs));
         ctx.restore();
         gameStateRef.current._shopBackBtnBounds = { x: width / 2 - backBtnW / 2, y: backBtnY, w: backBtnW, h: backBtnH };
 
@@ -5219,7 +5209,7 @@ const Game = () => {
         ctx.font = `bold ${Math.round(22 * sTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText('SETTINGS', width / 2, sSafeTop + (sHeaderH - sSafeTop) / 2 + Math.round(8 * sTs));
+        ctx.fillText(t('settings.title'), width / 2, sSafeTop + (sHeaderH - sSafeTop) / 2 + Math.round(8 * sTs));
 
         // Scrollable content area
         ctx.save();
@@ -5297,7 +5287,7 @@ const Game = () => {
           ctx.font = `bold ${sSmallFs}px Orbitron, Arial`;
           ctx.textAlign = 'center';
           ctx.fillStyle = '#ffffff';
-          ctx.fillText(value ? 'ON' : 'OFF', btnX + btnW / 2, btnY + btnH / 2 + Math.round(4 * sTs));
+          ctx.fillText(value ? t('settings.on') : t('settings.off'), btnX + btnW / 2, btnY + btnH / 2 + Math.round(4 * sTs));
           gameStateRef.current[boundsKey] = { x: btnX, y: btnY, w: btnW, h: btnH };
         };
 
@@ -5331,26 +5321,26 @@ const Game = () => {
         ctx.font = `bold ${sSectionFs}px Orbitron, Arial`;
         ctx.textAlign = 'left';
         ctx.fillStyle = '#bb88ff';
-        ctx.fillText('AUDIO', sStartX, sY + Math.round(14 * sTs));
+        ctx.fillText(t('settings.audio'), sStartX, sY + Math.round(14 * sTs));
         sY += Math.round(28 * sTs);
 
-        drawVolBar('MASTER', masterVolRef.current, sY, '_settingsMasterVolBounds');
+        drawVolBar(t('settings.master'), masterVolRef.current, sY, '_settingsMasterVolBounds');
         sY += sRowH;
-        drawVolBar('MUSIC', musicVolRef.current, sY, '_settingsMusicVolBounds');
+        drawVolBar(t('settings.music'), musicVolRef.current, sY, '_settingsMusicVolBounds');
         sY += sRowH;
-        drawVolBar('SFX', sfxVolRef.current, sY, '_settingsSfxVolBounds');
+        drawVolBar(t('settings.sfx'), sfxVolRef.current, sY, '_settingsSfxVolBounds');
         sY += sRowH + sPad;
 
         // --- SECTION: DISPLAY ---
         ctx.font = `bold ${sSectionFs}px Orbitron, Arial`;
         ctx.textAlign = 'left';
         ctx.fillStyle = '#bb88ff';
-        ctx.fillText('DISPLAY', sStartX, sY + Math.round(14 * sTs));
+        ctx.fillText(t('settings.display'), sStartX, sY + Math.round(14 * sTs));
         sY += Math.round(28 * sTs);
 
         const gfxColors = { low: '#44cc66', medium: '#ffaa22', high: '#ff4466' };
         const gfxColor = gfxColors[graphicsRef.current] || '#ffaa22';
-        drawLabel('GRAPHICS', sY);
+        drawLabel(t('settings.graphics'), sY);
         const gBtnW = Math.round((sIsWide ? 120 : 90) * sTs);
         const gBtnH = sMinTouch;
         const gBtnX = sStartX + sMaxW - gBtnW;
@@ -5367,7 +5357,8 @@ const Game = () => {
         ctx.font = `bold ${sBtnFs}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = gfxColor;
-        ctx.fillText(graphicsRef.current.toUpperCase(), gBtnX + gBtnW / 2, gBtnY + gBtnH / 2 + Math.round(4 * sTs));
+        const gfxLabelMap = { low: t('settings.low'), medium: t('settings.medium'), high: t('settings.high') };
+        ctx.fillText(gfxLabelMap[graphicsRef.current] || graphicsRef.current.toUpperCase(), gBtnX + gBtnW / 2, gBtnY + gBtnH / 2 + Math.round(4 * sTs));
         gameStateRef.current._settingsGfxBounds = { x: gBtnX, y: gBtnY, w: gBtnW, h: gBtnH };
         sY += sRowH + sPad;
 
@@ -5375,17 +5366,17 @@ const Game = () => {
         ctx.font = `bold ${sSectionFs}px Orbitron, Arial`;
         ctx.textAlign = 'left';
         ctx.fillStyle = '#bb88ff';
-        ctx.fillText('ACCESSIBILITY', sStartX, sY + Math.round(14 * sTs));
+        ctx.fillText(t('settings.accessibility'), sStartX, sY + Math.round(14 * sTs));
         sY += Math.round(28 * sTs);
 
-        const cbLabels = { none: 'NONE', deuteranopia: 'DEUTERANOPIA', protanopia: 'PROTANOPIA', tritanopia: 'TRITANOPIA' };
-        drawCycle('COLOR BLIND', cbLabels[colorblindModeRef.current] || 'NONE', sY, '_settingsColorblindBounds');
+        const cbLabels = { none: t('settings.none'), deuteranopia: t('settings.deuteranopia'), protanopia: t('settings.protanopia'), tritanopia: t('settings.tritanopia') };
+        drawCycle(t('settings.colorBlind'), cbLabels[colorblindModeRef.current] || t('settings.none'), sY, '_settingsColorblindBounds');
         sY += sRowH;
 
-        drawToggle('REDUCE MOTION', reducedMotionRef.current, sY, '_settingsReducedMotionBounds');
+        drawToggle(t('settings.reduceMotion'), reducedMotionRef.current, sY, '_settingsReducedMotionBounds');
         sY += sRowH;
 
-        drawToggle('LEFT HAND', leftHandRef.current, sY, '_settingsLeftHandBounds');
+        drawToggle(t('settings.leftHand'), leftHandRef.current, sY, '_settingsLeftHandBounds');
 
         ctx.restore(); // end clip
 
@@ -5409,7 +5400,7 @@ const Game = () => {
         ctx.font = `bold ${Math.round(18 * sTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText('BACK', width / 2, sBackY + Math.round(31 * sTs));
+        ctx.fillText(t('menu.back'), width / 2, sBackY + Math.round(31 * sTs));
         ctx.restore();
         gameStateRef.current._settingsBackBtnBounds = { x: width / 2 - sBackW / 2, y: sBackY, w: sBackW, h: sBackH };
 
@@ -5462,7 +5453,7 @@ const Game = () => {
         ctx.shadowBlur = 0;
         ctx.strokeStyle = '#6622aa';
         ctx.lineWidth = 6;
-        ctx.strokeText('VOID HOPPER', width / 2, titleY);
+        ctx.strokeText(t('menu.title'), width / 2, titleY);
         const titleGrad = ctx.createLinearGradient(width / 2 - titleFontSize * 3, titleY - 30, width / 2 + titleFontSize * 3, titleY + 10);
         titleGrad.addColorStop(0, '#cc66ff');
         titleGrad.addColorStop(0.3, '#ffffff');
@@ -5470,10 +5461,10 @@ const Game = () => {
         titleGrad.addColorStop(0.7, '#ffffff');
         titleGrad.addColorStop(1, '#aa44dd');
         ctx.fillStyle = titleGrad;
-        ctx.fillText('VOID HOPPER', width / 2, titleY);
+        ctx.fillText(t('menu.title'), width / 2, titleY);
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
         ctx.lineWidth = 1;
-        ctx.strokeText('VOID HOPPER', width / 2, titleY);
+        ctx.strokeText(t('menu.title'), width / 2, titleY);
         ctx.restore();
 
         // --- Player level badge ---
@@ -5484,7 +5475,7 @@ const Game = () => {
           ctx.font = `bold ${Math.round((isSmallScreen ? 10 : 11) * menuTs)}px Orbitron, Arial`;
           ctx.textAlign = 'center';
           ctx.fillStyle = '#aa88ff';
-          ctx.fillText(`LVL ${lvl}`, width / 2, titleY + Math.round((isSmallScreen ? 14 : 18) * menuTs));
+          ctx.fillText(t('menu.lvl', { level: lvl }), width / 2, titleY + Math.round((isSmallScreen ? 14 : 18) * menuTs));
           // XP bar
           const xpW = Math.round(60 * menuTs), xpH = 3;
           ctx.fillStyle = 'rgba(255,255,255,0.1)';
@@ -5540,9 +5531,9 @@ const Game = () => {
           ctx.fillStyle = '#000000';
           ctx.font = `bold ${Math.round((isSmallScreen ? 11 : 13) * menuTs)}px Orbitron, Arial`;
           ctx.textAlign = 'center';
-          ctx.fillText(`DAILY BONUS: +${drInfo.pending}`, width / 2, curY + drH / 2 - 3);
-          ctx.font = `${Math.round((isSmallScreen ? 8 : 9) * menuTs)}px Orbitron, Arial`;
-          ctx.fillText(`Day ${drInfo.day}/7 - Tap to claim!`, width / 2, curY + drH / 2 + 10);
+          ctx.fillText(t('menu.dailyBonus', { amount: drInfo.pending }), width / 2, curY + drH / 2 - 3);
+          ctx.font = `${Math.round((isSmallScreen ? 8 : 9) * menuTs)}px Orbitron, Arial, sans-serif`;
+          ctx.fillText(t('menu.dailyClaim', { day: drInfo.day }), width / 2, curY + drH / 2 + 10);
           ctx.restore();
           state._dailyRewardBounds = { x: drX, y: curY, w: drW, h: drH };
           curY += drH + menuPad;
@@ -5556,8 +5547,8 @@ const Game = () => {
             ctx.font = `bold ${Math.round((isSmallScreen ? 9 : 10) * menuTs)}px Orbitron, Arial`;
             ctx.textAlign = 'center';
             ctx.fillStyle = dc.completed ? '#44ff88' : '#44ddff';
-            const dcStatus = dc.completed ? 'DONE!' : `${dc.progress}/${dc.target}`;
-            ctx.fillText(`DAILY: ${dc.desc} [${dcStatus}] +${dc.reward}`, width / 2, curY + 4);
+            const dcStatus = dc.completed ? t('misc.done') : `${dc.progress}/${dc.target}`;
+            ctx.fillText(t('menu.dailyChallenge', { desc: dc.desc, status: dcStatus, reward: dc.reward }), width / 2, curY + 4);
             ctx.restore();
             curY += Math.round(16 * menuTs);
           }
@@ -5565,9 +5556,9 @@ const Game = () => {
 
         // --- Difficulty row (horizontal) ---
         const difficulties = [
-          { key: 'easy', label: 'EASY', color: '#44cc66', desc: 'Slower storm' },
-          { key: 'medium', label: 'MED', color: '#ffaa22', desc: 'Balanced' },
-          { key: 'hard', label: 'HARD', color: '#ff4444', desc: 'Fast storm' },
+          { key: 'easy', label: t('diff.easy'), color: '#44cc66', desc: t('diff.easyDesc') },
+          { key: 'medium', label: t('diff.med'), color: '#ffaa22', desc: t('diff.medDesc') },
+          { key: 'hard', label: t('diff.hard'), color: '#ff4444', desc: t('diff.hardDesc') },
         ];
         const diffTotalW = Math.min(width - 30, menuMaxW);
         const diffGap = Math.round(8 * menuTs);
@@ -5601,7 +5592,7 @@ const Game = () => {
 
           ctx.font = `${Math.round((isSmallScreen ? 9 : 10) * menuTs)}px Orbitron, Arial`;
           ctx.fillStyle = isSelected ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.35)';
-          ctx.fillText(best > 0 ? `Best: ${best}m` : d.desc, bx + diffBtnW / 2, by + Math.round((isSmallScreen ? 36 : 40) * menuTs));
+          ctx.fillText(best > 0 ? t('diff.best', { score: best }) : d.desc, bx + diffBtnW / 2, by + Math.round((isSmallScreen ? 36 : 40) * menuTs));
 
           d._bounds = { x: bx, y: by, w: diffBtnW, h: diffBtnH };
         });
@@ -5631,7 +5622,7 @@ const Game = () => {
         ctx.fillStyle = '#000000';
         ctx.font = `bold ${Math.round((isSmallScreen ? 20 : 24) * menuTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText('PLAY', width / 2, playBtnY + playBtnH / 2 + Math.round(8 * menuTs));
+        ctx.fillText(t('menu.play'), width / 2, playBtnY + playBtnH / 2 + Math.round(8 * menuTs));
         ctx.restore();
         gameStateRef.current._playBtnBounds = { x: playBtnX, y: playBtnY, w: playBtnW, h: playBtnH };
         curY += playBtnH + menuPad;
@@ -5653,7 +5644,7 @@ const Game = () => {
         ctx.fillStyle = '#ffffff';
         ctx.font = `bold ${Math.round((isSmallScreen ? 16 : 18) * menuTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText('SHOP', rowStartX + shopBtnW / 2, curY + shopBtnH / 2 + Math.round(6 * menuTs));
+        ctx.fillText(t('menu.shop'), rowStartX + shopBtnW / 2, curY + shopBtnH / 2 + Math.round(6 * menuTs));
         gameStateRef.current._shopBtnBounds = { x: rowStartX, y: curY, w: shopBtnW, h: shopBtnH };
 
         // Settings button
@@ -5666,7 +5657,7 @@ const Game = () => {
         ctx.font = `bold ${Math.round((isSmallScreen ? 14 : 16) * menuTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText('SETTINGS', settingsBtnX + gfxBtnW / 2, curY + shopBtnH / 2 + Math.round(5 * menuTs));
+        ctx.fillText(t('menu.settings'), settingsBtnX + gfxBtnW / 2, curY + shopBtnH / 2 + Math.round(5 * menuTs));
         gameStateRef.current._settingsBtnBounds = { x: settingsBtnX, y: curY, w: gfxBtnW, h: shopBtnH };
         curY += shopBtnH + menuPad;
 
@@ -5683,7 +5674,7 @@ const Game = () => {
           ctx.fillStyle = '#ffffff';
           ctx.font = `bold ${Math.round((isSmallScreen ? 14 : 16) * menuTs)}px Orbitron, Arial`;
           ctx.textAlign = 'center';
-          ctx.fillText('LEADERBOARD', width / 2, curY + lbBtnH / 2 + Math.round(5 * menuTs));
+          ctx.fillText(t('menu.leaderboard'), width / 2, curY + lbBtnH / 2 + Math.round(5 * menuTs));
           gameStateRef.current._menuLeaderboardBtnBounds = { x: lbBtnX, y: curY, w: lbBtnW, h: lbBtnH };
           curY += lbBtnH + menuPad;
         }
@@ -5703,7 +5694,8 @@ const Game = () => {
             ctx.shadowColor = streakVal >= 5 ? '#ff4400' : '#ffaa00';
             ctx.globalAlpha = streakPulse;
             const flameIcon = streakVal >= 7 ? '**' : streakVal >= 3 ? '*' : '';
-            ctx.fillText(`${flameIcon} Day ${streakVal} Streak${bonusPct > 0 ? ` +${bonusPct}% coins` : ''} ${flameIcon}`, width / 2, curY + 8);
+            const streakText = bonusPct > 0 ? t('menu.streakCoins', { days: streakVal, pct: bonusPct }) : t('menu.streak', { days: streakVal });
+            ctx.fillText(`${flameIcon} ${streakText} ${flameIcon}`, width / 2, curY + 8);
             ctx.shadowBlur = 0;
             ctx.globalAlpha = 1;
             ctx.restore();
@@ -5715,7 +5707,7 @@ const Game = () => {
           ctx.font = `bold ${Math.round((isSmallScreen ? 10 : 11) * menuTs)}px Orbitron, Arial`;
           ctx.textAlign = 'center';
           ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-          ctx.fillText('MISSIONS', width / 2, curY + Math.round(10 * menuTs));
+          ctx.fillText(t('menu.missions'), width / 2, curY + Math.round(10 * menuTs));
           curY += Math.round(16 * menuTs);
 
           const missions = progressionRef.current.getMissions();
@@ -5768,7 +5760,7 @@ const Game = () => {
           ctx.font = 'bold 10px Orbitron, Arial';
           ctx.textAlign = 'center';
           ctx.fillStyle = '#66dd88';
-          ctx.fillText('BACKUP', slX + slBtnW / 2, slY + 20);
+          ctx.fillText(t('menu.backup'), slX + slBtnW / 2, slY + 20);
           gameStateRef.current._saveBtnBounds = { x: slX, y: slY, w: slBtnW, h: slBtnH };
 
           const loadX = slX + slBtnW + slGap;
@@ -5778,7 +5770,7 @@ const Game = () => {
           ctx.lineWidth = 1;
           ctx.strokeRect(loadX, slY, slBtnW, slBtnH);
           ctx.fillStyle = '#aa88dd';
-          ctx.fillText('RESTORE', loadX + slBtnW / 2, slY + 20);
+          ctx.fillText(t('menu.restore'), loadX + slBtnW / 2, slY + 20);
           gameStateRef.current._loadBtnBounds = { x: loadX, y: slY, w: slBtnW, h: slBtnH };
         }
       }
@@ -5788,7 +5780,7 @@ const Game = () => {
       ctx.font = `${width < 420 ? 9 : 10}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-      ctx.fillText('Developed by Kevin Delao', width / 2, height - creditSafeBot - 8);
+      ctx.fillText(t('menu.credits'), width / 2, height - creditSafeBot - 8);
 
       ctx.restore();
     }
