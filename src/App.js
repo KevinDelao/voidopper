@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import ErrorBoundary from './components/ErrorBoundary';
 import Game from './components/Game';
+import { initializeAds, showBanner } from './AdManager';
 import './App.css';
 
 function App() {
@@ -23,6 +24,9 @@ function App() {
       import('@capacitor/splash-screen').then(({ SplashScreen }) => {
         SplashScreen.hide().catch(() => {});
       });
+
+      // Initialize AdMob and show banner ad
+      initializeAds().then(() => showBanner());
     }
   }, []);
 

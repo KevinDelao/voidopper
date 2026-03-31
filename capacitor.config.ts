@@ -5,8 +5,8 @@ const config: CapacitorConfig = {
   appName: 'Void Hopper',
   webDir: 'build',
   server: {
-    // Disable external URL loading for App Store compliance
-    allowNavigation: [],
+    // Allow AdMob network requests
+    allowNavigation: ['*.google.com', '*.googleapis.com', '*.doubleclick.net', '*.googleadservices.com'],
   },
   ios: {
     contentInset: 'never',

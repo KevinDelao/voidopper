@@ -22,6 +22,7 @@ import { getItem, setItem, getJSON, setJSON } from '../storage';
 import { lightTap, mediumTap, heavyTap, notifyTap, selectionTap } from '../haptics';
 import { authenticateGameCenter, submitScore as submitGCScore, showLeaderboard, isAuthenticated as isGCAuthenticated } from '../GameCenter';
 import { t } from '../i18n';
+import { getBannerHeight } from '../AdManager';
 
 // Detect iPad for performance tuning
 const isIPad = /iPad/i.test(navigator.userAgent) ||
@@ -285,7 +286,8 @@ const Game = () => {
       // On native (Capacitor), use innerHeight for full screen coverage including home indicator area
       // On mobile browsers, use visualViewport to handle URL bar
       const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
-      const logicalH = (!isNative && window.visualViewport) ? window.visualViewport.height : window.innerHeight;
+      const bannerH = getBannerHeight();
+      const logicalH = ((!isNative && window.visualViewport) ? window.visualViewport.height : window.innerHeight) - bannerH;
       const oldWidth = canvas.logicalWidth || 0;
       const oldHeight = canvas.logicalHeight || 0;
       canvas.width = logicalW * dpr;
