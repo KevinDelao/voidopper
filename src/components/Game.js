@@ -2092,6 +2092,17 @@ const Game = () => {
 
       if (safeMaxX - safeMinX > 100) {
         const enemyX = safeMinX + Math.random() * (safeMaxX - safeMinX);
+        const corridorWidth = safeMaxX - safeMinX;
+
+        // Check if jellyfish should be blocked: corridor too narrow or another
+        // stationary enemy already nearby (prevents impassable formations)
+        const jellyfishDiameter = 44; // radius 22 * 2
+        const playerDiameter = 36;    // ~radius 18 * 2
+        const minCorridorForJellyfish = jellyfishDiameter + playerDiameter + 30; // ~110px
+        const hasNearbyJellyfish = state.enemies.some(e =>
+          e instanceof SpaceJellyfish && Math.abs(e.y - enemyY) < 120
+        );
+        const canSpawnJellyfish = corridorWidth >= minCorridorForJellyfish && !hasNearbyJellyfish;
 
         // Progressive enemy introduction — thresholds shift by difficulty
         // Easy: enemies unlock 50% later, Hard: enemies unlock 40% sooner
@@ -2110,7 +2121,7 @@ const Game = () => {
           enemy = new Enemy(enemyX, enemyY);
         } else if (heightClimbed < t2) {
           // Introduce jellyfish
-          if (roll < 0.5) {
+          if (roll < 0.5 || !canSpawnJellyfish) {
             enemy = new Enemy(enemyX, enemyY);
           } else {
             enemy = new SpaceJellyfish(enemyX, enemyY);
@@ -2119,7 +2130,7 @@ const Game = () => {
           // Introduce plasma orbs
           if (roll < 0.3) {
             enemy = new Enemy(enemyX, enemyY);
-          } else if (roll < 0.6) {
+          } else if (roll < 0.6 && canSpawnJellyfish) {
             enemy = new SpaceJellyfish(enemyX, enemyY);
           } else {
             enemy = new PlasmaOrb(enemyX, enemyY, spawnLeftBound, spawnRightBound);
@@ -2128,7 +2139,7 @@ const Game = () => {
           // Introduce UFOs
           if (roll < 0.2) {
             enemy = new Enemy(enemyX, enemyY);
-          } else if (roll < 0.4) {
+          } else if (roll < 0.4 && canSpawnJellyfish) {
             enemy = new SpaceJellyfish(enemyX, enemyY);
           } else if (roll < 0.65) {
             enemy = new PlasmaOrb(enemyX, enemyY, spawnLeftBound, spawnRightBound);
@@ -2139,7 +2150,7 @@ const Game = () => {
           // Introduce cosmic serpents
           if (roll < 0.15) {
             enemy = new Enemy(enemyX, enemyY);
-          } else if (roll < 0.3) {
+          } else if (roll < 0.3 && canSpawnJellyfish) {
             enemy = new SpaceJellyfish(enemyX, enemyY);
           } else if (roll < 0.5) {
             enemy = new PlasmaOrb(enemyX, enemyY, spawnLeftBound, spawnRightBound);
@@ -2152,7 +2163,7 @@ const Game = () => {
           // Endgame: everything including black holes
           if (roll < 0.1) {
             enemy = new Enemy(enemyX, enemyY);
-          } else if (roll < 0.2) {
+          } else if (roll < 0.2 && canSpawnJellyfish) {
             enemy = new SpaceJellyfish(enemyX, enemyY);
           } else if (roll < 0.35) {
             enemy = new PlasmaOrb(enemyX, enemyY, spawnLeftBound, spawnRightBound);

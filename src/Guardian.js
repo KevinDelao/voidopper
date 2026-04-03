@@ -332,9 +332,11 @@ class Guardian {
     this.y = 0;
     this.homeX = this.corridorCenter;
 
-    // Zone tracking
+    // Zone tracking (time-based: duration in seconds)
     this.startHeight = startHeight;
-    this.zoneLength = type.zoneLength || (2000 + guardianIndex * 200);
+    const baseZonePixels = type.zoneLength || (2000 + guardianIndex * 200);
+    this.zoneDuration = baseZonePixels / 100; // convert pixels to seconds (~20s base, scales up)
+    this.zoneTimer = 0;
     this.progress = 0;
     this.active = true;
     this.exiting = false;
@@ -391,8 +393,9 @@ class Guardian {
     this.phase += 0.04;
     this.moveTimer += deltaTime;
 
-    // Zone progress
-    this.progress = Math.min(1, (currentHeight - this.startHeight) / this.zoneLength);
+    // Zone progress (time-based, not height-based)
+    this.zoneTimer += deltaTime;
+    this.progress = Math.min(1, this.zoneTimer / this.zoneDuration);
 
     // Entrance animation
     if (!this.entered) {
