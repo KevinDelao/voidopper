@@ -831,6 +831,7 @@ class Player {
 
   draw(ctx, cameraY, gfxLevel, spriteManager) {
     const screenY = this.y - cameraY;
+    const ss = this.screenScale || 1;
     // Cache skin colors — only recompute when skin changes or for rainbow
     if (!this._cachedColors || this._cachedSkinId !== this.skinId || (this.skin && this.skin.isRainbow)) {
       this._cachedColors = this.getSkinColors();
@@ -930,7 +931,6 @@ class Player {
 
     // Draw bird body based on type
     // Use 2x internal scale for crisper rendering on high-DPR screens
-    const ss = this.screenScale || 1;
     const birdScale = 2;
     const birdSize = Math.round(30 * ss); // logical radius to cover bird artwork (scaled)
     const offW = birdSize * 2 * birdScale;
