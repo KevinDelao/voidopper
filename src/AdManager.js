@@ -3,11 +3,9 @@ import { Capacitor } from '@capacitor/core';
 let admobModule = null;
 let bannerVisible = false;
 
-// Replace these with your real AdMob unit IDs before publishing
-// TODO: Replace XXXXXXXXXX with your actual ad unit suffixes from AdMob
 const AD_UNIT_IDS = {
-  ios: 'ca-app-pub-9488448873943026/XXXXXXXXXX',      // Replace with iOS banner unit ID
-  android: 'ca-app-pub-9488448873943026/XXXXXXXXXX',   // Replace with Android banner unit ID
+  ios: 'ca-app-pub-9488448873943026/4174857414',
+  android: 'ca-app-pub-9488448873943026/4174857414',
 };
 
 async function getAdMob() {
@@ -23,7 +21,8 @@ export async function initializeAds() {
   try {
     const { AdMob } = await getAdMob();
     await AdMob.initialize({
-      initializeForTesting: true, // Remove this for production
+      requestTrackingAuthorization: true,
+      initializeForTesting: false,
     });
   } catch (e) {
     console.warn('AdMob init failed:', e);
@@ -41,7 +40,6 @@ export async function showBanner() {
       adId,
       adSize: BannerAdSize.ADAPTIVE_BANNER,
       position: BannerAdPosition.BOTTOM_CENTER,
-      isTesting: true, // Remove this for production
     });
     bannerVisible = true;
   } catch (e) {

@@ -22,7 +22,7 @@ import { getItem, setItem, getJSON, setJSON } from '../storage';
 import { lightTap, mediumTap, heavyTap, notifyTap, selectionTap } from '../haptics';
 import { authenticateGameCenter, submitScore as submitGCScore, showLeaderboard, isAuthenticated as isGCAuthenticated } from '../GameCenter';
 import { t } from '../i18n';
-import { getBannerHeight } from '../AdManager';
+import { getBannerHeight, showBanner, hideBanner } from '../AdManager';
 
 // Detect iPad for performance tuning
 const isIPad = /iPad/i.test(navigator.userAgent) ||
@@ -218,6 +218,15 @@ const Game = () => {
   // Keep refs in sync with state for use inside closures
   unlockedSkinsRef.current = unlockedSkins;
   unlockedTrailsRef.current = unlockedTrails;
+
+  // Hide banner during active gameplay, show it everywhere else
+  useEffect(() => {
+    if (gameStarted && !isGameOver) {
+      hideBanner();
+    } else {
+      showBanner();
+    }
+  }, [gameStarted, isGameOver]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
