@@ -49,6 +49,17 @@ const CUMULATIVE_MISSIONS = [
   { id: 'lt_d200k', type: 'lt_distance', target: 200000, descKey: 'mission.lt_distance', reward: 120 },
 ];
 
+// 7-Day Escalating Daily Calendar Rewards
+const DAILY_CALENDAR_REWARDS = [
+  { day: 1, coins: 10 },
+  { day: 2, coins: 15 },
+  { day: 3, coins: 25 },
+  { day: 4, coins: 35 },
+  { day: 5, coins: 50, bonus: 'powerUpStartToken' },
+  { day: 6, coins: 75 },
+  { day: 7, coins: 100, bonus: 'gachaToken' },
+];
+
 // Daily challenge templates
 const DAILY_CHALLENGES = [
   { type: 'distance', target: 1000, descKey: 'daily.climb', reward: 30 },
@@ -100,6 +111,14 @@ class ProgressionManager {
     // Daily challenge
     this.dailyChallenge = data.dailyChallenge || null;
     this.dailyChallengeDate = data.dailyChallengeDate || '';
+    // Pilot rank (mission chains)
+    this.pilotRank = data.pilotRank || 0;
+    this.chainCompletedCount = data.chainCompletedCount || 0;
+    // Gacha and power-up start tokens
+    this.gachaTokens = data.gachaTokens || 0;
+    this.powerUpStartTokens = data.powerUpStartTokens || 0;
+    // Personal bests per difficulty
+    this.personalBests = data.personalBests || {};
 
     this._updateStreak();
     this._checkDailyLogin();
@@ -124,6 +143,11 @@ class ProgressionManager {
         dailyLoginDay: this.dailyLoginDay,
         dailyChallenge: this.dailyChallenge,
         dailyChallengeDate: this.dailyChallengeDate,
+        pilotRank: this.pilotRank,
+        chainCompletedCount: this.chainCompletedCount,
+        gachaTokens: this.gachaTokens,
+        powerUpStartTokens: this.powerUpStartTokens,
+        personalBests: this.personalBests,
       }));
     } catch {}
   }
@@ -141,35 +165,85 @@ class ProgressionManager {
     this.lastPlayDate = today;
   }
 
-  // Daily login reward: Day 1=5, Day 2=10, Day 3=15, Day 4=20, Day 5=25, Day 6=35, Day 7=50
+  // 7-Day Escalating Daily Calendar
+  // Day 1: 10 coins, Day 2: 15, Day 3: 25, Day 4: 35,
+  // Day 5: 50 coins + power-up token, Day 6: 75, Day 7: 100 coins + gacha token
+  // Missing a day resets to day 1.
   _checkDailyLogin() {
     const today = new Date().toDateString();
     if (this.lastDailyClaimDate === today) {
       this.pendingDailyReward = 0;
       return;
     }
-    const rewards = [5, 10, 15, 20, 25, 35, 50];
-    this.pendingDailyReward = rewards[this.dailyLoginDay % 7];
+    // Check if the player missed a day (reset to day 0 index)
+    if (this.lastDailyClaimDate) {
+      const lastDate = new Date(this.lastDailyClaimDate);
+      const now = new Date();
+      const diffMs = now.getTime() - lastDate.getTime();
+      const diffDays = Math.floor(diffMs / 86400000);
+      if (diffDays > 1) {
+        // Missed a day — reset calendar
+        this.dailyLoginDay = 0;
+      }
+    }
+    const calendarRewards = DAILY_CALENDAR_REWARDS;
+    this.pendingDailyReward = calendarRewards[this.dailyLoginDay % 7].coins;
   }
 
   claimDailyReward() {
-    if (this.pendingDailyReward <= 0) return 0;
-    const reward = this.pendingDailyReward;
+    if (this.pendingDailyReward <= 0) return { coins: 0, bonus: null };
+    const dayIndex = this.dailyLoginDay % 7;
+    const calendarEntry = DAILY_CALENDAR_REWARDS[dayIndex];
+    const coins = calendarEntry.coins;
+    const bonus = calendarEntry.bonus || null;
     this.lastDailyClaimDate = new Date().toDateString();
     this.dailyLoginDay = (this.dailyLoginDay + 1) % 7;
     this.pendingDailyReward = 0;
-    this.addXP(reward);
+    // Grant gacha token on day 7
+    if (bonus === 'gachaToken') {
+      this.gachaTokens = (this.gachaTokens || 0) + 1;
+    }
+    // Grant power-up start token on day 5
+    if (bonus === 'powerUpStartToken') {
+      this.powerUpStartTokens = (this.powerUpStartTokens || 0) + 1;
+    }
+    this.addXP(coins);
     this._save();
-    return reward;
+    return { coins, bonus };
   }
 
   getDailyRewardInfo() {
-    const rewards = [5, 10, 15, 20, 25, 35, 50];
+    const rewards = DAILY_CALENDAR_REWARDS.map(r => r.coins);
     return {
       pending: this.pendingDailyReward,
       day: (this.dailyLoginDay % 7) + 1,
       rewards,
     };
+  }
+
+  getDailyCalendar() {
+    const today = new Date().toDateString();
+    const claimed = this.lastDailyClaimDate === today;
+    return {
+      day: (this.dailyLoginDay % 7) + 1,
+      rewards: DAILY_CALENDAR_REWARDS.map((r, i) => ({
+        day: i + 1,
+        coins: r.coins,
+        bonus: r.bonus || null,
+      })),
+      claimed,
+    };
+  }
+
+  hasGachaToken() {
+    return (this.gachaTokens || 0) > 0;
+  }
+
+  useGachaToken() {
+    if (!this.hasGachaToken()) return false;
+    this.gachaTokens--;
+    this._save();
+    return true;
   }
 
   // Daily challenge: one special mission per day
@@ -353,21 +427,37 @@ class ProgressionManager {
         anyCompleted = true;
       }
     });
+    // Update personal bests if difficulty is provided
+    if (runStats.difficulty) {
+      this.updatePersonalBests(runStats.difficulty, runStats);
+    }
     this._save();
     return anyCompleted;
   }
 
   collectRewards() {
     let total = 0;
-    this.missions.filter(m => m.completed).forEach(m => {
+    const completedMissions = this.missions.filter(m => m.completed);
+    completedMissions.forEach(m => {
       total += m.reward;
       this.completedCount++;
       this.completedIds.add(m.id);
+      this.chainCompletedCount++;
     });
     this.missions = this.missions.filter(m => !m.completed);
+    // Mission chain: when all 3 in a chain are completed, pilot rank increases
+    if (this.chainCompletedCount >= 3) {
+      const chainsCompleted = Math.floor(this.chainCompletedCount / 3);
+      this.pilotRank += chainsCompleted;
+      this.chainCompletedCount = this.chainCompletedCount % 3;
+    }
     while (this.missions.length < 3) this._addNewMission();
     this._save();
     return total;
+  }
+
+  getPilotRank() {
+    return this.pilotRank;
   }
 
   getMissions() {
@@ -377,6 +467,65 @@ class ProgressionManager {
     }));
   }
   getStreak() { return this.streak; }
+
+  // Personal bests per difficulty
+  _ensurePersonalBests(difficulty) {
+    if (!this.personalBests[difficulty]) {
+      this.personalBests[difficulty] = {
+        bestHeight: 0,
+        bestCombo: 0,
+        bestCoins: 0,
+        longestSurvival: 0,
+        mostGuardians: 0,
+      };
+    }
+  }
+
+  getPersonalBests(difficulty) {
+    this._ensurePersonalBests(difficulty);
+    return { ...this.personalBests[difficulty] };
+  }
+
+  updatePersonalBests(difficulty, runStats) {
+    this._ensurePersonalBests(difficulty);
+    const bests = this.personalBests[difficulty];
+    const broken = [];
+
+    const height = runStats.distance || 0;
+    if (height > bests.bestHeight) {
+      bests.bestHeight = height;
+      broken.push('bestHeight');
+    }
+
+    const combo = runStats.maxCombo || 0;
+    if (combo > bests.bestCombo) {
+      bests.bestCombo = combo;
+      broken.push('bestCombo');
+    }
+
+    const coins = runStats.coins || 0;
+    if (coins > bests.bestCoins) {
+      bests.bestCoins = coins;
+      broken.push('bestCoins');
+    }
+
+    const survival = runStats.survivalTime || 0;
+    if (survival > bests.longestSurvival) {
+      bests.longestSurvival = survival;
+      broken.push('longestSurvival');
+    }
+
+    const guardians = runStats.guardiansDefeated || 0;
+    if (guardians > bests.mostGuardians) {
+      bests.mostGuardians = guardians;
+      broken.push('mostGuardians');
+    }
+
+    if (broken.length > 0) {
+      this._save();
+    }
+    return broken;
+  }
 }
 
 export default ProgressionManager;

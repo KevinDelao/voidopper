@@ -15,6 +15,7 @@ const BirdSkins = {
     name: 'Robin',
     cost: 60,
     birdType: 'robin',
+    ability: { type: 'coinBonus', value: 0.05, desc: '+5% coins' },
     body: '#8B6914', bodyStroke: '#6B4F12',
     breast: '#dd3322',
     head: '#5a4a3a', wing: '#7a6a4a', wingStroke: '#5a4a2a',
@@ -50,6 +51,7 @@ const BirdSkins = {
     name: 'Ice Bird',
     cost: 120,
     birdType: 'default',
+    ability: { type: 'comboTimer', value: 0.3, desc: '+0.3s combo timer' },
     body: '#66ddff', bodyStroke: '#44aadd',
     head: '#88eeff', wing: '#44ccee', wingStroke: '#2299bb',
     antenna: '#aaeeff', antennaGlow: '#ffffff',
@@ -74,6 +76,7 @@ const BirdSkins = {
     name: 'Owl',
     cost: 200,
     birdType: 'owl',
+    ability: { type: 'nearMissRange', value: 5, desc: '+5px near-miss range' },
     body: '#8B7355', bodyStroke: '#6B5335',
     head: '#9B8365', wing: '#7B6345', wingStroke: '#5B4325',
     earTufts: '#6B5335',
@@ -87,6 +90,7 @@ const BirdSkins = {
     name: 'Ghost Bird',
     cost: 250,
     birdType: 'default',
+    ability: { type: 'hitbox', value: 0.92, desc: '8% smaller hitbox' },
     body: 'rgba(200, 200, 220, 0.7)', bodyStroke: 'rgba(180, 180, 200, 0.5)',
     head: 'rgba(220, 220, 240, 0.8)',
     wing: 'rgba(180, 180, 210, 0.6)', wingStroke: 'rgba(160, 160, 190, 0.4)',
@@ -99,6 +103,7 @@ const BirdSkins = {
     name: 'Eagle',
     cost: 300,
     birdType: 'eagle',
+    ability: { type: 'launchSpeed', value: 1.08, desc: '+8% launch speed' },
     body: '#5a3a1a', bodyStroke: '#3a2a0a',
     head: '#ffffff', wing: '#4a2a0a', wingStroke: '#2a1a00',
     antenna: null, antennaGlow: null,
@@ -110,6 +115,7 @@ const BirdSkins = {
     name: 'Golden Bird',
     cost: 350,
     birdType: 'default',
+    ability: { type: 'coinBonus', value: 0.10, desc: '+10% coins' },
     body: '#ffd700', bodyStroke: '#daa520',
     head: '#ffe44d', wing: '#f0c800', wingStroke: '#cc9900',
     antenna: '#ffee88', antennaGlow: '#ffffff',
@@ -134,6 +140,7 @@ const BirdSkins = {
     name: 'Shadow Bird',
     cost: 500,
     birdType: 'default',
+    ability: { type: 'hitbox', value: 0.88, desc: '12% smaller hitbox' },
     body: '#2a1a3a', bodyStroke: '#1a0a2a',
     head: '#3a2a4a', wing: '#221133', wingStroke: '#110022',
     antenna: '#6633aa', antennaGlow: '#aa44ff',
@@ -147,6 +154,7 @@ const BirdSkins = {
     name: 'Prism Parrot',
     cost: 800,
     birdType: 'parrot',
+    ability: { type: 'coinBonus', value: 0.15, desc: '+15% coins' },
     animated: 'shimmer',
     premium: true,
     body: '#22bb44', bodyStroke: '#119933',
@@ -162,6 +170,7 @@ const BirdSkins = {
     name: 'Rainbow Bird',
     cost: 800,
     birdType: 'default',
+    ability: { type: 'comboTimer', value: 0.5, desc: '+0.5s combo timer' },
     isRainbow: true,
     animated: 'rainbow',
     premium: true,
@@ -176,6 +185,7 @@ const BirdSkins = {
     name: 'Cosmic Owl',
     cost: 1200,
     birdType: 'owl',
+    ability: { type: 'nearMissRange', value: 8, desc: '+8px near-miss range' },
     animated: 'galaxy',
     premium: true,
     body: '#1a0a3a', bodyStroke: '#0a0020',
@@ -191,6 +201,7 @@ const BirdSkins = {
     name: 'Fire Eagle',
     cost: 1600,
     birdType: 'eagle',
+    ability: { type: 'launchSpeed', value: 1.12, desc: '+12% launch speed' },
     animated: 'fire',
     premium: true,
     body: '#8B2500', bodyStroke: '#5a1500',
@@ -204,6 +215,7 @@ const BirdSkins = {
     name: 'Storm Falcon',
     cost: 2000,
     birdType: 'eagle',
+    ability: { type: 'hitbox', value: 0.85, desc: '15% smaller hitbox' },
     animated: 'electric',
     premium: true,
     body: '#2244aa', bodyStroke: '#112288',
@@ -217,6 +229,7 @@ const BirdSkins = {
     name: 'Celestial Phoenix',
     cost: 3500,
     birdType: 'default',
+    ability: { type: 'allBonus', value: 0.08, desc: '+8% all stats' },
     animated: 'cosmic',
     premium: true,
     isRainbow: true,
@@ -228,5 +241,12 @@ const BirdSkins = {
     trail: 'rgba(255, 150, 50, 0.6)',
   },
 };
+
+const SKINS = BirdSkins;
+
+export function getSkinAbility(skinKey) {
+  const skin = SKINS[skinKey];
+  return skin?.ability || null;
+}
 
 export default BirdSkins;

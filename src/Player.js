@@ -708,8 +708,8 @@ class Player {
 
   launch() {
     if (this.isStuck && this.isAiming) {
-      // Launch in the aimed direction, modified by emotion
-      const power = this.aimPower * this.getLaunchPowerMultiplier();
+      // Launch in the aimed direction, modified by emotion and skin ability
+      const power = this.aimPower * this.getLaunchPowerMultiplier() * (this.skinLaunchMult || 1);
       this.vx = Math.cos(this.aimAngle) * power;
       this.vy = Math.sin(this.aimAngle) * power;
       this.isStuck = false;

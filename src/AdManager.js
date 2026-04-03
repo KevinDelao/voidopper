@@ -59,6 +59,21 @@ export async function hideBanner() {
   }
 }
 
+export async function showRewardedAd() {
+  if (!Capacitor.isNativePlatform()) return true; // On web, just grant the reward
+
+  try {
+    const { AdMob } = await getAdMob();
+    const adId = Capacitor.getPlatform() === 'ios' ? AD_UNIT_IDS.ios : AD_UNIT_IDS.android;
+    await AdMob.prepareRewardVideoAd({ adId });
+    const result = await AdMob.showRewardVideoAd();
+    return result && result.type === 'earned_reward';
+  } catch (e) {
+    console.warn('Rewarded ad failed:', e);
+    return false;
+  }
+}
+
 export function isBannerVisible() {
   return bannerVisible;
 }

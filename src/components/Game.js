@@ -22,7 +22,8 @@ import { getItem, setItem, getJSON, setJSON } from '../storage';
 import { lightTap, mediumTap, heavyTap, notifyTap, selectionTap } from '../haptics';
 import { authenticateGameCenter, submitScore as submitGCScore, showLeaderboard, isAuthenticated as isGCAuthenticated } from '../GameCenter';
 import { t } from '../i18n';
-import { getBannerHeight, showBanner, hideBanner } from '../AdManager';
+import { getBannerHeight, showBanner, hideBanner, showRewardedAd } from '../AdManager';
+import { getSkinAbility } from '../BirdSkins';
 
 // Detect iPad for performance tuning
 const isIPad = /iPad/i.test(navigator.userAgent) ||
@@ -1108,10 +1109,18 @@ const Game = () => {
             clickY >= rBounds.y && clickY <= rBounds.y + rBounds.h) {
           mediumTap();
           handleRevive();
-        } else {
-          selectionTap();
-          declineRevive();
+          return;
         }
+        // Watch Ad to revive (free)
+        const adBounds = gameStateRef.current._adReviveBtnBounds;
+        if (adBounds && clickX >= adBounds.x && clickX <= adBounds.x + adBounds.w &&
+            clickY >= adBounds.y && clickY <= adBounds.y + adBounds.h) {
+          mediumTap();
+          handleAdRevive();
+          return;
+        }
+        selectionTap();
+        declineRevive();
         return;
       }
 
@@ -1152,7 +1161,7 @@ const Game = () => {
         }
         // Check Restart button
         const restartBounds = gameStateRef.current._restartBtnBounds;
-        if (restartBounds && timeSinceGameOver >= 1500 &&
+        if (restartBounds && timeSinceGameOver >= 500 &&
             clickX >= restartBounds.x && clickX <= restartBounds.x + restartBounds.w &&
             clickY >= restartBounds.y && clickY <= restartBounds.y + restartBounds.h) {
           mediumTap();
@@ -1230,9 +1239,9 @@ const Game = () => {
 
       if (isGameOver || gameOverTimeRef.current) {
         if (e.key === 'r' || e.key === 'R' || e.key === ' ') {
-          // Require 1.5 second delay before allowing restart
+          // Brief delay before allowing restart
           const timeSinceGameOver = Date.now() - gameOverTimeRef.current;
-          if (timeSinceGameOver >= 1500) {
+          if (timeSinceGameOver >= 500) {
             restartGame(getW(), getH());
             gameOverTimeRef.current = null; // Reset
             // Restart game music
@@ -1590,6 +1599,8 @@ const Game = () => {
     state.player.isStuck = true;
     state.player.skin = BirdSkins[selectedSkinRef.current] || BirdSkins.default;
     state.player.skinKey = selectedSkinRef.current || 'default';
+    const initSkinAb = getSkinAbility(selectedSkinRef.current);
+    state.player.skinLaunchMult = initSkinAb && initSkinAb.type === 'launchSpeed' ? initSkinAb.value : (initSkinAb && initSkinAb.type === 'allBonus' ? 1 + initSkinAb.value : 1);
     const trailKey = selectedTrailRef.current || 'none';
     state.player.activeTrail = trailKey !== 'none' ? Trails[trailKey] : null;
     state.enemies = [];
@@ -1612,7 +1623,9 @@ const Game = () => {
     state.shakeY = 0;
     state.combo = 0;
     state.comboTimer = 0;
-    state.comboTimerMax = 3.0;
+    const skinAb = getSkinAbility(selectedSkinRef.current);
+    const comboTimerBonus = skinAb && (skinAb.type === 'comboTimer' || skinAb.type === 'allBonus') ? (skinAb.type === 'comboTimer' ? skinAb.value : skinAb.value * 3) : 0;
+    state.comboTimerMax = 3.0 + comboTimerBonus;
     state.maxCombo = 0;
     state.lastComboAction = '';
     state.comboScoreAccum = 0;
@@ -1670,7 +1683,11 @@ const Game = () => {
     state.milestoneText = '';
     state.milestoneTextTimer = 0;
     // Reset run stats and revive
-    state.runStats = { distance: 0, coins: 0, wallBounces: 0, nearMisses: 0, guardiansDefeated: 0, purpleCoins: 0, maxCombo: 0, reachedOnFire: false };
+    state.runStats = { distance: 0, coins: 0, wallBounces: 0, nearMisses: 0, guardiansDefeated: 0, purpleCoins: 0, maxCombo: 0, reachedOnFire: false, survivalTime: 0 };
+    state.currentZoneName = '';
+    state.zoneAnnounceTimer = 0;
+    state.zoneAnnounceName = '';
+    state.survivalTimer = 0;
     state.canRevive = true;
     state.pendingRevive = false;
     // First-run hints (only show once ever)
@@ -1990,6 +2007,23 @@ const Game = () => {
     const targetY = player.y - height * 0.75;
     state.cameraY = state.cameraY * 0.9 + targetY * 0.1;
 
+    // Track survival time
+    state.survivalTimer += playerDeltaTime;
+    state.runStats.survivalTime = state.survivalTimer;
+
+    // Zone name announcement — detect biome transitions
+    if (state.leftTerrain) {
+      const biome = state.leftTerrain.getBiomeAt(state.cameraY + height * 0.5);
+      if (biome && biome.name && biome.name !== state.currentZoneName) {
+        state.currentZoneName = biome.name;
+        state.zoneAnnounceName = biome.name;
+        state.zoneAnnounceTimer = 3.0;
+      }
+      if (state.zoneAnnounceTimer > 0) {
+        state.zoneAnnounceTimer -= playerDeltaTime;
+      }
+    }
+
     // Generate new terrain (above as bird climbs - Y decreases)
     // Terrain generates from startY going UPWARD (decreasing Y)
     // Terrain with startY=0 and height=1000 covers Y from 0 to -1000
@@ -2139,10 +2173,16 @@ const Game = () => {
           }
         }
 
-        // Gradually increase enemy fall speed with height (caps at 1.5x at 20000m)
-        if (enemy && enemy.vy) {
-          const speedMultiplier = 1.0 + Math.min(heightClimbed / 20000, 0.5);
-          enemy.vy *= speedMultiplier;
+        // Gradually increase enemy speed with height (caps at 1.5x at 200000m)
+        if (enemy) {
+          const speedMultiplier = 1.0 + Math.min(heightClimbed / 200000, 0.5);
+          if (enemy.vy !== undefined && enemy.vy !== 0) {
+            enemy.vy *= speedMultiplier;
+          }
+          if (enemy.vx !== undefined && enemy.vx !== 0) {
+            enemy.vx *= speedMultiplier;
+          }
+          enemy.speedScale = speedMultiplier;
         }
 
         enemies.push(enemy);
@@ -2153,7 +2193,7 @@ const Game = () => {
 
     // Spawn coins at intervals
     state.lastCoinSpawnY += deltaTime;
-    const coinSpawnInterval = diff === 'easy' ? 4.0 : diff === 'hard' ? 5.0 : 6.0;
+    const coinSpawnInterval = diff === 'easy' ? 2.0 : diff === 'hard' ? 3.0 : 2.5;
 
     if (state.lastCoinSpawnY > coinSpawnInterval) {
       const coinY = state.cameraY - 150;
@@ -2199,7 +2239,9 @@ const Game = () => {
         player.addMood(4);
         const comboMult = getComboMultiplier(state.combo);
         const moodMult = player.getCoinMultiplier();
-        const totalMult = comboMult * moodMult;
+        const skinAbility = getSkinAbility(selectedSkinRef.current);
+        const skinCoinBonus = skinAbility && (skinAbility.type === 'coinBonus' || skinAbility.type === 'allBonus') ? skinAbility.value : 0;
+        const totalMult = comboMult * moodMult * (1 + skinCoinBonus);
         const totalValue = Math.round(coin.value * totalMult);
         state.currentCoinScore += totalValue;
         setCoinScore(state.currentCoinScore);
@@ -2405,10 +2447,10 @@ const Game = () => {
     }
     state.wallTraps.length = trapWrite;
 
-    // Spawn power-ups (rare)
+    // Spawn power-ups
     state.lastPowerUpSpawnY += deltaTime;
-    const puInterval = diff === 'easy' ? 10 : diff === 'hard' ? 12 : 15;
-    if (state.lastPowerUpSpawnY > puInterval && player.y < state.startingY - 500) {
+    const puInterval = diff === 'easy' ? 8 : diff === 'hard' ? 10 : 9;
+    if (state.lastPowerUpSpawnY > puInterval && player.y < state.startingY - 200) {
       const puY = state.cameraY - 150;
       const puLeft = state.leftTerrain.getMaxXAtY(puY);
       const puRight = state.rightTerrain.getMinXAtY(puY);
@@ -2572,7 +2614,9 @@ const Game = () => {
     // Apply mood-based hitbox scaling for collision checks
     // Use try/finally to guarantee radius restoration even on early return (handleGameOver)
     const originalRadius = player.radius;
-    player.radius = originalRadius * player.getHitboxScale();
+    const skinAb2 = getSkinAbility(selectedSkinRef.current);
+    const skinHitbox = skinAb2 && skinAb2.type === 'hitbox' ? skinAb2.value : (skinAb2 && skinAb2.type === 'allBonus' ? 1 - skinAb2.value : 1);
+    player.radius = originalRadius * player.getHitboxScale() * skinHitbox;
     try {
 
     // Update enemies
@@ -2709,15 +2753,20 @@ const Game = () => {
         const distSq = dx * dx + dy * dy;
         if (distSq > nearMissMaxSq) continue;
         const dist = Math.sqrt(distSq) - enemy.radius - pr;
-        if (dist > 5 && dist < 35) {
+        const skinNM = getSkinAbility(selectedSkinRef.current);
+        const nearMissBonus = skinNM && (skinNM.type === 'nearMissRange' || skinNM.type === 'allBonus') ? (skinNM.type === 'nearMissRange' ? skinNM.value : 5) : 0;
+        if (dist > 5 && dist < 35 + nearMissBonus) {
           state._nearMissedEnemies.add(enemy);
           player.registerNearMiss(); // adds +8 mood internally
           addCombo(state, 2, 'CLOSE CALL');
           state.runStats.nearMisses++;
+          const nearMissCoins = 2 + Math.floor(state.combo * 0.5);
+          state.currentCoinScore += nearMissCoins;
+          setCoinScore(state.currentCoinScore);
           state.floatingTexts.push({
             x: px, y: py,
             label: 'CLOSE CALL!',
-            desc: '+2 combo',
+            desc: `+2 combo  +${nearMissCoins} coins`,
             color: '#ff66aa',
             life: 1.2, maxLife: 1.2, vy: -60,
           });
@@ -3019,12 +3068,13 @@ const Game = () => {
     state.milestoneTextTimer = 0;
     if (state.hints) state.hints.active = null;
 
-    // Check if revive is available
+    // Check if revive is available (coins or ad)
     const reviveCost = Math.floor(10 + state.currentScore / 200);
-    if (state.canRevive && totalCoinsRef.current >= reviveCost) {
+    if (state.canRevive) {
       state.pendingRevive = true;
       state.reviveTimer = 5.0;
       state.reviveCost = reviveCost;
+      state.canAffordRevive = totalCoinsRef.current >= reviveCost;
       return;
     }
     finalizeGameOver();
@@ -3065,6 +3115,13 @@ const Game = () => {
       const updated = { ...savedHighCoinScores, [diff]: finalCoinScore };
       setHighCoinScores(updated);
       setJSON('voidHopper_highCoinScores', updated);
+    }
+
+    // Update personal bests
+    state.brokenRecords = [];
+    if (progressionRef.current && progressionRef.current.updatePersonalBests) {
+      state.runStats.difficulty = diff;
+      state.brokenRecords = progressionRef.current.updatePersonalBests(diff, state.runStats);
     }
 
     // Update mission progress and collect rewards
@@ -3148,6 +3205,48 @@ const Game = () => {
       state.player.stickToWall('right', rightB - state.player.radius, state.player.y);
     }
 
+    state.shakeIntensity = 8;
+    state.floatingTexts.push({
+      x: state.player.x, y: state.player.y,
+      label: t('revive.revived'), desc: t('revive.shieldActive'),
+      color: '#44ff88', life: 2.5, maxLife: 2.5, vy: -60,
+    });
+    if (audioManagerRef.current) audioManagerRef.current.playScoreMilestoneSound();
+  };
+
+  const handleAdRevive = async () => {
+    const state = gameStateRef.current;
+    if (!state.pendingRevive) return;
+    const rewarded = await showRewardedAd();
+    if (!rewarded) {
+      // Ad failed or was dismissed — don't revive
+      return;
+    }
+    // Same revive logic as coin revive, but free
+    state.pendingRevive = false;
+    state.canRevive = false;
+    state.isRunning = true;
+    state.player.isDying = false;
+    state.player.mood = 30;
+    state.explosionParticles = [];
+    state._nearMissedEnemies = new Set();
+    state.player.hasMagnet = false;
+    state.player.magnetTimer = 0;
+    state.player.hasSlowmo = false;
+    state.player.slowmoTimer = 0;
+    state.player.hasSpeedBoost = false;
+    state.player.speedBoostTimer = 0;
+    state.player.deathTime = 0;
+    state.player.hasShield = true;
+    state.player.shieldTimer = 5;
+    if (state.voidStorm) state.voidStorm.y += 300;
+    const leftB = state.leftTerrain.getMaxXAtY(state.player.y);
+    const rightB = state.rightTerrain.getMinXAtY(state.player.y);
+    if (state.player.x - leftB < rightB - state.player.x) {
+      state.player.stickToWall('left', leftB + state.player.radius, state.player.y);
+    } else {
+      state.player.stickToWall('right', rightB - state.player.radius, state.player.y);
+    }
     state.shakeIntensity = 8;
     state.floatingTexts.push({
       x: state.player.x, y: state.player.y,
@@ -3255,7 +3354,16 @@ const Game = () => {
     const combo = state.maxCombo;
     const skinName = (state.player && state.player.skin) ? state.player.skin.name : 'Default';
     const lvl = progressionRef.current ? progressionRef.current.getLevel() : 1;
-    const text = `Void Hopper | ${diff} | ${dist}m | ${coins} coins | ${combo}x combo | Lvl ${lvl} | ${skinName}\nCan you beat my score?`;
+    const pilotRank = progressionRef.current && progressionRef.current.getPilotRank ? progressionRef.current.getPilotRank() : 0;
+    const zone = state.currentZoneName || '';
+    const survival = state.survivalTimer ? `${Math.floor(state.survivalTimer)}s` : '';
+    const rs = state.runStats;
+    const statsLine = [
+      rs.wallBounces > 0 ? `${rs.wallBounces} bounces` : null,
+      rs.nearMisses > 0 ? `${rs.nearMisses} dodges` : null,
+      rs.guardiansDefeated > 0 ? `${rs.guardiansDefeated} bosses` : null,
+    ].filter(Boolean).join(' | ');
+    const text = `Void Hopper | ${diff} | ${dist}m | ${coins} coins | ${combo}x combo | ${survival}\n${zone ? 'Zone: ' + zone + ' | ' : ''}Pilot Rank ${pilotRank} | Lvl ${lvl} | ${skinName}\n${statsLine ? statsLine + '\n' : ''}Can you beat my score?`;
 
     // Use Web Share API if available (mobile), otherwise copy to clipboard
     if (navigator.share) {
@@ -3853,6 +3961,19 @@ const Game = () => {
       ctx.fillText(diffLabel, 12, 18 * ts + safeTop);
       ctx.restore();
 
+      // Zone name announcement
+      if (state.zoneAnnounceTimer > 0 && state.zoneAnnounceName) {
+        ctx.save();
+        const zoneAlpha = state.zoneAnnounceTimer > 2.0 ? Math.min(1, (3.0 - state.zoneAnnounceTimer) / 0.5) : Math.min(1, state.zoneAnnounceTimer / 1.0);
+        ctx.globalAlpha = zoneAlpha * 0.8;
+        ctx.font = `bold ${Math.round(11 * ts)}px Orbitron, Arial`;
+        ctx.textAlign = 'right';
+        const zoneBiome = state.leftTerrain ? state.leftTerrain.getBiomeAt(state.cameraY + height * 0.5) : null;
+        ctx.fillStyle = zoneBiome ? (zoneBiome.accent || '#aaaaff') : '#aaaaff';
+        ctx.fillText(state.zoneAnnounceName, width - 12, 18 * ts + safeTop);
+        ctx.restore();
+      }
+
       // Draw distance score — glowing outline
       ctx.save();
       ctx.font = `bold ${Math.round(30 * ts)}px Orbitron, Arial`;
@@ -4405,18 +4526,44 @@ const Game = () => {
       ctx.font = `bold ${Math.round(20 * rvTs)}px Orbitron, Arial`;
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
-      ctx.fillText(t('revive.revive'), width / 2, revBtnY + Math.round(23 * rvTs));
-      ctx.font = `bold ${Math.round(13 * rvTs)}px Orbitron, Arial, sans-serif`;
-      ctx.fillStyle = '#aaffcc';
-      ctx.fillText(t('revive.cost', { cost: state.reviveCost }), width / 2, revBtnY + Math.round(42 * rvTs));
+      if (state.canAffordRevive) {
+        ctx.fillText(t('revive.revive'), width / 2, revBtnY + Math.round(23 * rvTs));
+        ctx.font = `bold ${Math.round(13 * rvTs)}px Orbitron, Arial, sans-serif`;
+        ctx.fillStyle = '#aaffcc';
+        ctx.fillText(t('revive.cost', { cost: state.reviveCost }), width / 2, revBtnY + Math.round(42 * rvTs));
+      } else {
+        ctx.fillText('NOT ENOUGH', width / 2, revBtnY + Math.round(23 * rvTs));
+        ctx.font = `bold ${Math.round(13 * rvTs)}px Orbitron, Arial, sans-serif`;
+        ctx.fillStyle = '#ff8888';
+        ctx.fillText(`Need ${state.reviveCost} coins`, width / 2, revBtnY + Math.round(42 * rvTs));
+      }
       ctx.restore();
+
+      // Watch Ad to Revive button
+      const adBtnW = Math.round(180 * rvTs);
+      const adBtnH = Math.round(44 * rvTs);
+      const adBtnX = width / 2 - adBtnW / 2;
+      const adBtnY = revBtnY + revBtnH + Math.round(10 * rvTs);
+      ctx.fillStyle = '#2244aa';
+      ctx.fillRect(adBtnX, adBtnY, adBtnW, adBtnH);
+      ctx.strokeStyle = '#4488ff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(adBtnX, adBtnY, adBtnW, adBtnH);
+      ctx.font = `bold ${Math.round(15 * rvTs)}px Orbitron, Arial`;
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.fillText('WATCH AD', width / 2, adBtnY + Math.round(18 * rvTs));
+      ctx.font = `${Math.round(10 * rvTs)}px Orbitron, Arial`;
+      ctx.fillStyle = '#88bbff';
+      ctx.fillText('Free Revive', width / 2, adBtnY + Math.round(34 * rvTs));
+      state._adReviveBtnBounds = { x: adBtnX, y: adBtnY, w: adBtnW, h: adBtnH };
 
       ctx.font = `${Math.round(15 * rvTs)}px Orbitron, Arial`;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
       ctx.textAlign = 'center';
-      ctx.fillText(t('revive.skip'), width / 2, height / 2 + Math.round(100 * rvTs));
+      ctx.fillText(t('revive.skip'), width / 2, adBtnY + adBtnH + Math.round(30 * rvTs));
 
-      state._reviveBtnBounds = { x: revBtnX, y: revBtnY, w: revBtnW, h: revBtnH };
+      state._reviveBtnBounds = state.canAffordRevive ? { x: revBtnX, y: revBtnY, w: revBtnW, h: revBtnH } : null;
 
       // Draw dying bird on revive screen — stays in place with X eyes + stars
       if (state.player && state.player.isDying) {
@@ -4592,6 +4739,24 @@ const Game = () => {
         goY += Math.round(26 * goScale);
       }
 
+      // New records broken this run
+      if (gameStateRef.current.brokenRecords && gameStateRef.current.brokenRecords.length > 0) {
+        ctx.font = `bold ${Math.round(13 * goScale)}px Orbitron, Arial`;
+        ctx.fillStyle = '#ffd700';
+        const recordLabels = { bestHeight: 'Best Height', bestCombo: 'Best Combo', bestCoins: 'Most Coins', longestSurvival: 'Longest Run', mostGuardians: 'Most Guardians' };
+        const recordText = gameStateRef.current.brokenRecords.map(r => recordLabels[r] || r).join(' | ');
+        ctx.fillText('NEW RECORDS: ' + recordText, cx, goY);
+        goY += Math.round(22 * goScale);
+      }
+
+      // Pilot rank
+      if (progressionRef.current && progressionRef.current.getPilotRank && progressionRef.current.getPilotRank() > 0) {
+        ctx.font = `${Math.round(12 * goScale)}px Orbitron, Arial`;
+        ctx.fillStyle = '#aa88ff';
+        ctx.fillText('Pilot Rank ' + progressionRef.current.getPilotRank(), cx, goY);
+        goY += Math.round(20 * goScale);
+      }
+
       // High score for current difficulty
       const goDiff = gameStateRef.current.difficulty || 'medium';
       const goBest = highScores[goDiff] || 0;
@@ -4613,7 +4778,7 @@ const Game = () => {
 
       // Restart button
       const timeSinceGO = gameOverTimeRef.current ? Date.now() - gameOverTimeRef.current : 0;
-      const restartReady = timeSinceGO >= 1500;
+      const restartReady = timeSinceGO >= 500;
       if (restartReady) {
         const time = Date.now() / 1000;
         const btnPulse = 0.97 + Math.sin(time * 3) * 0.03;
@@ -4640,7 +4805,7 @@ const Game = () => {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
         ctx.font = `bold ${Math.round(16 * goScale)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText(t('gameover.restartTimer', { seconds: Math.ceil((1500 - timeSinceGO) / 1000) }), cx, goRestartY + goBtnH / 2 + 6);
+        ctx.fillText(t('gameover.restartTimer', { seconds: Math.ceil((500 - timeSinceGO) / 1000) }), cx, goRestartY + goBtnH / 2 + 6);
       }
       gameStateRef.current._restartBtnBounds = { x: goRestartX, y: goRestartY, w: goBtnW, h: goBtnH };
 
@@ -4911,6 +5076,14 @@ const Game = () => {
             }
             ctx.textAlign = 'left';
             ctx.fillText(skinStatusText, skinTextX, cy + Math.round(50 * shopTs));
+            // Show skin ability if it has one
+            const shopSkinAb = getSkinAbility(key);
+            if (shopSkinAb) {
+              ctx.font = `${Math.round(8 * shopTs)}px Orbitron, Arial`;
+              ctx.fillStyle = '#aa88ff';
+              ctx.shadowBlur = 0;
+              ctx.fillText(shopSkinAb.desc, skinTextX, cy + Math.round(62 * shopTs));
+            }
             ctx.restore();
 
             skin._shopBounds = { x: cx, y: cy, w: cardW, h: cardH, key };
@@ -5715,6 +5888,49 @@ const Game = () => {
             ctx.globalAlpha = 1;
             ctx.restore();
             curY += Math.round(20 * menuTs);
+          }
+
+          // Daily Calendar (7-day reward cycle)
+          if (progressionRef.current.getDailyCalendar) {
+            const cal = progressionRef.current.getDailyCalendar();
+            const calBoxW = Math.min(width - 30, menuMaxW);
+            const calBoxX = width / 2 - calBoxW / 2;
+            const dayW = calBoxW / 7;
+            const dayH = Math.round(28 * menuTs);
+            ctx.save();
+            ctx.font = `bold ${Math.round(8 * menuTs)}px Orbitron, Arial`;
+            ctx.textAlign = 'center';
+            for (let d = 0; d < 7; d++) {
+              const dx = calBoxX + d * dayW;
+              const isToday = d === (cal.day - 1);
+              const isPast = d < (cal.day - 1);
+              const reward = cal.rewards[d];
+              ctx.fillStyle = isToday ? 'rgba(255, 170, 0, 0.25)' : isPast ? 'rgba(68, 255, 136, 0.1)' : 'rgba(255, 255, 255, 0.05)';
+              ctx.fillRect(dx + 1, curY, dayW - 2, dayH);
+              if (isToday) {
+                ctx.strokeStyle = '#ffaa00';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(dx + 1, curY, dayW - 2, dayH);
+              }
+              ctx.fillStyle = isPast ? '#44ff88' : isToday ? '#ffd700' : 'rgba(255,255,255,0.4)';
+              ctx.fillText(`D${d + 1}`, dx + dayW / 2, curY + Math.round(10 * menuTs));
+              ctx.font = `${Math.round(7 * menuTs)}px Orbitron, Arial`;
+              ctx.fillText(reward.coins + '', dx + dayW / 2, curY + Math.round(20 * menuTs));
+              ctx.font = `bold ${Math.round(8 * menuTs)}px Orbitron, Arial`;
+            }
+            ctx.restore();
+            curY += dayH + Math.round(6 * menuTs);
+
+            // Pilot Rank display
+            if (progressionRef.current.getPilotRank) {
+              ctx.save();
+              ctx.font = `bold ${Math.round(10 * menuTs)}px Orbitron, Arial`;
+              ctx.textAlign = 'center';
+              ctx.fillStyle = '#aa88ff';
+              ctx.fillText('PILOT RANK ' + progressionRef.current.getPilotRank(), width / 2, curY + Math.round(6 * menuTs));
+              ctx.restore();
+              curY += Math.round(16 * menuTs);
+            }
           }
 
           // Missions header

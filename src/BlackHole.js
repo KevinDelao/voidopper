@@ -69,7 +69,7 @@ class BlackHole {
     });
 
     // Very slow downward drift
-    this.y += 8 * deltaTime;
+    this.y += 8 * (this.speedScale || 1) * deltaTime;
   }
 
   // Apply gravitational pull to the player — called from Game.js
