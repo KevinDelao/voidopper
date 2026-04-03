@@ -22,7 +22,7 @@ import { getItem, setItem, getJSON, setJSON } from '../storage';
 import { lightTap, mediumTap, heavyTap, notifyTap, selectionTap } from '../haptics';
 import { authenticateGameCenter, submitScore as submitGCScore, showLeaderboard, isAuthenticated as isGCAuthenticated } from '../GameCenter';
 import { t } from '../i18n';
-import { getBannerHeight, showBanner, hideBanner, showRewardedAd } from '../AdManager';
+import { getBannerHeight, showBanner, hideBanner } from '../AdManager';
 import { getSkinAbility } from '../BirdSkins';
 
 // Detect iPad for performance tuning
@@ -1109,14 +1109,6 @@ const Game = () => {
             clickY >= rBounds.y && clickY <= rBounds.y + rBounds.h) {
           mediumTap();
           handleRevive();
-          return;
-        }
-        // Watch Ad to revive (free)
-        const adBounds = gameStateRef.current._adReviveBtnBounds;
-        if (adBounds && clickX >= adBounds.x && clickX <= adBounds.x + adBounds.w &&
-            clickY >= adBounds.y && clickY <= adBounds.y + adBounds.h) {
-          mediumTap();
-          handleAdRevive();
           return;
         }
         selectionTap();
@@ -3068,13 +3060,12 @@ const Game = () => {
     state.milestoneTextTimer = 0;
     if (state.hints) state.hints.active = null;
 
-    // Check if revive is available (coins or ad)
+    // Check if revive is available
     const reviveCost = Math.floor(10 + state.currentScore / 200);
-    if (state.canRevive) {
+    if (state.canRevive && totalCoinsRef.current >= reviveCost) {
       state.pendingRevive = true;
       state.reviveTimer = 5.0;
       state.reviveCost = reviveCost;
-      state.canAffordRevive = totalCoinsRef.current >= reviveCost;
       return;
     }
     finalizeGameOver();
@@ -3205,48 +3196,6 @@ const Game = () => {
       state.player.stickToWall('right', rightB - state.player.radius, state.player.y);
     }
 
-    state.shakeIntensity = 8;
-    state.floatingTexts.push({
-      x: state.player.x, y: state.player.y,
-      label: t('revive.revived'), desc: t('revive.shieldActive'),
-      color: '#44ff88', life: 2.5, maxLife: 2.5, vy: -60,
-    });
-    if (audioManagerRef.current) audioManagerRef.current.playScoreMilestoneSound();
-  };
-
-  const handleAdRevive = async () => {
-    const state = gameStateRef.current;
-    if (!state.pendingRevive) return;
-    const rewarded = await showRewardedAd();
-    if (!rewarded) {
-      // Ad failed or was dismissed — don't revive
-      return;
-    }
-    // Same revive logic as coin revive, but free
-    state.pendingRevive = false;
-    state.canRevive = false;
-    state.isRunning = true;
-    state.player.isDying = false;
-    state.player.mood = 30;
-    state.explosionParticles = [];
-    state._nearMissedEnemies = new Set();
-    state.player.hasMagnet = false;
-    state.player.magnetTimer = 0;
-    state.player.hasSlowmo = false;
-    state.player.slowmoTimer = 0;
-    state.player.hasSpeedBoost = false;
-    state.player.speedBoostTimer = 0;
-    state.player.deathTime = 0;
-    state.player.hasShield = true;
-    state.player.shieldTimer = 5;
-    if (state.voidStorm) state.voidStorm.y += 300;
-    const leftB = state.leftTerrain.getMaxXAtY(state.player.y);
-    const rightB = state.rightTerrain.getMinXAtY(state.player.y);
-    if (state.player.x - leftB < rightB - state.player.x) {
-      state.player.stickToWall('left', leftB + state.player.radius, state.player.y);
-    } else {
-      state.player.stickToWall('right', rightB - state.player.radius, state.player.y);
-    }
     state.shakeIntensity = 8;
     state.floatingTexts.push({
       x: state.player.x, y: state.player.y,
@@ -4526,44 +4475,18 @@ const Game = () => {
       ctx.font = `bold ${Math.round(20 * rvTs)}px Orbitron, Arial`;
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
-      if (state.canAffordRevive) {
-        ctx.fillText(t('revive.revive'), width / 2, revBtnY + Math.round(23 * rvTs));
-        ctx.font = `bold ${Math.round(13 * rvTs)}px Orbitron, Arial, sans-serif`;
-        ctx.fillStyle = '#aaffcc';
-        ctx.fillText(t('revive.cost', { cost: state.reviveCost }), width / 2, revBtnY + Math.round(42 * rvTs));
-      } else {
-        ctx.fillText('NOT ENOUGH', width / 2, revBtnY + Math.round(23 * rvTs));
-        ctx.font = `bold ${Math.round(13 * rvTs)}px Orbitron, Arial, sans-serif`;
-        ctx.fillStyle = '#ff8888';
-        ctx.fillText(`Need ${state.reviveCost} coins`, width / 2, revBtnY + Math.round(42 * rvTs));
-      }
+      ctx.fillText(t('revive.revive'), width / 2, revBtnY + Math.round(23 * rvTs));
+      ctx.font = `bold ${Math.round(13 * rvTs)}px Orbitron, Arial, sans-serif`;
+      ctx.fillStyle = '#aaffcc';
+      ctx.fillText(t('revive.cost', { cost: state.reviveCost }), width / 2, revBtnY + Math.round(42 * rvTs));
       ctx.restore();
-
-      // Watch Ad to Revive button
-      const adBtnW = Math.round(180 * rvTs);
-      const adBtnH = Math.round(44 * rvTs);
-      const adBtnX = width / 2 - adBtnW / 2;
-      const adBtnY = revBtnY + revBtnH + Math.round(10 * rvTs);
-      ctx.fillStyle = '#2244aa';
-      ctx.fillRect(adBtnX, adBtnY, adBtnW, adBtnH);
-      ctx.strokeStyle = '#4488ff';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(adBtnX, adBtnY, adBtnW, adBtnH);
-      ctx.font = `bold ${Math.round(15 * rvTs)}px Orbitron, Arial`;
-      ctx.fillStyle = '#ffffff';
-      ctx.textAlign = 'center';
-      ctx.fillText('WATCH AD', width / 2, adBtnY + Math.round(18 * rvTs));
-      ctx.font = `${Math.round(10 * rvTs)}px Orbitron, Arial`;
-      ctx.fillStyle = '#88bbff';
-      ctx.fillText('Free Revive', width / 2, adBtnY + Math.round(34 * rvTs));
-      state._adReviveBtnBounds = { x: adBtnX, y: adBtnY, w: adBtnW, h: adBtnH };
 
       ctx.font = `${Math.round(15 * rvTs)}px Orbitron, Arial`;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
       ctx.textAlign = 'center';
-      ctx.fillText(t('revive.skip'), width / 2, adBtnY + adBtnH + Math.round(30 * rvTs));
+      ctx.fillText(t('revive.skip'), width / 2, height / 2 + Math.round(100 * rvTs));
 
-      state._reviveBtnBounds = state.canAffordRevive ? { x: revBtnX, y: revBtnY, w: revBtnW, h: revBtnH } : null;
+      state._reviveBtnBounds = { x: revBtnX, y: revBtnY, w: revBtnW, h: revBtnH };
 
       // Draw dying bird on revive screen — stays in place with X eyes + stars
       if (state.player && state.player.isDying) {
