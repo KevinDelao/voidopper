@@ -1,9 +1,11 @@
 class Coin {
-  constructor(x, y, type = 'gold') {
+  constructor(x, y, type = 'gold', screenWidth = 390) {
+    const ss = Math.max(1, screenWidth / 390);
+    this.ss = ss;
     this.x = x;
     this.y = y;
     this.type = type; // 'gold', 'silver', 'purple'
-    this.radius = type === 'purple' ? 14 : type === 'silver' ? 11 : 8;
+    this.radius = Math.round((type === 'purple' ? 14 : type === 'silver' ? 11 : 8) * ss);
     this.rotation = 0;
     this.rotationSpeed = 0.08;
     this.collected = false;

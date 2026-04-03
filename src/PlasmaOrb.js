@@ -1,8 +1,10 @@
 class PlasmaOrb {
-  constructor(x, y, corridorLeft, corridorRight) {
+  constructor(x, y, corridorLeft, corridorRight, screenWidth = 390) {
+    const ss = Math.max(1, screenWidth / 390);
+    this.ss = ss;
     this.x = x;
     this.y = y;
-    this.radius = 14;
+    this.radius = Math.round(14 * ss);
     this.active = true;
     this.isPlasmaOrb = true;
 
@@ -20,7 +22,7 @@ class PlasmaOrb {
     for (let i = 0; i < 6; i++) {
       this.tendrils.push({
         angle: (i / 6) * Math.PI * 2,
-        length: 8 + Math.random() * 10,
+        length: (8 + Math.random() * 10) * ss,
         speed: 1 + Math.random() * 2,
         phase: Math.random() * Math.PI * 2,
       });

@@ -1,12 +1,14 @@
 
 
 class Player {
-  constructor(x, y) {
+  constructor(x, y, screenWidth = 390) {
+    const ss = Math.max(1, screenWidth / 390);
+    this.screenScale = ss;
     this.x = x;
     this.y = y;
     this.vx = 0;
     this.vy = 0;
-    this.radius = 12;
+    this.radius = Math.round(12 * ss);
     this.mass = 1.0;
     this.rotation = 0;
     this.trail = [];
@@ -177,7 +179,7 @@ class Player {
     if (this.invincibleTimer > 0) this.invincibleTimer -= deltaTime;
 
     // Velocity cap — prevent clipping through walls at extreme speed
-    const maxSpeed = 1800;
+    const maxSpeed = 1800 * (this.screenScale || 1);
     const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
     if (speed > maxSpeed) {
       const scale = maxSpeed / speed;
@@ -773,7 +775,7 @@ class Player {
   }
 
   applyHillBoost(normal) {
-    const boostMagnitude = 900; // Increased from 600
+    const boostMagnitude = 900 * (this.screenScale || 1);
 
     // Calculate perpendicular direction to normal (along the slope)
     const slopeDx = -normal.y;
@@ -880,7 +882,7 @@ class Player {
       }
       ctx.globalAlpha = 0.4 + Math.sin(Date.now() / 200) * 0.15;
       ctx.beginPath();
-      ctx.arc(0, 0, 22 * shieldPulse, 0, Math.PI * 2);
+      ctx.arc(0, 0, 22 * ss * shieldPulse, 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = 0.1;
       ctx.fillStyle = '#44aaff';
@@ -896,7 +898,7 @@ class Player {
       ctx.save();
       ctx.translate(this.x, screenY);
       const auraPulse = Math.sin(Date.now() / 120) * 0.15 + 0.85;
-      const auraSize = tier === 'onfire' ? 24 : 18;
+      const auraSize = (tier === 'onfire' ? 24 : 18) * ss;
       const auraAlpha = tier === 'onfire' ? 0.25 : 0.12;
       ctx.globalAlpha = auraAlpha * auraPulse;
       if (allowShadow) {
@@ -921,15 +923,16 @@ class Player {
       }
       ctx.fillStyle = '#ff2222';
       ctx.beginPath();
-      ctx.arc(0, 0, 20, 0, Math.PI * 2);
+      ctx.arc(0, 0, 20 * ss, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
 
     // Draw bird body based on type
     // Use 2x internal scale for crisper rendering on high-DPR screens
+    const ss = this.screenScale || 1;
     const birdScale = 2;
-    const birdSize = 30; // logical radius to cover bird artwork
+    const birdSize = Math.round(30 * ss); // logical radius to cover bird artwork (scaled)
     const offW = birdSize * 2 * birdScale;
     const offH = birdSize * 2 * birdScale;
     if (!this._birdCanvas) {

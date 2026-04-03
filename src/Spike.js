@@ -1,22 +1,24 @@
 class Spike {
-  constructor(x, y, side, size = 'medium') {
+  constructor(x, y, side, size = 'medium', screenWidth = 390) {
+    const ss = Math.max(1, screenWidth / 390);
+    this.ss = ss;
     this.x = x;
     this.y = y;
     this.side = side;
     this.size = size;
 
-    // Size determines dimensions
+    // Size determines dimensions (scaled for screen)
     if (size === 'small') {
-      this.width = 35;
-      this.height = 12;
+      this.width = Math.round(35 * ss);
+      this.height = Math.round(12 * ss);
       this.shardCount = 2;
     } else if (size === 'medium') {
-      this.width = 45;
-      this.height = 15;
+      this.width = Math.round(45 * ss);
+      this.height = Math.round(15 * ss);
       this.shardCount = 3;
     } else {
-      this.width = 55;
-      this.height = 18;
+      this.width = Math.round(55 * ss);
+      this.height = Math.round(18 * ss);
       this.shardCount = 4;
     }
 

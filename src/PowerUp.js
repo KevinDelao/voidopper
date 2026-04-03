@@ -1,9 +1,11 @@
 class PowerUp {
-  constructor(x, y, type) {
+  constructor(x, y, type, screenWidth = 390) {
+    const ss = Math.max(1, screenWidth / 390);
+    this.ss = ss;
     this.x = x;
     this.y = y;
     this.type = type; // 'shield', 'magnet', 'slowmo', 'speedboost'
-    this.radius = 16;
+    this.radius = Math.round(16 * ss);
     this.collected = false;
     this.phase = Math.random() * Math.PI * 2;
     this.bobPhase = Math.random() * Math.PI * 2;

@@ -1,5 +1,7 @@
 class WallTrap {
-  constructor(x, y, side, trapType = null) {
+  constructor(x, y, side, trapType = null, screenWidth = 390) {
+    const ss = Math.max(1, screenWidth / 390);
+    this.ss = ss;
     this.x = x;
     this.y = y;
     this.side = side;
@@ -11,21 +13,21 @@ class WallTrap {
     this.phase = Math.random() * Math.PI * 2;
     this.active = true;
 
-    // Type-specific setup
+    // Type-specific setup (scaled for screen)
     if (this.trapType === 'sawblade') {
-      this.radius = 18 + Math.random() * 8;
+      this.radius = (18 + Math.random() * 8) * ss;
       this.rotationAngle = 0;
       this.rotationSpeed = 3 + Math.random() * 3;
       this.teeth = 8 + Math.floor(Math.random() * 4);
-      this.armLength = 20 + Math.random() * 10;
+      this.armLength = (20 + Math.random() * 10) * ss;
       // Extends from wall
       this.width = this.radius + this.armLength;
       this.height = this.radius * 2;
     } else if (this.trapType === 'lasergrid') {
-      this.width = 50 + Math.random() * 20;
-      this.height = 8;
+      this.width = (50 + Math.random() * 20) * ss;
+      this.height = Math.round(8 * ss);
       this.beamCount = 2 + Math.floor(Math.random() * 2);
-      this.beamSpacing = 14;
+      this.beamSpacing = Math.round(14 * ss);
       this.flickerPhase = Math.random() * Math.PI * 2;
       // Lasers pulse on and off
       this.onDuration = 2.0 + Math.random();
@@ -33,7 +35,7 @@ class WallTrap {
       this.timer = 0;
       this.isOn = true;
     } else if (this.trapType === 'voidmouth') {
-      this.radius = 16 + Math.random() * 6;
+      this.radius = (16 + Math.random() * 6) * ss;
       this.width = this.radius * 2;
       this.height = this.radius * 2;
       this.jawAngle = 0;

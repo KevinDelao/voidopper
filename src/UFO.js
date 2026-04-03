@@ -1,8 +1,10 @@
 class UFO {
-  constructor(x, y) {
+  constructor(x, y, screenWidth = 390) {
+    const ss = Math.max(1, screenWidth / 390);
+    this.ss = ss;
     this.x = x;
     this.y = y;
-    this.radius = 30; // Collision radius
+    this.radius = Math.round(30 * ss); // Collision radius
     this.rotation = 0;
     this.rotationSpeed = 0.02;
     this.pulsePhase = Math.random() * Math.PI * 2;
@@ -53,6 +55,8 @@ class UFO {
 
     ctx.save();
     ctx.translate(this.x, screenY + bobOffset);
+    const ss = this.ss || 1;
+    ctx.scale(ss, ss);
 
     // Draw engine glow at the back
     const pulseScale = 1 + Math.sin(this.pulsePhase) * 0.2;

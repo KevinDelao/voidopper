@@ -1,21 +1,23 @@
 class Enemy {
-  constructor(x, y) {
+  constructor(x, y, screenWidth = 390) {
+    const ss = Math.max(1, screenWidth / 390);
+    this.ss = ss;
     this.x = x;
     this.y = y;
 
-    // Varied asteroid sizes - small, medium, large
+    // Varied asteroid sizes - small, medium, large (scaled for screen)
     const sizeType = Math.random();
     if (sizeType < 0.4) {
       // Small asteroids (40% chance)
-      this.radius = Math.random() * 8 + 12; // 12-20
+      this.radius = (Math.random() * 8 + 12) * ss; // 12-20 base
       this.sizeCategory = 'small';
     } else if (sizeType < 0.75) {
       // Medium asteroids (35% chance)
-      this.radius = Math.random() * 12 + 22; // 22-34
+      this.radius = (Math.random() * 12 + 22) * ss; // 22-34 base
       this.sizeCategory = 'medium';
     } else {
       // Large asteroids (25% chance)
-      this.radius = Math.random() * 15 + 35; // 35-50
+      this.radius = (Math.random() * 15 + 35) * ss; // 35-50 base
       this.sizeCategory = 'large';
     }
 

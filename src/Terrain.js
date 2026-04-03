@@ -37,6 +37,7 @@ class Terrain {
     this.safeStart = safeStart;
     this.difficulty = difficulty;
     this.hillPoints = [];
+    this.screenScale = Math.max(1, width / 390);
 
     // Visual details
     this.panelDetails = [];
@@ -320,11 +321,12 @@ class Terrain {
 
       // Bounce pads every ~5 segments (absolute)
       if (absIdx % 5 === 2) {
+        const ss = this.screenScale || 1;
         this.bouncePads.push({
           y: p.y,
           x: p.x,
-          width: 24,
-          height: 40,
+          width: Math.round(24 * ss),
+          height: Math.round(40 * ss),
           glowIntensity: 0,
         });
       }
@@ -365,7 +367,7 @@ class Terrain {
     this.bounceImpacts.push({
       y,
       life: 1.0,
-      maxRadius: 30,
+      maxRadius: Math.round(30 * (this.screenScale || 1)),
     });
   }
 
@@ -688,7 +690,7 @@ class Terrain {
     const distY = player.y - closestY;
     const distance = Math.sqrt(distX * distX + distY * distY);
 
-    if (distance < player.radius + 15) {
+    if (distance < player.radius + 15 * (this.screenScale || 1)) {
       let normalX = -ndy;
       let normalY = ndx;
 

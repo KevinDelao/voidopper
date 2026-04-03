@@ -1572,7 +1572,8 @@ const Game = () => {
 
     // Randomly start on left or right wall, flush against it
     const startSide = Math.random() < 0.5 ? 'left' : 'right';
-    const playerRadius = 12; // matches Player constructor
+    const ss = Math.max(1, width / 390);
+    const playerRadius = Math.round(12 * ss); // matches Player constructor (scaled)
     let startX;
     if (startSide === 'left') {
       const leftWallX = state.leftTerrain.getMaxXAtY(startY);
@@ -1581,7 +1582,7 @@ const Game = () => {
       const rightWallX = state.rightTerrain.getMinXAtY(startY);
       startX = rightWallX - playerRadius;
     }
-    state.player = new Player(startX, startY);
+    state.player = new Player(startX, startY, width);
     // Scale bird speed for wider screens (iPad) so flight feels equally fast
     const iPhoneBaseWidth = 390;
     const speedScale = Math.max(1, width / iPhoneBaseWidth);
@@ -1624,7 +1625,7 @@ const Game = () => {
     state._nearMissedEnemies = new Set();
     state.activePowerUpDisplay = [];
     state.difficulty = difficultyRef.current;
-    const voidStorm = new VoidStorm(startY);
+    const voidStorm = new VoidStorm(startY, width);
     // Adjust void storm speed by difficulty
     if (state.difficulty === 'easy') {
       voidStorm.baseSpeed = 20;
@@ -2118,59 +2119,59 @@ const Game = () => {
 
         if (heightClimbed < t1) {
           // Early game: asteroids only
-          enemy = new Enemy(enemyX, enemyY);
+          enemy = new Enemy(enemyX, enemyY, width);
         } else if (heightClimbed < t2) {
           // Introduce jellyfish
           if (roll < 0.5 || !canSpawnJellyfish) {
-            enemy = new Enemy(enemyX, enemyY);
+            enemy = new Enemy(enemyX, enemyY, width);
           } else {
-            enemy = new SpaceJellyfish(enemyX, enemyY);
+            enemy = new SpaceJellyfish(enemyX, enemyY, width);
           }
         } else if (heightClimbed < t3) {
           // Introduce plasma orbs
           if (roll < 0.3) {
-            enemy = new Enemy(enemyX, enemyY);
+            enemy = new Enemy(enemyX, enemyY, width);
           } else if (roll < 0.6 && canSpawnJellyfish) {
-            enemy = new SpaceJellyfish(enemyX, enemyY);
+            enemy = new SpaceJellyfish(enemyX, enemyY, width);
           } else {
-            enemy = new PlasmaOrb(enemyX, enemyY, spawnLeftBound, spawnRightBound);
+            enemy = new PlasmaOrb(enemyX, enemyY, spawnLeftBound, spawnRightBound, width);
           }
         } else if (heightClimbed < t4) {
           // Introduce UFOs
           if (roll < 0.2) {
-            enemy = new Enemy(enemyX, enemyY);
+            enemy = new Enemy(enemyX, enemyY, width);
           } else if (roll < 0.4 && canSpawnJellyfish) {
-            enemy = new SpaceJellyfish(enemyX, enemyY);
+            enemy = new SpaceJellyfish(enemyX, enemyY, width);
           } else if (roll < 0.65) {
-            enemy = new PlasmaOrb(enemyX, enemyY, spawnLeftBound, spawnRightBound);
+            enemy = new PlasmaOrb(enemyX, enemyY, spawnLeftBound, spawnRightBound, width);
           } else {
-            enemy = new UFO(enemyX, enemyY);
+            enemy = new UFO(enemyX, enemyY, width);
           }
         } else if (heightClimbed < t5) {
           // Introduce cosmic serpents
           if (roll < 0.15) {
-            enemy = new Enemy(enemyX, enemyY);
+            enemy = new Enemy(enemyX, enemyY, width);
           } else if (roll < 0.3 && canSpawnJellyfish) {
-            enemy = new SpaceJellyfish(enemyX, enemyY);
+            enemy = new SpaceJellyfish(enemyX, enemyY, width);
           } else if (roll < 0.5) {
-            enemy = new PlasmaOrb(enemyX, enemyY, spawnLeftBound, spawnRightBound);
+            enemy = new PlasmaOrb(enemyX, enemyY, spawnLeftBound, spawnRightBound, width);
           } else if (roll < 0.7) {
-            enemy = new UFO(enemyX, enemyY);
+            enemy = new UFO(enemyX, enemyY, width);
           } else {
-            enemy = new CosmicSerpent(enemyX, enemyY, spawnLeftBound, spawnRightBound);
+            enemy = new CosmicSerpent(enemyX, enemyY, spawnLeftBound, spawnRightBound, width);
           }
         } else {
           // Endgame: everything including black holes
           if (roll < 0.1) {
-            enemy = new Enemy(enemyX, enemyY);
+            enemy = new Enemy(enemyX, enemyY, width);
           } else if (roll < 0.2 && canSpawnJellyfish) {
-            enemy = new SpaceJellyfish(enemyX, enemyY);
+            enemy = new SpaceJellyfish(enemyX, enemyY, width);
           } else if (roll < 0.35) {
-            enemy = new PlasmaOrb(enemyX, enemyY, spawnLeftBound, spawnRightBound);
+            enemy = new PlasmaOrb(enemyX, enemyY, spawnLeftBound, spawnRightBound, width);
           } else if (roll < 0.5) {
-            enemy = new UFO(enemyX, enemyY);
+            enemy = new UFO(enemyX, enemyY, width);
           } else if (roll < 0.7) {
-            enemy = new CosmicSerpent(enemyX, enemyY, spawnLeftBound, spawnRightBound);
+            enemy = new CosmicSerpent(enemyX, enemyY, spawnLeftBound, spawnRightBound, width);
           } else {
             enemy = new BlackHole(enemyX, enemyY, width);
           }
@@ -2218,7 +2219,7 @@ const Game = () => {
           coinType = 'silver'; // 15% chance - rare
         }
 
-        const coin = new Coin(coinX, coinY, coinType);
+        const coin = new Coin(coinX, coinY, coinType, width);
         state.coins.push(coin);
       }
 
@@ -2330,7 +2331,7 @@ const Game = () => {
         const sizes = ['small', 'medium', 'large'];
         const size = sizes[Math.floor(Math.random() * sizes.length)];
 
-        const spike = new Spike(spikeX, spikeY, side, size);
+        const spike = new Spike(spikeX, spikeY, side, size, width);
         state.spikes.push(spike);
       }
 
@@ -2412,7 +2413,7 @@ const Game = () => {
       });
 
       if (!tooClose) {
-        state.wallTraps.push(new WallTrap(trapX, trapY, trapSide));
+        state.wallTraps.push(new WallTrap(trapX, trapY, trapSide, null, width));
       }
 
       state.lastWallTrapSpawnY = 0;
@@ -2464,7 +2465,7 @@ const Game = () => {
         const puX = puMinX + Math.random() * (puMaxX - puMinX);
         const types = ['shield', 'magnet', 'slowmo', 'speedboost'];
         const puType = types[Math.floor(Math.random() * types.length)];
-        state.powerUps.push(new PowerUp(puX, puY, puType));
+        state.powerUps.push(new PowerUp(puX, puY, puType, width));
       }
       state.lastPowerUpSpawnY = 0;
     }

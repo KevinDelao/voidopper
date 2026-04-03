@@ -1,8 +1,10 @@
 class SpaceJellyfish {
-  constructor(x, y) {
+  constructor(x, y, screenWidth = 390) {
+    const ss = Math.max(1, screenWidth / 390);
+    this.ss = ss;
     this.x = x;
     this.y = y;
-    this.radius = 22;
+    this.radius = Math.round(22 * ss);
     this.active = true;
 
     // Gentle horizontal drift only — jellyfish floats in place
@@ -68,9 +70,11 @@ class SpaceJellyfish {
     const screenY = this.y - cameraY;
     const pulse = Math.sin(this.pulsePhase);
     const pulseScale = 1 + pulse * 0.15;
+    const ss = this.ss || 1;
 
     ctx.save();
     ctx.translate(this.x, screenY);
+    ctx.scale(ss, ss);
 
     // Outer glow aura
     ctx.shadowBlur = 0;
@@ -179,9 +183,11 @@ class SpaceJellyfish {
     const distance = Math.sqrt(dx * dx + dy * dy);
     // Slightly generous hitbox — tentacles add danger zone below
     const effectiveRadius = this.radius * 0.7;
-    // Tapered tentacle hitbox - wider near body, narrower at tips
-    const tentacleWidth = 15 * (1 - dy / 50); // tapers from 15 to 0
-    if (dy > 0 && dy < 50 && Math.abs(dx) < tentacleWidth) {
+    // Tapered tentacle hitbox - wider near body, narrower at tips (scaled)
+    const ss = this.ss || 1;
+    const tentacleLen = 50 * ss;
+    const tentacleWidth = 15 * ss * (1 - dy / tentacleLen);
+    if (dy > 0 && dy < tentacleLen && Math.abs(dx) < tentacleWidth) {
       return true;
     }
     return distance < (effectiveRadius + player.radius * 0.7);

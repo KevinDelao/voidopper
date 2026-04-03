@@ -1,9 +1,11 @@
 class VoidStorm {
-  constructor(startY) {
-    this.y = startY + 600; // Start below the player's starting position
-    this.baseSpeed = 35; // Base rising speed (pixels/sec)
+  constructor(startY, screenWidth = 390) {
+    const ss = Math.max(1, screenWidth / 390);
+    this.ss = ss;
+    this.y = startY + Math.round(600 * ss); // Start below the player's starting position
+    this.baseSpeed = 35 * ss; // Base rising speed (pixels/sec, scaled)
     this.currentSpeed = this.baseSpeed;
-    this.warningDistance = 400; // Distance at which warning effects start
+    this.warningDistance = Math.round(400 * ss); // Distance at which warning effects start
     this.killDistance = 0; // Player dies when void reaches them
 
     // Visual

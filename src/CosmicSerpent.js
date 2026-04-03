@@ -1,8 +1,10 @@
 class CosmicSerpent {
-  constructor(x, y, corridorLeft, corridorRight) {
+  constructor(x, y, corridorLeft, corridorRight, screenWidth = 390) {
+    const ss = Math.max(1, screenWidth / 390);
+    this.ss = ss;
     this.x = x;
     this.y = y;
-    this.radius = 12;
+    this.radius = Math.round(12 * ss);
     this.active = true;
 
     this.vy = Math.random() * 15 + 25;
@@ -14,7 +16,7 @@ class CosmicSerpent {
 
     // Snake body segments
     this.numSegments = 18;
-    this.segmentSpacing = 12;
+    this.segmentSpacing = Math.round(12 * ss);
 
     // Path history — the head leaves a trail that the body follows exactly.
     // This is how real snakes move: each body part traces the path the head took.
@@ -192,7 +194,7 @@ class CosmicSerpent {
       const next = this.segments[i + 1];
       const t = i / (this.numSegments - 1);
       // Width tapers: thick at head, thin at tail
-      const width = 11 * (1 - t * 0.7);
+      const width = 11 * (this.ss || 1) * (1 - t * 0.7);
 
       ctx.strokeStyle = this.colors.body;
       ctx.lineWidth = width;
@@ -208,7 +210,7 @@ class CosmicSerpent {
       const seg = this.segments[i];
       const next = this.segments[i + 1];
       const t = i / (this.numSegments - 1);
-      const width = 4 * (1 - t * 0.7);
+      const width = 4 * (this.ss || 1) * (1 - t * 0.7);
 
       ctx.strokeStyle = this.colors.core;
       ctx.lineWidth = width;
@@ -240,6 +242,7 @@ class CosmicSerpent {
     ctx.save();
     ctx.translate(this.x, headScreenY);
     ctx.rotate(headAngle - Math.PI / 2);
+    ctx.scale(this.ss || 1, this.ss || 1);
 
     // Head glow — simple circle instead of radial gradient for performance
     ctx.fillStyle = this.colors.body;
