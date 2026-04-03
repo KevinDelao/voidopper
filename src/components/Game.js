@@ -183,7 +183,8 @@ const Game = () => {
     // Guardian system
     guardian: null,
     guardianIndex: 0,
-    nextGuardianMilestone: 5000,
+    nextGuardianTime: 0,
+    guardianTimer: 0,
     guardianActive: false,
     guardianClearedHeight: 0,
     // Menu scene
@@ -1636,32 +1637,32 @@ const Game = () => {
     state.guardianIndex = 0;
     state.guardianActive = false;
     state.guardianClearedHeight = 0;
-    // Build guardian schedule: milestone bosses + difficulty-spaced encounters between them
-    // Heights are in raw pixels (displayed score = pixels / 10)
-    // Milestones: 1000m, 2500m, 5000m, 10000m, 15000m, 20000m (x10 for pixels)
-    const milestones = Guardian.MILESTONES.map(m => m * 10);
-    // Spacing between non-milestone guardians (in pixels)
-    // Easy: every ~1500m, Medium: every ~1000m, Hard: every ~750m
-    const spacing = state.difficulty === 'easy' ? 15000 : state.difficulty === 'hard' ? 7500 : 10000;
+    // Build guardian schedule: milestone bosses + difficulty-spaced encounters (time-based)
+    // Milestone times in seconds: ~30s, ~75s, ~150s, ~300s, ~450s, ~600s
+    const milestoneTimes = [30, 75, 150, 300, 450, 600];
+    // Spacing between non-milestone guardians (in seconds)
+    // Easy: every ~45s, Medium: every ~30s, Hard: every ~22s
+    const spacing = state.difficulty === 'easy' ? 45 : state.difficulty === 'hard' ? 22 : 30;
     const guardianSchedule = [];
     let prev = 0;
-    for (const m of milestones) {
+    for (const m of milestoneTimes) {
       // Add filler guardians between previous milestone and this one
-      let h = prev + spacing;
-      while (h < m - spacing * 0.4) {
-        guardianSchedule.push({ height: h, isMilestone: false });
-        h += spacing;
+      let t = prev + spacing;
+      while (t < m - spacing * 0.4) {
+        guardianSchedule.push({ time: t, isMilestone: false });
+        t += spacing;
       }
-      guardianSchedule.push({ height: m, isMilestone: true });
+      guardianSchedule.push({ time: m, isMilestone: true });
       prev = m;
     }
     // Continue with filler guardians past the last milestone
     for (let i = 1; i <= 20; i++) {
-      guardianSchedule.push({ height: prev + spacing * i, isMilestone: false });
+      guardianSchedule.push({ time: prev + spacing * i, isMilestone: false });
     }
     state.guardianSchedule = guardianSchedule;
     state.guardianScheduleIdx = 0;
-    state.nextGuardianMilestone = guardianSchedule.length > 0 ? guardianSchedule[0].height : 99999;
+    state.nextGuardianTime = guardianSchedule.length > 0 ? guardianSchedule[0].time : 99999;
+    state.guardianTimer = 0;
     state.wallParticles = [];
     state.coinCollectAnims = [];
     state.lastMilestone = 0;
@@ -1975,12 +1976,12 @@ const Game = () => {
         break;
       }
     }
-    // Decay milestone flash and text
+    // Decay milestone flash and text (use playerDeltaTime so slow-mo doesn't affect UI)
     if (state.milestoneFlash > 0) {
-      state.milestoneFlash -= deltaTime * 1.5;
+      state.milestoneFlash -= playerDeltaTime * 1.5;
     }
     if (state.milestoneTextTimer > 0) {
-      state.milestoneTextTimer -= deltaTime;
+      state.milestoneTextTimer -= playerDeltaTime;
     }
 
     // Update camera (follow bird going UP, keep bird at bottom of screen)
@@ -2503,13 +2504,13 @@ const Game = () => {
       if (player.speedBoostTimer <= 0) player.hasSpeedBoost = false;
     }
 
-    // Update floating texts — in-place removal
+    // Update floating texts — in-place removal (use playerDeltaTime so slow-mo doesn't affect text)
     let ftWrite = 0;
     for (let i = 0; i < state.floatingTexts.length; i++) {
       const ft = state.floatingTexts[i];
-      ft.y += ft.vy * deltaTime;
+      ft.y += ft.vy * playerDeltaTime;
       ft.vy *= 0.97;
-      ft.life -= deltaTime;
+      ft.life -= playerDeltaTime;
       if (ft.life > 0) state.floatingTexts[ftWrite++] = ft;
     }
     state.floatingTexts.length = ftWrite;
@@ -2800,8 +2801,11 @@ const Game = () => {
     // === Guardian System (gauntlet zones) ===
     const currentHeight = state.startingY - player.y;
 
-    // Spawn guardian from schedule
-    if (!state.guardianActive && !state.guardian && currentHeight >= state.nextGuardianMilestone) {
+    // Advance guardian timer (real time, not slowed)
+    state.guardianTimer += playerDeltaTime;
+
+    // Spawn guardian from schedule (time-based)
+    if (!state.guardianActive && !state.guardian && state.guardianTimer >= state.nextGuardianTime) {
       const leftB = state.leftTerrain.getMaxXAtY(player.y);
       const rightB = state.rightTerrain.getMinXAtY(player.y);
       state.guardian = new Guardian(leftB + 30, rightB - 30, state.guardianIndex, currentHeight, state.difficulty);
@@ -2889,9 +2893,9 @@ const Game = () => {
         state.guardianScheduleIdx++;
         // Advance to next scheduled guardian
         if (state.guardianScheduleIdx < state.guardianSchedule.length) {
-          state.nextGuardianMilestone = state.guardianSchedule[state.guardianScheduleIdx].height;
+          state.nextGuardianTime = state.guardianSchedule[state.guardianScheduleIdx].time;
         } else {
-          state.nextGuardianMilestone = 999999;
+          state.nextGuardianTime = 999999;
         }
         state.guardianClearedHeight = currentHeight;
       }

@@ -1158,7 +1158,7 @@ class Guardian {
       const barW = Math.round(200 * ts);
       const barH = this.isMilestone ? Math.round(6 * ts) : Math.round(4 * ts);
       const barX = (this.corridorLeft + this.corridorRight) / 2 - barW / 2;
-      const barScreenY = Math.round(125 * ts) + safeTop;
+      const barScreenY = Math.round(165 * ts) + safeTop;
 
       ctx.save();
 
