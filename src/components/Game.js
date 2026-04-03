@@ -221,14 +221,14 @@ const Game = () => {
   unlockedSkinsRef.current = unlockedSkins;
   unlockedTrailsRef.current = unlockedTrails;
 
-  // Hide banner during active gameplay, show it everywhere else
+  // Hide banner during active gameplay, show it when paused or not in game
   useEffect(() => {
-    if (gameStarted && !isGameOver) {
+    if (gameStarted && !isGameOver && !isPaused) {
       hideBanner().then(() => window.dispatchEvent(new Event('resize')));
     } else {
       showBanner().then(() => window.dispatchEvent(new Event('resize')));
     }
-  }, [gameStarted, isGameOver]);
+  }, [gameStarted, isGameOver, isPaused]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
