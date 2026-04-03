@@ -224,9 +224,9 @@ const Game = () => {
   // Hide banner during active gameplay, show it everywhere else
   useEffect(() => {
     if (gameStarted && !isGameOver) {
-      hideBanner();
+      hideBanner().then(() => window.dispatchEvent(new Event('resize')));
     } else {
-      showBanner();
+      showBanner().then(() => window.dispatchEvent(new Event('resize')));
     }
   }, [gameStarted, isGameOver]);
 
