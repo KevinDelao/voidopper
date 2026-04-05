@@ -55,7 +55,7 @@ const MILESTONE_BOSSES = [
     color: { primary: '#220044', secondary: '#6600aa', glow: '#aa44ff' },
     attackPattern: 'multi_attack',
     attackInterval: 1.4,
-    attackParams: { burstCount: 5, burstSpeed: 150, laserWidth: 7, sweepSpeed: 2.5, vortexRadius: 380, vortexStrength: 140 },
+    attackParams: { burstCount: 5, burstSpeed: 150, spiralSpeed: 130, waveSegments: 5, waveSpeed: 160 },
     movementPattern: 'figure_eight',
     movementSpeed: 60,
     size: 48,
@@ -70,7 +70,7 @@ const MILESTONE_BOSSES = [
     color: { primary: '#cc2244', secondary: '#ff4466', glow: '#ff88aa' },
     attackPattern: 'hydra_heads',
     attackInterval: 1.0,
-    attackParams: { headCount: 3, burstCount: 4, speed: 160, laserWidth: 5, sweepSpeed: 2.5 },
+    attackParams: { headCount: 3, burstCount: 4, speed: 160 },
     movementPattern: 'patrol',
     movementSpeed: 70,
     size: 44,
@@ -162,11 +162,11 @@ const MEDIUM_GUARDIANS = [
   },
   {
     name: 'STORM WEAVER',
-    desc: 'Evade the beam!',
+    desc: 'Dodge the spiral!',
     color: { primary: '#cc2244', secondary: '#ff4466', glow: '#ff6688' },
-    attackPattern: 'laser_sweep',
-    attackInterval: 2.0,
-    attackParams: { width: 6, sweepSpeed: 3.0 },
+    attackPattern: 'spiral_barrage',
+    attackInterval: 0.5,
+    attackParams: { speed: 120, radius: 5 },
     movementPattern: 'zigzag',
     movementSpeed: 85,
     size: 36,
@@ -174,11 +174,11 @@ const MEDIUM_GUARDIANS = [
   },
   {
     name: 'GRAVITY WARDEN',
-    desc: 'Resist the pull!',
+    desc: 'Find the gap!',
     color: { primary: '#2266cc', secondary: '#44aaff', glow: '#66ccff' },
-    attackPattern: 'gravity_pull',
-    attackInterval: 2.5,
-    attackParams: { radius: 380, strength: 130 },
+    attackPattern: 'frost_wave',
+    attackInterval: 2.0,
+    attackParams: { count: 5, speed: 80 },
     movementPattern: 'orbit',
     movementSpeed: 60,
     size: 38,
@@ -213,11 +213,11 @@ const MEDIUM_GUARDIANS = [
 const HARD_GUARDIANS = [
   {
     name: 'BLOOD ORACLE',
-    desc: 'Dual beams!',
+    desc: 'Double trouble!',
     color: { primary: '#aa0022', secondary: '#dd2244', glow: '#ff4466' },
-    attackPattern: 'dual_laser',
+    attackPattern: 'twin_burst',
     attackInterval: 1.6,
-    attackParams: { width: 6, sweepSpeed: 3.5 },
+    attackParams: { count: 4, speed: 140, spread: 1.4 },
     movementPattern: 'zigzag',
     movementSpeed: 95,
     size: 36,
@@ -241,7 +241,7 @@ const HARD_GUARDIANS = [
     color: { primary: '#666688', secondary: '#8888aa', glow: '#aaaacc' },
     attackPattern: 'multi_attack',
     attackInterval: 1.8,
-    attackParams: { burstCount: 6, burstSpeed: 150, laserWidth: 7, sweepSpeed: 2.5, vortexRadius: 380, vortexStrength: 130 },
+    attackParams: { burstCount: 6, burstSpeed: 150, spiralSpeed: 120, waveSegments: 5, waveSpeed: 140 },
     movementPattern: 'patrol',
     movementSpeed: 60,
     size: 44,
@@ -748,16 +748,34 @@ class Guardian {
             });
           }
         } else if (this.multiAttackPhase === 1) {
-          // Laser
-          this.laserActive = true;
-          this.laserTimer = 1.5;
-          this.laserAngle = Math.atan2(playerY - this.y, playerX - this.x);
+          // Spiral burst
+          const spiralSpeed = (params.spiralSpeed || 120) * this.difficultyScale;
+          for (let i = 0; i < 4; i++) {
+            const angle = this.spiralAngle + (i / 4) * Math.PI * 2;
+            this.spiralAngle += 0.5;
+            this.projectiles.push({
+              x: this.x, y: this.y,
+              vx: Math.cos(angle) * spiralSpeed,
+              vy: Math.sin(angle) * spiralSpeed,
+              radius: 5, life: 2.5 * ss, phase: 0,
+            });
+          }
         } else {
-          // Vortex
-          this.vortexActive = true;
-          this.vortexTimer = 2.0;
-          this.vortexRadius = (params.vortexRadius || 350) * ss;
-          this.vortexStrength = (params.vortexStrength || 100) * this.difficultyScale;
+          // Energy wave with gaps
+          const waveCw = this.corridorRight - this.corridorLeft;
+          const waveSegs = params.waveSegments || 5;
+          const wSpeed = (params.waveSpeed || 150) * this.difficultyScale;
+          const waveGap = Math.floor(Math.random() * waveSegs);
+          const waveSegW = waveCw / waveSegs;
+          for (let s = 0; s < waveSegs; s++) {
+            if (s === waveGap) continue;
+            this.projectiles.push({
+              x: this.corridorLeft + (s + 0.5) * waveSegW, y: this.y,
+              vx: 0, vy: wSpeed,
+              radius: Math.round(waveSegW * 0.35), life: 3.5 * ss, phase: 0,
+              isWave: true,
+            });
+          }
         }
         break;
       }
@@ -782,10 +800,17 @@ class Guardian {
               });
             }
           } else {
-            // Laser from head
-            this.laserActive = true;
-            this.laserTimer = 1.2;
-            this.laserAngle = Math.atan2(playerY - this.y, playerX - this.x);
+            // Scatter shot from head
+            const hSpeed = (headParams.speed || 140) * this.difficultyScale;
+            for (let j = 0; j < 3; j++) {
+              const sAngle = Math.atan2(playerY - hy, playerX - hx) + (Math.random() - 0.5) * 0.8;
+              this.projectiles.push({
+                x: hx, y: hy,
+                vx: Math.cos(sAngle) * hSpeed,
+                vy: Math.sin(sAngle) * hSpeed,
+                radius: 4, life: 3.0 * ss, phase: 0,
+              });
+            }
           }
         });
         break;
@@ -848,13 +873,17 @@ class Guardian {
             }
           }
         } else {
-          // Dual laser
-          this.laserActive = true;
-          this.laserTimer = 1.5;
-          this.laserAngle = Math.atan2(playerY - this.y, playerX - this.x);
-          this.laser2Active = true;
-          this.laser2Timer = 1.5;
-          this.laser2Angle = this.laserAngle + Math.PI * 0.6;
+          // Nova ring burst
+          const novaSpeed = (params.burstSpeed || 150) * scale;
+          for (let i = 0; i < 10; i++) {
+            const angle = (i / 10) * Math.PI * 2;
+            this.projectiles.push({
+              x: this.x, y: this.y,
+              vx: Math.cos(angle) * novaSpeed,
+              vy: Math.sin(angle) * novaSpeed,
+              radius: 5, life: 2.5 * ss, phase: 0,
+            });
+          }
         }
         break;
       }
