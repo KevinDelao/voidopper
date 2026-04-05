@@ -16,12 +16,6 @@ class Player {
     this.wingFlap = 0;
     this.wingFlapSpeed = 0.3;
 
-    // Modern bird animation state
-    this.blinkTimer = 0;
-    this.isBlinking = false;
-    this.nextBlink = 3 + Math.random() * 4;
-    this.squashStretch = 1;
-
     // State management
     this.isStuck = true;
     this.currentSide = 'left';
@@ -226,27 +220,6 @@ class Player {
     // Update wing flap animation — speed scales with mood
     if (!this.isStuck) {
       this.wingFlap += this.wingFlapSpeed * this.getWingFlapMult();
-    }
-
-    // Blink animation
-    this.blinkTimer += deltaTime;
-    if (!this.isBlinking && this.blinkTimer > this.nextBlink) {
-      this.isBlinking = true;
-      this.blinkTimer = 0;
-    }
-    if (this.isBlinking && this.blinkTimer > 0.12) {
-      this.isBlinking = false;
-      this.blinkTimer = 0;
-      this.nextBlink = 2.5 + Math.random() * 4;
-    }
-
-    // Squash & stretch based on vertical velocity
-    if (!this.isStuck) {
-      const vyNorm = Math.max(-1, Math.min(1, this.vy / -400));
-      const targetSS = 1 + vyNorm * 0.12;
-      this.squashStretch = this.squashStretch * 0.85 + targetSS * 0.15;
-    } else {
-      this.squashStretch = this.squashStretch * 0.9 + 1 * 0.1;
     }
 
     // Update trail effect particles
@@ -822,13 +795,10 @@ class Player {
     const s = this.skin;
     if (!s) {
       return {
-        body: '#c76cf0', bodyStroke: '#9b4fc9', head: '#dda0f8',
-        belly: '#e8c8ff', wing: '#a858d8', wingStroke: '#8442b5',
-        antenna: '#8855dd', antennaGlow: '#55ddff',
-        tail: '#a858d8', tailStroke: '#8442b5',
-        beak: '#ffd700', beakDark: '#e6b800',
-        trail: 'rgba(199, 108, 240, 0.5)',
-        glow: 'rgba(199, 108, 240, 0.25)',
+        body: '#ba55d3', bodyStroke: '#9370db', head: '#da70d6',
+        wing: '#9370db', wingStroke: '#7b68ee', antenna: '#7b68ee',
+        antennaGlow: '#4dccff', tail: '#9370db', tailStroke: '#7b68ee',
+        beak: '#ffd700', trail: 'rgba(147, 112, 219, 0.5)',
       };
     }
     // Rainbow skin cycles colors
@@ -1001,134 +971,64 @@ class Player {
     this._drawAnimParticles(ctx, screenY, 'front');
   }
 
-  // ── DEFAULT SPACE BIRD (Modern Tiny Wings-inspired) ────
+  // ── DEFAULT SPACE BIRD ─────────────────────────────────
   _drawDefault(ctx, c) {
-    const wingAngle = Math.sin(this.wingFlap) * 0.5;
-    const ss = this.squashStretch || 1;
-    const stretchX = 1 / Math.sqrt(ss);
-    const stretchY = Math.sqrt(ss);
+    const wingAngle = Math.sin(this.wingFlap) * 0.4;
 
-    // ── Cosmic glow aura behind everything ──
-    const glowGrad = ctx.createRadialGradient(0, -2, 4, 0, -2, 20);
-    glowGrad.addColorStop(0, c.glow || 'rgba(199, 108, 240, 0.25)');
-    glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = glowGrad;
-    ctx.beginPath();
-    ctx.arc(0, -2, 20, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Apply squash/stretch for body + wings
+    // Left wing
     ctx.save();
-    ctx.scale(stretchX, stretchY);
-
-    // ── Left wing (small, round, stubby — Tiny Wings style) ──
-    ctx.save();
-    ctx.translate(-8, -1);
-    ctx.rotate(wingAngle + 0.15);
+    ctx.rotate(wingAngle);
     ctx.fillStyle = c.wing;
+    ctx.strokeStyle = c.wingStroke;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.ellipse(0, 0, 8, 4.5, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(-8, 0, 10, 6, -0.3, 0, Math.PI * 2);
     ctx.fill();
-    // Wing highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    ctx.beginPath();
-    ctx.ellipse(-1, -1.5, 5, 2.5, -0.3, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.stroke();
     ctx.restore();
 
-    // ── Right wing ──
+    // Right wing
     ctx.save();
-    ctx.translate(8, -1);
-    ctx.rotate(-wingAngle - 0.15);
+    ctx.rotate(-wingAngle);
     ctx.fillStyle = c.wing;
+    ctx.strokeStyle = c.wingStroke;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.ellipse(0, 0, 8, 4.5, 0.3, 0, Math.PI * 2);
+    ctx.ellipse(8, 0, 10, 6, 0.3, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    ctx.beginPath();
-    ctx.ellipse(1, -1.5, 5, 2.5, 0.3, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.stroke();
     ctx.restore();
 
-    // ── Main body — unified round egg (no separate head) ──
-    const bodyGrad = ctx.createRadialGradient(-3, -7, 2, 0, 0, 14);
-    bodyGrad.addColorStop(0, c.head);
-    bodyGrad.addColorStop(0.55, c.body);
-    bodyGrad.addColorStop(1, c.bodyStroke);
-    ctx.fillStyle = bodyGrad;
+    // Body
+    ctx.fillStyle = c.body;
+    ctx.strokeStyle = c.bodyStroke;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.ellipse(0, -2, 10.5, 13, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, 10, 11, 0, 0, Math.PI * 2);
     ctx.fill();
-
-    // ── Belly highlight (lighter underbelly) ──
-    ctx.fillStyle = c.belly || 'rgba(255,255,255,0.15)';
-    ctx.globalAlpha = 0.25;
-    ctx.beginPath();
-    ctx.ellipse(0, 4, 7, 7, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-
-    // ── Specular highlight (gives roundness & life) ──
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.beginPath();
-    ctx.arc(-3.5, -9, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.beginPath();
-    ctx.arc(-2, -7, 1.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // ── Small cosmic tail glow ──
-    const tailPulse = 0.8 + Math.sin(this.wingFlap * 1.5) * 0.2;
-    ctx.fillStyle = c.glow || 'rgba(199, 108, 240, 0.3)';
-    ctx.beginPath();
-    ctx.ellipse(0, 11, 4 * tailPulse, 3.5 * tailPulse, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Tail feather wisps
-    ctx.strokeStyle = c.tail;
-    ctx.lineWidth = 1.5;
-    ctx.lineCap = 'round';
-    ctx.globalAlpha = 0.5;
-    const tw = Math.sin(this.wingFlap * 0.8);
-    ctx.beginPath();
-    ctx.moveTo(-2, 11);
-    ctx.quadraticCurveTo(-4 + tw * 2, 16, -3 + tw * 3, 19);
     ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, 12);
-    ctx.quadraticCurveTo(tw, 17, tw * 2, 20);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(2, 11);
-    ctx.quadraticCurveTo(4 + tw * 2, 16, 3 + tw * 3, 19);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
 
-    ctx.restore(); // end squash/stretch
-
-    // ── Beak (cute small wedge, positioned on the right side) ──
-    const dp = this.dangerPulse;
-    const beakOpen = (dp > 0.5 || this.mood < 10) ? Math.max(dp, this.mood < 10 ? 0.8 : 0) * 1.5 : 0;
-    ctx.fillStyle = c.beak;
+    // Head
+    ctx.fillStyle = c.head;
+    ctx.strokeStyle = c.bodyStroke;
     ctx.beginPath();
-    ctx.moveTo(7, -4 - beakOpen * 0.3);
-    ctx.lineTo(12, -3);
-    ctx.lineTo(7, -2 + beakOpen * 0.3);
-    ctx.closePath();
+    ctx.arc(0, -9, 7.5, 0, Math.PI * 2);
     ctx.fill();
-    // Beak lower half (darker)
-    if (beakOpen > 0.3) {
-      ctx.fillStyle = c.beakDark || '#e6b800';
-      ctx.beginPath();
-      ctx.moveTo(7, -2);
-      ctx.lineTo(11, -2.5 + beakOpen * 0.3);
-      ctx.lineTo(7, -1 + beakOpen * 0.5);
-      ctx.closePath();
-      ctx.fill();
+    ctx.stroke();
+
+    // Beak
+    this._drawBeak(ctx, c);
+
+    // Face
+    this._drawFace(ctx, c);
+
+    // Antennas
+    if (c.antenna) {
+      this._drawAntennas(ctx, c);
     }
 
-    // ── Face / Eyes (big, expressive, Tiny Wings style) ──
-    this._drawFace(ctx, c, -4);
+    // Tail feathers
+    this._drawTailFeathers(ctx, c);
   }
 
   // ── OWL ────────────────────────────────────────────────
@@ -1704,20 +1604,18 @@ class Player {
   _drawFace(ctx, c, headY, headR) {
     const hy = headY || -9;
 
-    // Pupil tracking — shift toward movement direction
-    const pupilOffX = Math.max(-1.2, Math.min(1.2, (this.vx || 0) / 250));
-    const pupilOffY = Math.max(-1, Math.min(0.5, (this.vy || 0) / -300));
-
     // Death: draw X eyes only, skip normal face
     if (this.isDying) {
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 2.5;
       ctx.lineCap = 'round';
       const xSize = 2.5;
+      // Left X
       ctx.beginPath();
       ctx.moveTo(-3 - xSize, hy - xSize); ctx.lineTo(-3 + xSize, hy + xSize);
       ctx.moveTo(-3 + xSize, hy - xSize); ctx.lineTo(-3 - xSize, hy + xSize);
       ctx.stroke();
+      // Right X
       ctx.beginPath();
       ctx.moveTo(3 - xSize, hy - xSize); ctx.lineTo(3 + xSize, hy + xSize);
       ctx.moveTo(3 + xSize, hy - xSize); ctx.lineTo(3 - xSize, hy + xSize);
@@ -1728,34 +1626,23 @@ class Player {
     const m = this.mood;
     const dp = this.dangerPulse;
     const tier = this.getMoodTier();
+
+    // Danger shake when dangerPulse is high
     const shake = dp > 0.5 ? Math.sin(Date.now() / 40) * dp * 0.4 : 0;
 
-    // ── Blink: draw closed eyes as arcs for any tier ──
-    if (this.isBlinking && tier !== 'onfire' && tier !== 'firedup') {
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.arc(-3, hy - 0.5, 2.8, 0.2, Math.PI - 0.2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(3, hy - 0.5, 2.8, 0.2, Math.PI - 0.2);
-      ctx.stroke();
-      return;
-    }
-
     if (tier === 'onfire') {
-      // ON FIRE — blazing determined squint
+      // ON FIRE — blazing determined squint eyes, confident grin
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 2.5;
       ctx.lineCap = 'round';
+      // Intense squint
       ctx.beginPath();
       ctx.arc(-3 + shake, hy - 0.5, 2.8, Math.PI + 0.15, -0.15);
       ctx.stroke();
       ctx.beginPath();
       ctx.arc(3 + shake, hy - 0.5, 2.8, Math.PI + 0.15, -0.15);
       ctx.stroke();
-      // Determined brows
+      // Determined brows (angled outward)
       ctx.strokeStyle = c.bodyStroke;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -1772,7 +1659,7 @@ class Player {
       ctx.beginPath();
       ctx.arc(0, hy + 2, 3, 0.1, Math.PI - 0.1);
       ctx.stroke();
-      // Fire glow
+      // Fire glow around head
       ctx.save();
       const fireAlpha = 0.15 + Math.sin(Date.now() / 100) * 0.08;
       ctx.globalAlpha = fireAlpha;
@@ -1794,7 +1681,7 @@ class Player {
       ctx.fill();
 
     } else if (tier === 'firedup') {
-      // FIRED UP — happy squint with cheeks
+      // FIRED UP — happy squint eyes with rosy cheeks
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 2;
       ctx.lineCap = 'round';
@@ -1821,35 +1708,34 @@ class Player {
       ctx.stroke();
 
     } else if (tier === 'chill') {
-      // CHILL — wide worried eyes with tracking pupils
-      const chillFactor = 1 - m / 20;
+      // CHILL — wide worried eyes, small pupils
+      const chillFactor = 1 - m / 20; // 0 at mood=20, 1 at mood=0
       const eyeScale = 1 + chillFactor * 0.25;
       const pupilShrink = 1 - chillFactor * 0.4;
-      // Sclera
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#e0e0e0';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.ellipse(-3 + shake, hy - 1, 3.2 * eyeScale, 3.5 * eyeScale, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(3 + shake, hy - 1, 3.2 * eyeScale, 3.5 * eyeScale, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      ctx.arc(-3 + shake, hy - 0.8, 1.5 * pupilShrink, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(3 + shake, hy - 0.8, 1.5 * pupilShrink, 0, Math.PI * 2);
+      ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.ellipse(-3 + shake, hy - 1, 3.5 * eyeScale, 3.8 * eyeScale, 0, 0, Math.PI * 2);
+      ctx.arc(-3.5, hy - 2, 0.9, 0, Math.PI * 2);
       ctx.fill();
       ctx.beginPath();
-      ctx.ellipse(3 + shake, hy - 1, 3.5 * eyeScale, 3.8 * eyeScale, 0, 0, Math.PI * 2);
+      ctx.arc(2.5, hy - 2, 0.9, 0, Math.PI * 2);
       ctx.fill();
-      // Pupils with tracking
-      ctx.fillStyle = '#1a1a2e';
-      ctx.beginPath();
-      ctx.arc(-3 + shake + pupilOffX, hy - 0.8 + pupilOffY, 1.8 * pupilShrink, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(3 + shake + pupilOffX, hy - 0.8 + pupilOffY, 1.8 * pupilShrink, 0, Math.PI * 2);
-      ctx.fill();
-      // Highlights (life!)
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(-3.8, hy - 2.2, 1.1, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(2.2, hy - 2.2, 1.1, 0, Math.PI * 2);
-      ctx.fill();
-      // Worried brows
+      // Worried brows when very low
       if (chillFactor > 0.5) {
         ctx.strokeStyle = c.bodyStroke;
         ctx.lineWidth = 1.5;
@@ -1863,7 +1749,7 @@ class Player {
         ctx.lineTo(1.5, hy - 5 - chillFactor);
         ctx.stroke();
       }
-      // Sweat drop
+      // Sweat drop when dangerPulse is active
       if (dp > 0.3) {
         ctx.fillStyle = `rgba(100, 200, 255, ${dp * 0.6})`;
         const sweatY = hy - 5 + Math.sin(Date.now() / 200) * 1;
@@ -1875,32 +1761,32 @@ class Player {
       }
 
     } else {
-      // NEUTRAL — big expressive eyes with tracking pupils
+      // NEUTRAL — standard eyes with danger-reactive pupils
       const dangerScale = 1 + dp * 0.15;
-      // Sclera (bigger, rounder)
       ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#e0e0e0';
+      ctx.lineWidth = 0.5;
       ctx.beginPath();
-      ctx.ellipse(-3 + shake, hy - 0.5, 3.5 * dangerScale, 3.8 * dangerScale, 0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.ellipse(-3 + shake, hy - 1, 3.2 * dangerScale, 3.5 * dangerScale, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
       ctx.beginPath();
-      ctx.ellipse(3 + shake, hy - 0.5, 3.5 * dangerScale, 3.8 * dangerScale, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // Pupils with velocity tracking (shrink under danger)
+      ctx.ellipse(3 + shake, hy - 1, 3.2 * dangerScale, 3.5 * dangerScale, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      // Pupils shrink when danger is high
       const ps = 1 - dp * 0.3;
-      ctx.fillStyle = '#1a1a2e';
+      ctx.fillStyle = '#000000';
       ctx.beginPath();
-      ctx.arc(-3 + shake + pupilOffX, hy - 0.3 + pupilOffY, 1.8 * ps, 0, Math.PI * 2);
+      ctx.arc(-3 + shake, hy - 0.8, 1.5 * ps, 0, Math.PI * 2);
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(3 + shake + pupilOffX, hy - 0.3 + pupilOffY, 1.8 * ps, 0, Math.PI * 2);
+      ctx.arc(3 + shake, hy - 0.8, 1.5 * ps, 0, Math.PI * 2);
       ctx.fill();
-      // Highlight dots (the soul of the character)
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(-3.8, hy - 1.8, 1.2, 0, Math.PI * 2);
+      ctx.arc(-3.5, hy - 2, 1, 0, Math.PI * 2);
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(2.2, hy - 1.8, 1.2, 0, Math.PI * 2);
+      ctx.arc(2.5, hy - 2, 1, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -2405,81 +2291,39 @@ class Player {
       p.arc(0, -7.5, 1.4, 0, Math.PI * 2);
       p.fill();
     } else {
-      // Modern unified egg body with gradient feel
-      // Cosmic glow
-      const glowGrad = p.createRadialGradient(0, -2, 3, 0, -2, 14);
-      glowGrad.addColorStop(0, (skin.glow || 'rgba(199,108,240,0.25)'));
-      glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
-      p.fillStyle = glowGrad;
-      p.beginPath();
-      p.arc(0, -2, 14, 0, Math.PI * 2);
-      p.fill();
-
-      // Body gradient
-      const bodyGrad = p.createRadialGradient(-2, -5, 1, 0, -1, 10);
-      bodyGrad.addColorStop(0, headColor);
-      bodyGrad.addColorStop(0.55, bodyColor);
-      bodyGrad.addColorStop(1, skin.bodyStroke || '#9b4fc9');
-      p.fillStyle = bodyGrad;
-      p.beginPath();
-      p.ellipse(0, -1, 7.5, 9.5, 0, 0, Math.PI * 2);
-      p.fill();
-
-      // Belly highlight
-      p.fillStyle = 'rgba(255,255,255,0.2)';
-      p.beginPath();
-      p.ellipse(0, 3, 5, 5, 0, 0, Math.PI * 2);
-      p.fill();
-
-      // Specular
-      p.fillStyle = 'rgba(255,255,255,0.45)';
-      p.beginPath();
-      p.arc(-2.5, -6, 2.2, 0, Math.PI * 2);
-      p.fill();
-
-      // Wing
-      p.fillStyle = wingColor;
-      p.beginPath();
-      p.ellipse(-6, -1, 5, 3, -0.3, 0, Math.PI * 2);
-      p.fill();
-
-      // Beak
-      p.fillStyle = '#ffd700';
-      p.beginPath();
-      p.moveTo(5, -3); p.lineTo(9, -2); p.lineTo(5, -1);
-      p.closePath();
-      p.fill();
-
-      // Big eyes
       p.fillStyle = '#ffffff';
       p.beginPath();
-      p.arc(-2, -3.5, 2.8, 0, Math.PI * 2);
+      p.arc(-2, -7.5, 2.3, 0, Math.PI * 2);
       p.fill();
       p.beginPath();
-      p.arc(2, -3.5, 2.8, 0, Math.PI * 2);
+      p.arc(2, -7.5, 2.3, 0, Math.PI * 2);
       p.fill();
-      // Pupils
-      p.fillStyle = '#1a1a2e';
+      p.fillStyle = '#000000';
       p.beginPath();
-      p.arc(-2, -3.3, 1.3, 0, Math.PI * 2);
-      p.fill();
-      p.beginPath();
-      p.arc(2, -3.3, 1.3, 0, Math.PI * 2);
-      p.fill();
-      // Highlights
-      p.fillStyle = '#ffffff';
-      p.beginPath();
-      p.arc(-2.7, -4.2, 0.9, 0, Math.PI * 2);
+      p.arc(-2, -7.3, 1.1, 0, Math.PI * 2);
       p.fill();
       p.beginPath();
-      p.arc(1.3, -4.2, 0.9, 0, Math.PI * 2);
+      p.arc(2, -7.3, 1.1, 0, Math.PI * 2);
       p.fill();
-
-      // Tail glow
-      p.fillStyle = skin.glow || 'rgba(199,108,240,0.3)';
-      p.beginPath();
-      p.ellipse(0, 9, 3, 2.5, 0, 0, Math.PI * 2);
-      p.fill();
+      if (skin.antenna) {
+        p.strokeStyle = skin.antenna;
+        p.lineWidth = 1.5;
+        p.beginPath();
+        p.moveTo(-2, -12); p.lineTo(-3, -15);
+        p.stroke();
+        p.beginPath();
+        p.moveTo(2, -12); p.lineTo(3, -15);
+        p.stroke();
+        if (skin.antennaGlow) {
+          p.fillStyle = skin.antennaGlow;
+          p.beginPath();
+          p.arc(-3, -15, 1.5, 0, Math.PI * 2);
+          p.fill();
+          p.beginPath();
+          p.arc(3, -15, 1.5, 0, Math.PI * 2);
+          p.fill();
+        }
+      }
     }
 
     p.restore();
