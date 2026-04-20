@@ -34,11 +34,14 @@ class VoidStorm {
     }
   }
 
-  update(deltaTime, playerY, heightClimbed) {
+  update(deltaTime, playerY, heightClimbed, difficulty) {
     this.phase += deltaTime * 2;
 
-    // Speed increases with height climbed (more pressure the higher you go)
-    const heightBonus = Math.min(heightClimbed / 300, 40); // Up to +40 speed
+    // Speed increases with height — rate varies by difficulty
+    // Easy: slow ramp (+30 max over 15k). Hard: fast ramp (+60 max over 8k).
+    const maxBonus = difficulty === 'easy' ? 30 : difficulty === 'hard' ? 60 : 40;
+    const rampDist = difficulty === 'easy' ? 15000 : difficulty === 'hard' ? 8000 : 12000;
+    const heightBonus = maxBonus * Math.min(heightClimbed / rampDist, 1.0);
     this.currentSpeed = this.baseSpeed + heightBonus;
 
     // If player is far ahead, the void accelerates to maintain tension

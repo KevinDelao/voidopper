@@ -74,6 +74,8 @@ class BugTracker {
       maxEntities: 0,
       narrowestCorridor: Infinity,
       bossesEncountered: 0,
+      lastSpeedMult: 1.0,
+      lastStormSpeed: 0,
     };
   }
   bug(msg, data) { this.bugs.push({ msg, frame: this.stats.frames, ...data }); }
@@ -144,9 +146,17 @@ function simulate(difficulty, godMode = false) {
   state.player.currentSide = 'left';
   state.player.x = leftWallX + state.player.radius;
 
-  // Init void storm
-  const stormSpeed = difficulty === 'easy' ? 15 : difficulty === 'hard' ? 30 : 22;
-  state.voidStorm = new VoidStorm(startY + HEIGHT, stormSpeed);
+  // Init void storm (matches Game.js initGame)
+  const voidStorm = new VoidStorm(startY, WIDTH);
+  if (difficulty === 'easy') {
+    voidStorm.baseSpeed = 20;
+    voidStorm.y = startY + 900;
+  } else if (difficulty === 'hard') {
+    voidStorm.baseSpeed = 40;
+    voidStorm.y = startY + 500;
+  }
+  voidStorm.currentSpeed = voidStorm.baseSpeed;
+  state.voidStorm = voidStorm;
 
   let gameOver = false;
   let gameOverReason = '';
@@ -403,6 +413,17 @@ function simulate(difficulty, godMode = false) {
                   new BlackHole(enemyX, enemyY);
         }
 
+        // Apply difficulty-scaled speed multiplier (matches Game.js)
+        if (enemy) {
+          const maxBoost = diff === 'easy' ? 0.4 : diff === 'hard' ? 1.0 : 0.6;
+          const rampDist = diff === 'easy' ? 20000 : diff === 'hard' ? 10000 : 15000;
+          const speedMultiplier = 1.0 + maxBoost * Math.min(heightClimbed / rampDist, 1.0);
+          if (enemy.vy !== undefined && enemy.vy !== 0) enemy.vy *= speedMultiplier;
+          if (enemy.vx !== undefined && enemy.vx !== 0) enemy.vx *= speedMultiplier;
+          enemy.speedScale = speedMultiplier;
+          tracker.stats.lastSpeedMult = speedMultiplier;
+        }
+
         state.enemies.push(enemy);
         tracker.stats.enemiesSpawned++;
       } else if (safeMaxX - safeMinX <= 0) {
@@ -617,7 +638,9 @@ function simulate(difficulty, godMode = false) {
 
     // ── Void storm ───────────────────────────────────────────────────────
     if (state.voidStorm) {
-      state.voidStorm.update(deltaTime);
+      const heightClimbedForStorm = state.startingY - state.lowestY;
+      state.voidStorm.update(deltaTime, player.y, heightClimbedForStorm, state.difficulty);
+      tracker.stats.lastStormSpeed = state.voidStorm.currentSpeed;
       if (player.y > state.voidStorm.y) {
         gameOver = true;
         gameOverReason = 'void_storm';
@@ -698,6 +721,7 @@ for (const diff of DIFFICULTIES) {
       console.log(`    Height: ${s.maxHeight}m | Combo: ${s.maxCombo}x | Coins: ${s.coinsCollected}`);
       console.log(`    Bounces: ${s.wallBounces} | Enemies spawned: ${s.enemiesSpawned} | Power-ups: ${s.powerUpsCollected}`);
       console.log(`    Narrowest corridor: ${s.narrowestCorridor.toFixed(1)}px | Max entities: ${s.maxEntities}`);
+      console.log(`    Enemy speed mult: ${s.lastSpeedMult.toFixed(2)}x | Storm speed: ${s.lastStormSpeed.toFixed(1)} px/s`);
       console.log(`    Death: ${s.deathCause}`);
       console.log(`    Frames: ${s.frames} (${(s.frames / 60).toFixed(1)}s)`);
 
@@ -742,6 +766,7 @@ for (const diff of DIFFICULTIES) {
       console.log(`    Height: ${s.maxHeight}m | Combo: ${s.maxCombo}x | Coins: ${s.coinsCollected}`);
       console.log(`    Bounces: ${s.wallBounces} | Enemies spawned: ${s.enemiesSpawned} | Power-ups: ${s.powerUpsCollected}`);
       console.log(`    Narrowest corridor: ${s.narrowestCorridor.toFixed(1)}px | Max entities: ${s.maxEntities}`);
+      console.log(`    Enemy speed mult: ${s.lastSpeedMult.toFixed(2)}x | Storm speed: ${s.lastStormSpeed.toFixed(1)} px/s`);
       console.log(`    Death/End: ${s.deathCause}`);
       console.log(`    Frames: ${s.frames} (${(s.frames / 60).toFixed(1)}s)`);
 

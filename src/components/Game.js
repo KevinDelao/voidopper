@@ -2210,9 +2210,12 @@ const Game = () => {
           }
         }
 
-        // Gradually increase enemy speed with height (caps at 1.5x at 200000m)
+        // Gradually increase enemy speed with height — rate varies by difficulty
+        // Easy: gentle ramp, caps at 1.4x around 20k. Hard: steep ramp, caps at 2.0x around 10k.
         if (enemy) {
-          const speedMultiplier = 1.0 + Math.min(heightClimbed / 200000, 0.5);
+          const maxBoost = diff === 'easy' ? 0.4 : diff === 'hard' ? 1.0 : 0.6;
+          const rampDist = diff === 'easy' ? 20000 : diff === 'hard' ? 10000 : 15000;
+          const speedMultiplier = 1.0 + maxBoost * Math.min(heightClimbed / rampDist, 1.0);
           if (enemy.vy !== undefined && enemy.vy !== 0) {
             enemy.vy *= speedMultiplier;
           }
@@ -2992,7 +2995,7 @@ const Game = () => {
       // Slow the void during guardian encounters so the player isn't double-pressured
       const voidMult = state.guardianActive ? 0.4 : 1.0;
       const heightClimbed = state.startingY - state.lowestY;
-      state.voidStorm.update(deltaTime * voidMult, player.y, heightClimbed);
+      state.voidStorm.update(deltaTime * voidMult, player.y, heightClimbed, state.difficulty);
 
       // Check if void consumed the player
       if (!playerInvincible && state.voidStorm.checkCollision(player.y)) {
