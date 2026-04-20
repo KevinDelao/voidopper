@@ -2938,7 +2938,9 @@ const Game = () => {
         const dist = Math.sqrt(distSq) - enemy.radius - pr;
         const skinNM = getSkinAbility(selectedSkinRef.current);
         const nearMissBonus = skinNM && (skinNM.type === 'nearMissRange' || skinNM.type === 'allBonus') ? (skinNM.type === 'nearMissRange' ? skinNM.value : 5) : 0;
-        if (dist > 5 && dist < 35 + nearMissBonus) {
+        // Only count near-miss when player is moving away (survived the pass)
+        const dotAway = dx * player.vx + dy * player.vy;
+        if (dist > 5 && dist < 35 + nearMissBonus && dotAway > 0) {
           state._nearMissedEnemies.add(enemy);
           player.registerNearMiss(); // adds +8 mood internally
           addCombo(state, 2, 'CLOSE CALL');
