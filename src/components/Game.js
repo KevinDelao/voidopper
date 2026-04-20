@@ -428,7 +428,7 @@ const Game = () => {
     };
     const insets = getSafeInsets();
     gameStateRef.current.safeTop = insets.top;
-    gameStateRef.current.safeBottom = insets.bottom;
+    gameStateRef.current.safeBottom = Math.max(insets.bottom, getBannerHeight());
 
     // Game loop
     let animationFrameId;
@@ -5021,7 +5021,7 @@ const Game = () => {
         + goBtnH_est + goBtnGap_est                   // restart button
         + goBtnH_est + goBtnGap_est                   // menu button
         + Math.round(goBtnH_est * 0.8);               // share button
-      const availGoH = height - safeBot - (gameStateRef.current.safeTop || 0);
+      const availGoH = height - safeBot - (gameStateRef.current.safeTop || 0) - getBannerHeight();
       const goOffset = Math.max(60, (availGoH - totalGoH) / 2 + (gameStateRef.current.safeTop || 0));
       let goY = goOffset;
 
@@ -6100,7 +6100,8 @@ const Game = () => {
           + (hasStreak ? Math.round(20 * menuTs) : 0)        // streak
           + (missionRows > 0 ? Math.round(16 * menuTs) + missionRows * mRowH_est + menuPad : 0) // missions
           + ((window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ? 0 : slBtnH_est + Math.round(12 * menuTs));
-        const availableH = height - safeTop - safeBot;
+        const adPad = getBannerHeight();
+        const availableH = height - safeTop - safeBot - adPad;
         const menuOffset = Math.max(0, (availableH - totalMenuH) / 2);
 
         // --- Title ---
@@ -6145,20 +6146,6 @@ const Game = () => {
           ctx.fillStyle = '#aa88ff';
           ctx.fillRect(width / 2 - xpW / 2, titleY + Math.round((isSmallScreen ? 18 : 22) * menuTs), xpW * xpProg, xpH);
           ctx.restore();
-        }
-
-        // Daily theme name
-        if (themeRef.current) {
-          const dTheme = themeRef.current.getCurrentTheme();
-          if (dTheme.name && dTheme.name !== 'Deep Space') {
-            ctx.save();
-            ctx.font = `${Math.round(9 * menuTs)}px Orbitron, Arial`;
-            ctx.textAlign = 'center';
-            ctx.fillStyle = dTheme.edgeGlow || '#888888';
-            ctx.globalAlpha = 0.7;
-            ctx.fillText(`Today: ${dTheme.name}`, width / 2, titleY + Math.round((isSmallScreen ? 30 : 34) * menuTs));
-            ctx.restore();
-          }
         }
 
         // --- Coins + skin name row ---
@@ -6494,8 +6481,21 @@ const Game = () => {
         }
       }
 
-      // Developer credit
+      // Daily theme name (bottom corner)
       const creditSafeBot = gameStateRef.current.safeBottom || 0;
+      if (themeRef.current) {
+        const dTheme = themeRef.current.getCurrentTheme();
+        if (dTheme.name && dTheme.name !== 'Deep Space') {
+          ctx.font = `${width < 420 ? 8 : 9}px Orbitron, Arial`;
+          ctx.textAlign = 'center';
+          ctx.fillStyle = dTheme.edgeGlow || '#666666';
+          ctx.globalAlpha = 0.5;
+          ctx.fillText(`${dTheme.name}`, width / 2, height - creditSafeBot - 22);
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      // Developer credit
       ctx.font = `${width < 420 ? 9 : 10}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
