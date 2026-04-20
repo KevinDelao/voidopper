@@ -5326,7 +5326,8 @@ const Game = () => {
         // === SHOP UI ===
         const shopTs = Math.max(1, width / 390);
         const shopSafeBot = gameStateRef.current.safeBottom || 0;
-        const footerH = Math.round(80 * shopTs) + shopSafeBot;
+        const shopAdPad = getBannerHeight();
+        const footerH = Math.round(80 * shopTs) + shopSafeBot + shopAdPad;
         const headerH = Math.round(140 * shopTs); // taller to fit tabs
         const activeTab = shopTabRef.current;
 
@@ -5826,7 +5827,7 @@ const Game = () => {
         ctx.save();
         const backBtnW = Math.round(160 * shopTs);
         const backBtnH = Math.round(50 * shopTs);
-        const backBtnY = height - shopSafeBot - Math.round(68 * shopTs);
+        const backBtnY = height - shopSafeBot - shopAdPad - Math.round(68 * shopTs);
         ctx.fillStyle = 'rgba(60, 40, 100, 0.9)';
         ctx.fillRect(width / 2 - backBtnW / 2, backBtnY, backBtnW, backBtnH);
         ctx.strokeStyle = '#9966cc';
@@ -5847,7 +5848,8 @@ const Game = () => {
         const sTs = Math.min(1.8, Math.max(1, width / 390));
         const sSafeTop = isMobile ? (gameStateRef.current.safeTop || 0) : 0;
         const sSafeBot = gameStateRef.current.safeBottom || 0;
-        const sFooterH = Math.round(80 * sTs) + sSafeBot;
+        const sAdPad = getBannerHeight();
+        const sFooterH = Math.round(80 * sTs) + sSafeBot + sAdPad;
         const sHeaderH = Math.round(80 * sTs) + sSafeTop;
         const sVisibleH = height - sHeaderH - sFooterH;
         const sPad = Math.round(16 * sTs);
@@ -6050,7 +6052,7 @@ const Game = () => {
         ctx.save();
         const sBackW = Math.round((sIsWide ? 200 : 160) * sTs);
         const sBackH = Math.max(50, Math.round(50 * sTs));
-        const sBackY = height - sSafeBot - Math.round(68 * sTs);
+        const sBackY = height - sSafeBot - sAdPad - Math.round(68 * sTs);
         ctx.fillStyle = 'rgba(60, 40, 100, 0.9)';
         ctx.fillRect(width / 2 - sBackW / 2, sBackY, sBackW, sBackH);
         ctx.strokeStyle = '#9966cc';
