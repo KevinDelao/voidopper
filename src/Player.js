@@ -83,7 +83,7 @@ class Player {
   // Add mood (positive events)
   addMood(amount) {
     const oldTier = this.getMoodTier();
-    this.mood = Math.min(100, this.mood + amount);
+    this.mood = Math.min(100, this.mood + amount * (this.moodBoostMult || 1));
     const newTier = this.getMoodTier();
     if (newTier !== oldTier) {
       this.moodFlashTimer = 0.6;

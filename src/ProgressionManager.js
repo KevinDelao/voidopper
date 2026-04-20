@@ -318,6 +318,7 @@ class ProgressionManager {
   getLevel() { return this.level; }
   getXP() { return this.xp; }
   getXPProgress() { return this.xp / this.getXPForLevel(this.level); }
+  getScoreMultiplier() { return 1 + (this.level - 1) * 0.02; }
 
   // Cumulative lifetime missions
   updateLifetimeStats(runStats) {

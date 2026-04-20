@@ -47,6 +47,24 @@ export function notifyTap(type = 'SUCCESS') {
   }
 }
 
+// Rhythmic bounce haptic — varies by mood tier
+export function bounceTap(moodTier) {
+  try {
+    if (moodTier === 'onfire') {
+      Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => {});
+      setTimeout(() => Haptics.impact({ style: ImpactStyle.Light }).catch(() => {}), 60);
+    } else if (moodTier === 'firedup') {
+      Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => {});
+    } else if (moodTier === 'neutral') {
+      Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {});
+    } else {
+      Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+    }
+  } catch {
+    vibrate(moodTier === 'onfire' ? 40 : moodTier === 'firedup' ? 30 : 20);
+  }
+}
+
 // Selection click for UI interactions (menu taps, toggles)
 export function selectionTap() {
   try {

@@ -19,11 +19,15 @@ import Guardian from '../Guardian';
 import ProgressionManager from '../ProgressionManager';
 import Trails from '../Trails';
 import { getItem, setItem, getJSON, setJSON } from '../storage';
-import { lightTap, mediumTap, heavyTap, notifyTap, selectionTap } from '../haptics';
+import { lightTap, mediumTap, heavyTap, notifyTap, selectionTap, bounceTap } from '../haptics';
 import { authenticateGameCenter, submitScore as submitGCScore, showLeaderboard, isAuthenticated as isGCAuthenticated } from '../GameCenter';
 import { t } from '../i18n';
 import { getBannerHeight, showBanner, hideBanner } from '../AdManager';
 import { getSkinAbility } from '../BirdSkins';
+import UpgradeManager from '../UpgradeManager';
+import AchievementManager from '../AchievementManager';
+import ThemeManager from '../ThemeManager';
+import TutorialOverlay from '../TutorialOverlay';
 
 // Detect iPad for performance tuning
 const isIPad = /iPad/i.test(navigator.userAgent) ||
@@ -86,6 +90,10 @@ const Game = () => {
   const audioManagerRef = useRef(null);
   const gameOverTimeRef = useRef(null);
   const progressionRef = useRef(null);
+  const upgradeRef = useRef(new UpgradeManager());
+  const achievementRef = useRef(new AchievementManager());
+  const themeRef = useRef(new ThemeManager());
+  const tutorialRef = useRef(new TutorialOverlay());
   const appStateListenerRef = useRef(null);
 
   // Persistent data from localStorage
@@ -215,6 +223,17 @@ const Game = () => {
     newBestScore: false,
     missionRewardsThisRun: 0,
     streakBonusThisRun: 0,
+    // Achievement toast
+    achievementToast: null,
+    achievementToastTimer: 0,
+    // Death slow-mo
+    deathSlowmo: false,
+    deathSlowmoTimer: 0,
+    deathSlowmoDuration: 0.6,
+    // Fever mode
+    feverActive: false,
+    feverTimer: 0,
+    feverCooldown: 0,
   });
 
   // Keep refs in sync with state for use inside closures
@@ -427,7 +446,25 @@ const Game = () => {
         if (audioManagerRef.current) audioManagerRef.current.ensureContextRunning();
       }
 
-      if (gameStateRef.current.isRunning && !isGameOver && gameStarted && !isPausedRef.current) {
+      // Tutorial overlay — pauses game, update animation
+      if (tutorialRef.current && tutorialRef.current.active) {
+        tutorialRef.current.update(deltaTime);
+        render(ctx, getW(), getH(), deltaTime);
+        animationFrameId = requestAnimationFrame(gameLoop);
+        return;
+      }
+
+      // Death slow-mo: keep updating at reduced speed, then finalize
+      if (gameStateRef.current.deathSlowmo && gameStateRef.current.isRunning) {
+        gameStateRef.current.deathSlowmoTimer -= deltaTime;
+        const slowProg = 1 - Math.max(0, gameStateRef.current.deathSlowmoTimer / gameStateRef.current.deathSlowmoDuration);
+        const slowFactor = 0.15 + 0.05 * slowProg; // 0.15x → 0.20x over duration
+        update(deltaTime * slowFactor, getW(), getH());
+        if (gameStateRef.current.deathSlowmoTimer <= 0) {
+          gameStateRef.current.deathSlowmo = false;
+          handleGameOver();
+        }
+      } else if (gameStateRef.current.isRunning && !isGameOver && gameStarted && !isPausedRef.current) {
         update(deltaTime, getW(), getH());
       } else if (isGameOver || gameStateRef.current.pendingRevive) {
         // Update particles even when game is over or revive pending
@@ -521,6 +558,12 @@ const Game = () => {
         }
         // Route through mouse handler for menu interaction (difficulty double-tap, etc.)
         handleMouseDown({ clientX: touch.clientX, clientY: touch.clientY });
+        return;
+      }
+
+      // Dismiss tutorial on tap
+      if (tutorialRef.current && tutorialRef.current.active) {
+        tutorialRef.current.dismiss();
         return;
       }
 
@@ -945,6 +988,26 @@ const Game = () => {
               }
               return;
             }
+          } else if (shopTabRef.current === 'upgrades') {
+            const um = upgradeRef.current;
+            const upgradeKeys = Object.keys(um.getAllDefs());
+            for (const key of upgradeKeys) {
+              const b = gameStateRef.current['_upg_' + key];
+              if (b && clickX >= b.x && clickX <= b.x + b.w && clickY >= b.y && clickY <= b.y + b.h) {
+                if (!um.isMaxed(key) && totalCoinsRef.current >= um.getCost(key)) {
+                  const cost = um.purchase(key, totalCoinsRef.current);
+                  if (cost != null) {
+                    selectionTap();
+                    const newTotal = totalCoinsRef.current - cost;
+                    totalCoinsRef.current = newTotal;
+                    setTotalCoins(newTotal);
+                    setItem('voidHopper_totalCoins', String(newTotal));
+                    if (audioManagerRef.current) audioManagerRef.current.playScoreMilestoneSound();
+                  }
+                }
+                return;
+              }
+            }
           }
 
           return;
@@ -1030,6 +1093,9 @@ const Game = () => {
           mediumTap();
           initGame(getW(), getH());
           setGameStarted(true);
+          if (tutorialRef.current.shouldShow()) {
+            tutorialRef.current.start();
+          }
           if (audioManagerRef.current) {
             if (!audioManagerRef.current.isInitialized) {
               audioManagerRef.current.initialize().then(() => {
@@ -1580,6 +1646,33 @@ const Game = () => {
       });
     }
     gameStateRef.current.backgroundStars = stars;
+
+    // Parallax nebulae — large, slow-moving color patches
+    const nebulae = [];
+    for (let i = 0; i < 6; i++) {
+      nebulae.push({
+        x: Math.random() * width,
+        y: Math.random() * 4000,
+        radius: 80 + Math.random() * 120,
+        color: ['rgba(60,20,80,0.08)', 'rgba(20,40,80,0.06)', 'rgba(80,20,40,0.07)',
+                'rgba(20,60,60,0.05)', 'rgba(50,10,70,0.09)', 'rgba(30,30,70,0.06)'][i],
+        parallax: 0.15 + Math.random() * 0.1,
+      });
+    }
+    gameStateRef.current.bgNebulae = nebulae;
+
+    // Distant planets
+    const planets = [];
+    for (let i = 0; i < 3; i++) {
+      planets.push({
+        x: 40 + Math.random() * (width - 80),
+        y: Math.random() * 6000,
+        radius: 12 + Math.random() * 20,
+        hue: Math.floor(Math.random() * 360),
+        parallax: 0.2 + Math.random() * 0.15,
+      });
+    }
+    gameStateRef.current.bgPlanets = planets;
   };
 
   const initGame = (width, height) => {
@@ -1608,7 +1701,8 @@ const Game = () => {
     // Scale bird speed for wider screens (iPad) so flight feels equally fast
     const iPhoneBaseWidth = 390;
     const speedScale = Math.max(1, width / iPhoneBaseWidth);
-    state.player.aimPower = 900 * speedScale;
+    state.player.aimPower = 900 * speedScale * upgradeRef.current.getEffect('launchPower');
+    state.player.moodBoostMult = upgradeRef.current.getEffect('moodBoost');
     state.speedScale = speedScale;
     state.player.currentSide = startSide;
     state.player.isStuck = true;
@@ -1705,6 +1799,21 @@ const Game = () => {
     state.survivalTimer = 0;
     state.canRevive = true;
     state.pendingRevive = false;
+    state.deathSlowmo = false;
+    state.deathSlowmoTimer = 0;
+    state._deathSlowmoTriggered = false;
+    state.feverActive = false;
+    state.feverTimer = 0;
+    state.feverCooldown = 0;
+    // Cache upgrade multipliers for this run
+    const um = upgradeRef.current;
+    state.upgrades = {
+      coinMagnet: um.getEffect('coinMagnet'),
+      moodBoost: um.getEffect('moodBoost'),
+      voidResist: um.getEffect('voidResist'),
+      coinBonus: um.getEffect('coinBonus'),
+      shieldDuration: um.getEffect('shieldDuration'),
+    };
     // First-run hints (only show once ever)
     const seenHints = getJSON('voidHopper_seenHints', {});
     state.hints = {
@@ -1715,6 +1824,11 @@ const Game = () => {
     state.newBestScore = false;
     state.missionRewardsThisRun = 0;
     state.streakBonusThisRun = 0;
+    // Ghost marker: best height line
+    const savedHS = getJSON('voidHopper_highScores', {});
+    const bestDist = savedHS[difficultyRef.current] || 0;
+    state.bestHeightY = bestDist > 0 ? startY - bestDist * 10 : null;
+    state.bestHeightPassed = false;
     // Generate foreground dust motes
     state.dustParticles = [];
     const dustCount = getGfx().dust;
@@ -1967,7 +2081,7 @@ const Game = () => {
         if (state.runStats.wallBounces === 1) {
           showHint(state, 'wallBounce', t('hint.comboText'), t('hint.comboSub'));
         }
-        mediumTap();
+        bounceTap(player.getMoodTier());
         if (audioManagerRef.current) {
           audioManagerRef.current.playBounceSound();
         }
@@ -1981,7 +2095,7 @@ const Game = () => {
         if (state.runStats.wallBounces === 1) {
           showHint(state, 'wallBounce', t('hint.comboText'), t('hint.comboSub'));
         }
-        mediumTap();
+        bounceTap(player.getMoodTier());
         if (audioManagerRef.current) {
           audioManagerRef.current.playBounceSound();
         }
@@ -1992,10 +2106,22 @@ const Game = () => {
     if (player.y < state.lowestY) {
       state.lowestY = player.y;
       const heightClimbed = state.startingY - state.lowestY;
-      const newScore = Math.floor(heightClimbed / 10);
+      const levelMult = progressionRef.current ? progressionRef.current.getScoreMultiplier() : 1;
+      const newScore = Math.floor(heightClimbed / 10 * levelMult);
       if (newScore !== state.currentScore) {
         state.currentScore = newScore;
         setScore(newScore);
+      }
+      // Ghost marker: detect passing best height
+      if (state.bestHeightY != null && !state.bestHeightPassed && player.y <= state.bestHeightY) {
+        state.bestHeightPassed = true;
+        state.floatingTexts.push({
+          x: player.x, y: player.y,
+          label: 'NEW BEST!',
+          desc: '',
+          color: '#ffd700',
+          life: 2.0, maxLife: 2.0, vy: -50,
+        });
       }
     }
 
@@ -2084,6 +2210,12 @@ const Game = () => {
     const heightClimbed = state.startingY - player.y;
     const diff = state.difficulty || 'medium';
     let spawnInterval = diff === 'easy' ? 3.5 : diff === 'hard' ? 1.8 : 2.5;
+
+    // Early-game grace: enemies spawn slower in the first 500m, ramping to full rate
+    if (heightClimbed < 5000) {
+      const graceEase = Math.min(1, heightClimbed / 5000);
+      spawnInterval *= 1 + (1.5 - 1.5 * graceEase); // 2.5x at start → 1x at 500m
+    }
 
     // First-run softening: no enemies for first 200m on very first game ever
     const isFirstRun = !getItem('voidHopper_hasPlayed');
@@ -2267,7 +2399,12 @@ const Game = () => {
       coin.update(deltaTime);
 
       // Check collision with player
-      if (!coin.collected && coin.checkCollision(player)) {
+      const magnetMult = state.upgrades ? state.upgrades.coinMagnet : 1;
+      const magnetDist = (coin.radius + player.radius) * magnetMult;
+      const cdx = player.x - coin.x;
+      const cdy = player.y - coin.y;
+      const coinDist = Math.sqrt(cdx * cdx + cdy * cdy);
+      if (!coin.collected && coinDist < magnetDist) {
         coin.collected = true;
         // Coin pickup builds combo and mood
         addCombo(state, 1, 'COIN');
@@ -2281,7 +2418,8 @@ const Game = () => {
         const moodMult = player.getCoinMultiplier();
         const skinAbility = getSkinAbility(selectedSkinRef.current);
         const skinCoinBonus = skinAbility && (skinAbility.type === 'coinBonus' || skinAbility.type === 'allBonus') ? skinAbility.value : 0;
-        const totalMult = comboMult * moodMult * (1 + skinCoinBonus);
+        const upgradeCoinBonus = (state.upgrades ? state.upgrades.coinBonus : 1);
+        const totalMult = comboMult * moodMult * (1 + skinCoinBonus) * upgradeCoinBonus;
         const totalValue = Math.round(coin.value * totalMult);
         state.currentCoinScore += totalValue;
         setCoinScore(state.currentCoinScore);
@@ -2333,7 +2471,12 @@ const Game = () => {
 
     // Spawn spikes on walls (never at starting position)
     state.lastSpikeSpawnY += deltaTime;
-    const spikeSpawnInterval = diff === 'easy' ? 8.0 : diff === 'hard' ? 3.5 : 5.0;
+    let spikeSpawnInterval = diff === 'easy' ? 8.0 : diff === 'hard' ? 3.5 : 5.0;
+    // Early-game grace: spikes spawn slower in the first 600m
+    if (heightClimbed < 6000) {
+      const spikeGrace = Math.min(1, heightClimbed / 6000);
+      spikeSpawnInterval *= 1 + (1.0 - 1.0 * spikeGrace); // 2x at start → 1x at 600m
+    }
 
     if (state.lastSpikeSpawnY > spikeSpawnInterval && player.y < state.startingY - 200) {
       // Only spawn when player is well above starting position
@@ -2428,7 +2571,7 @@ const Game = () => {
     state.lastWallTrapSpawnY += deltaTime;
     const wallTrapInterval = diff === 'easy' ? 10.0 : diff === 'hard' ? 5.0 : 7.0;
 
-    if (state.lastWallTrapSpawnY > wallTrapInterval && player.y < state.startingY - 1500) {
+    if (state.lastWallTrapSpawnY > wallTrapInterval && player.y < state.startingY - 2500) {
       const trapY = state.cameraY - 120;
       const trapSide = Math.random() < 0.5 ? 'left' : 'right';
 
@@ -2518,7 +2661,7 @@ const Game = () => {
 
         if (pu.type === 'shield') {
           player.hasShield = true;
-          player.shieldTimer = duration;
+          player.shieldTimer = duration * (state.upgrades ? state.upgrades.shieldDuration : 1);
         } else if (pu.type === 'magnet') {
           player.hasMagnet = true;
           player.magnetTimer = duration;
@@ -2993,7 +3136,8 @@ const Game = () => {
     // Update void storm — the rising threat (slowed during guardian zones)
     if (state.voidStorm) {
       // Slow the void during guardian encounters so the player isn't double-pressured
-      const voidMult = state.guardianActive ? 0.4 : 1.0;
+      const voidResist = state.upgrades ? state.upgrades.voidResist : 1;
+      const voidMult = (state.guardianActive ? 0.4 : 1.0) * voidResist;
       const heightClimbed = state.startingY - state.lowestY;
       state.voidStorm.update(deltaTime * voidMult, player.y, heightClimbed, state.difficulty);
 
@@ -3047,6 +3191,33 @@ const Game = () => {
       }
     }
 
+    // Fever mode: trigger invincibility burst when mood hits 100
+    if (state.feverCooldown > 0) {
+      state.feverCooldown -= deltaTime;
+    }
+    if (player.mood >= 100 && !state.feverActive && state.feverCooldown <= 0) {
+      state.feverActive = true;
+      state.feverTimer = 3.0;
+      player.invincibleTimer = 3.0;
+      state._feversTriggeredThisRun = (state._feversTriggeredThisRun || 0) + 1;
+      state.shakeIntensity = 6;
+      heavyTap();
+      state.floatingTexts.push({
+        x: player.x, y: player.y,
+        label: 'FEVER!',
+        desc: 'Invincible!',
+        color: '#ff4400',
+        life: 2.0, maxLife: 2.0, vy: -60,
+      });
+    }
+    if (state.feverActive) {
+      state.feverTimer -= deltaTime;
+      if (state.feverTimer <= 0) {
+        state.feverActive = false;
+        state.feverCooldown = 10.0;
+      }
+    }
+
     // Update background stars twinkle
     state.backgroundStars.forEach(star => {
       star.twinklePhase += star.twinkleSpeed;
@@ -3056,11 +3227,26 @@ const Game = () => {
   const handleGameOver = () => {
     const state = gameStateRef.current;
     if (!state.isRunning) return; // Prevent double-call in same frame
-    notifyTap('ERROR');
+    if (state.deathSlowmo) return; // Already in slow-mo death phase
+
+    // Trigger slow-mo phase before finalizing death (only once)
+    if (!state._deathSlowmoTriggered) {
+      state._deathSlowmoTriggered = true;
+      state.deathSlowmo = true;
+      state.deathSlowmoTimer = state.deathSlowmoDuration;
+      notifyTap('ERROR');
+      state.shakeIntensity = 12;
+      if (state.player) {
+        state.player.isDying = true;
+        state.player.deathTime = 0;
+        state.player.mood = 0;
+      }
+      return;
+    }
 
     // Drop mood on death
     if (state.player) {
-      state.player.mood = 0; // Drop to minimum on death
+      state.player.mood = 0;
     }
 
     // Create feather particles floating away from bird, matching the current skin
@@ -3183,6 +3369,21 @@ const Game = () => {
       progressionRef.current.addXP(Math.floor(finalScore / 10) + finalCoinScore);
     }
 
+    // Update achievement stats
+    if (achievementRef.current) {
+      achievementRef.current.updateStats({
+        gamesPlayed: 1,
+        bestDistance: finalScore,
+        totalCoins: finalCoinScore,
+        bestCombo: state.maxCombo || 0,
+        guardiansDefeated: state.runStats ? state.runStats.guardiansDefeated : 0,
+        nearMisses: state.runStats ? state.runStats.nearMisses : 0,
+        wallBounces: state.runStats ? state.runStats.wallBounces : 0,
+        feversTriggered: state._feversTriggeredThisRun || 0,
+        revivesUsed: state._revivesUsedThisRun || 0,
+      });
+    }
+
     // Calculate streak bonus
     let streakBonus = 0;
     if (progressionRef.current && finalCoinScore > 0) {
@@ -3217,6 +3418,8 @@ const Game = () => {
 
     state.pendingRevive = false;
     state.canRevive = false;
+    state._revivesUsedThisRun = (state._revivesUsedThisRun || 0) + 1;
+    state._deathSlowmoTriggered = false;
     state.isRunning = true;
     state.player.isDying = false;
     state.player.mood = 30;
@@ -3232,7 +3435,7 @@ const Game = () => {
     state.player.speedBoostTimer = 0;
     state.player.deathTime = 0;
     state.player.hasShield = true;
-    state.player.shieldTimer = 5;
+    state.player.shieldTimer = 5 * (state.upgrades ? state.upgrades.shieldDuration : 1);
 
     if (state.voidStorm) state.voidStorm.y += 300;
 
@@ -3343,26 +3546,85 @@ const Game = () => {
     input.click();
   };
 
-  const shareScore = () => {
+  const generateScoreCard = () => {
     const state = gameStateRef.current;
     const diff = (state.difficulty || 'medium').toUpperCase();
     const dist = state.currentScore;
     const coins = state.currentCoinScore;
     const combo = state.maxCombo;
-    const skinName = (state.player && state.player.skin) ? state.player.skin.name : 'Default';
-    const lvl = progressionRef.current ? progressionRef.current.getLevel() : 1;
-    const pilotRank = progressionRef.current && progressionRef.current.getPilotRank ? progressionRef.current.getPilotRank() : 0;
-    const zone = state.currentZoneName || '';
-    const survival = state.survivalTimer ? `${Math.floor(state.survivalTimer)}s` : '';
-    const rs = state.runStats;
-    const statsLine = [
-      rs.wallBounces > 0 ? `${rs.wallBounces} bounces` : null,
-      rs.nearMisses > 0 ? `${rs.nearMisses} dodges` : null,
-      rs.guardiansDefeated > 0 ? `${rs.guardiansDefeated} bosses` : null,
-    ].filter(Boolean).join(' | ');
-    const text = `Void Hopper | ${diff} | ${dist}m | ${coins} coins | ${combo}x combo | ${survival}\n${zone ? 'Zone: ' + zone + ' | ' : ''}Pilot Rank ${pilotRank} | Lvl ${lvl} | ${skinName}\n${statsLine ? statsLine + '\n' : ''}Can you beat my score?`;
+    const cw = 600, ch = 340;
+    const c = document.createElement('canvas');
+    c.width = cw; c.height = ch;
+    const cx = c.getContext('2d');
 
-    // Use Web Share API if available (mobile), otherwise copy to clipboard
+    // Background gradient
+    const bg = cx.createLinearGradient(0, 0, cw, ch);
+    bg.addColorStop(0, '#0a0820'); bg.addColorStop(1, '#1a0a30');
+    cx.fillStyle = bg; cx.fillRect(0, 0, cw, ch);
+    // Border
+    cx.strokeStyle = '#6644aa'; cx.lineWidth = 3; cx.strokeRect(2, 2, cw - 4, ch - 4);
+
+    cx.textAlign = 'center';
+    // Title
+    cx.font = 'bold 32px Orbitron, Arial'; cx.fillStyle = '#ffffff';
+    cx.fillText('VOID HOPPER', cw / 2, 45);
+    // Difficulty
+    cx.font = 'bold 16px Orbitron, Arial';
+    cx.fillStyle = diff === 'EASY' ? '#44cc66' : diff === 'HARD' ? '#ff4444' : '#ffaa22';
+    cx.fillText(diff, cw / 2, 70);
+    // Score
+    cx.font = 'bold 48px Orbitron, Arial'; cx.fillStyle = '#44ccff';
+    cx.fillText(`${dist}m`, cw / 2, 130);
+    // Stats
+    cx.font = '20px Orbitron, Arial'; cx.fillStyle = '#ffd700';
+    cx.fillText(`${coins} coins  |  ${combo}x combo`, cw / 2, 170);
+    // Run stats
+    const rs = state.runStats;
+    if (rs) {
+      cx.font = '14px Orbitron, Arial'; cx.fillStyle = '#aaaacc';
+      const statsLine = [
+        rs.wallBounces > 0 ? `${rs.wallBounces} bounces` : null,
+        rs.nearMisses > 0 ? `${rs.nearMisses} dodges` : null,
+        rs.guardiansDefeated > 0 ? `${rs.guardiansDefeated} bosses` : null,
+      ].filter(Boolean).join('  |  ');
+      if (statsLine) cx.fillText(statsLine, cw / 2, 200);
+    }
+    // Level
+    const lvl = progressionRef.current ? progressionRef.current.getLevel() : 1;
+    cx.font = '14px Orbitron, Arial'; cx.fillStyle = '#aa88ff';
+    cx.fillText(`Level ${lvl}`, cw / 2, 230);
+    // CTA
+    cx.font = 'bold 18px Orbitron, Arial'; cx.fillStyle = '#ffffff';
+    cx.fillText('Can you beat my score?', cw / 2, 280);
+    // Watermark
+    cx.font = '12px Orbitron, Arial'; cx.fillStyle = 'rgba(255,255,255,0.3)';
+    cx.fillText('voidhopper.game', cw / 2, 315);
+
+    return c;
+  };
+
+  const shareScore = async () => {
+    const state = gameStateRef.current;
+    const diff = (state.difficulty || 'medium').toUpperCase();
+    const dist = state.currentScore;
+    const coins = state.currentCoinScore;
+    const combo = state.maxCombo;
+    const lvl = progressionRef.current ? progressionRef.current.getLevel() : 1;
+    const text = `Void Hopper | ${diff} | ${dist}m | ${coins} coins | ${combo}x combo | Lvl ${lvl}\nCan you beat my score?`;
+
+    // Try sharing with generated score card image
+    if (navigator.share && navigator.canShare) {
+      try {
+        const card = generateScoreCard();
+        const blob = await new Promise(r => card.toBlob(r, 'image/png'));
+        const file = new File([blob], 'voidhopper-score.png', { type: 'image/png' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ title: 'Void Hopper Score', text, files: [file] });
+          return;
+        }
+      } catch {}
+    }
+    // Fallback to text share
     if (navigator.share) {
       navigator.share({ title: 'Void Hopper Score', text }).catch(() => {});
     } else if (navigator.clipboard) {
@@ -3664,6 +3926,13 @@ const Game = () => {
     ctx.fillStyle = bgBiome ? bgBiome.bg : '#120e29';
     ctx.fillRect(0, 0, width, height);
 
+    // Daily theme tint overlay
+    const dailyTheme = themeRef.current.getCurrentTheme();
+    if (dailyTheme.bgTint) {
+      ctx.fillStyle = dailyTheme.bgTint;
+      ctx.fillRect(0, 0, width, height);
+    }
+
     // Snap camera to whole pixels for rendering to prevent sub-pixel jitter
     // Game logic keeps the smooth float; only drawing uses the snapped value
     const renderCam = Math.round(state.cameraY);
@@ -3672,6 +3941,41 @@ const Game = () => {
     ctx.save();
     if (state.shakeIntensity > 0) {
       ctx.translate(state.shakeX, state.shakeY);
+    }
+
+    // Draw parallax nebulae (deepest layer)
+    if (state.bgNebulae) {
+      for (const neb of state.bgNebulae) {
+        const ny = (neb.y - renderCam * neb.parallax) % (height + 800) - 400;
+        if (ny > -neb.radius * 2 && ny < height + neb.radius * 2) {
+          ctx.save();
+          const grad = ctx.createRadialGradient(neb.x, ny, 0, neb.x, ny, neb.radius);
+          grad.addColorStop(0, neb.color);
+          grad.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(neb.x - neb.radius, ny - neb.radius, neb.radius * 2, neb.radius * 2);
+          ctx.restore();
+        }
+      }
+    }
+
+    // Draw distant planets (behind stars)
+    if (state.bgPlanets) {
+      for (const pl of state.bgPlanets) {
+        const py = (pl.y - renderCam * pl.parallax) % (height + 1500) - 750;
+        if (py > -pl.radius * 2 && py < height + pl.radius * 2) {
+          ctx.save();
+          ctx.globalAlpha = 0.25;
+          ctx.beginPath();
+          ctx.arc(pl.x, py, pl.radius, 0, Math.PI * 2);
+          ctx.fillStyle = `hsl(${pl.hue}, 40%, 30%)`;
+          ctx.fill();
+          ctx.strokeStyle = `hsl(${pl.hue}, 50%, 45%)`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
     }
 
     // Draw background stars (parallax effect) — batched into a single path
@@ -3695,6 +3999,27 @@ const Game = () => {
     }
     if (state.rightTerrain) {
       state.rightTerrain.draw(ctx, renderCam);
+    }
+
+    // Draw best height ghost marker (behind entities)
+    if (state.bestHeightY != null && !state.bestHeightPassed) {
+      const ghostScreenY = state.bestHeightY - renderCam;
+      if (ghostScreenY > -50 && ghostScreenY < height + 50) {
+        ctx.save();
+        ctx.setLineDash([10, 8]);
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.45)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, ghostScreenY);
+        ctx.lineTo(width, ghostScreenY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = `bold ${Math.round(11 * Math.max(1, width / 390))}px Orbitron, Arial`;
+        ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.6)';
+        ctx.fillText('BEST', width - 10, ghostScreenY - 6);
+        ctx.restore();
+      }
     }
 
     // Draw void storm (behind entities)
@@ -3890,8 +4215,75 @@ const Game = () => {
       state.voidStorm.drawWarning(ctx, width, height, proximity);
     }
 
+    // Fever mode golden border glow
+    if (state.feverActive && state.feverTimer > 0) {
+      ctx.save();
+      const feverPulse = 0.3 + Math.sin(Date.now() / 80) * 0.15;
+      ctx.strokeStyle = `rgba(255, 160, 0, ${feverPulse})`;
+      ctx.lineWidth = 6;
+      ctx.strokeRect(0, 0, width, height);
+      ctx.restore();
+    }
+
+    // Death slow-mo vignette overlay
+    if (state.deathSlowmo && state.deathSlowmoTimer > 0) {
+      ctx.save();
+      const slowProg = 1 - (state.deathSlowmoTimer / state.deathSlowmoDuration);
+      const vigAlpha = 0.2 + slowProg * 0.4;
+      const grad = ctx.createRadialGradient(width / 2, height / 2, width * 0.2, width / 2, height / 2, width * 0.8);
+      grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      grad.addColorStop(1, `rgba(80, 0, 0, ${vigAlpha})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+      ctx.restore();
+    }
+
+    // Achievement toast
+    if (state.achievementToastTimer > 0) {
+      state.achievementToastTimer -= dt || 0.016;
+      const toast = state.achievementToast;
+      if (toast) {
+        const toastTs = Math.max(1, width / 390);
+        const toastAlpha = state.achievementToastTimer > 2.5 ? Math.min(1, (3.0 - state.achievementToastTimer) * 2) : Math.min(1, state.achievementToastTimer / 0.5);
+        const toastW = Math.min(width - 20, Math.round(280 * toastTs));
+        const toastH = Math.round(50 * toastTs);
+        const toastX = width / 2 - toastW / 2;
+        const toastSafeTop = state.safeTop || 0;
+        const toastY = toastSafeTop + 10;
+        ctx.save();
+        ctx.globalAlpha = toastAlpha;
+        ctx.fillStyle = 'rgba(50, 30, 80, 0.9)';
+        ctx.fillRect(toastX, toastY, toastW, toastH);
+        ctx.strokeStyle = '#ffd700';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(toastX, toastY, toastW, toastH);
+        ctx.font = `${Math.round(18 * toastTs)}px Arial`;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(toast.icon || '', toastX + 12, toastY + toastH / 2 + 6);
+        ctx.font = `bold ${Math.round(12 * toastTs)}px Orbitron, Arial`;
+        ctx.fillStyle = '#ffd700';
+        ctx.fillText(toast.name, toastX + 40, toastY + Math.round(20 * toastTs));
+        ctx.font = `${Math.round(10 * toastTs)}px Orbitron, Arial`;
+        ctx.fillStyle = '#ccccee';
+        ctx.fillText(toast.desc, toastX + 40, toastY + Math.round(36 * toastTs));
+        ctx.restore();
+      }
+    } else if (achievementRef.current) {
+      const nextToast = achievementRef.current.popToast();
+      if (nextToast) {
+        state.achievementToast = nextToast;
+        state.achievementToastTimer = 3.0;
+      }
+    }
+
     // Draw UI (not affected by shake)
     drawUI(ctx, width, height);
+
+    // Tutorial overlay
+    if (tutorialRef.current && tutorialRef.current.active) {
+      tutorialRef.current.draw(ctx, width, height);
+    }
 
     // Coin collect sparkles (screen space, on top of everything) — batched
     if (state.coinCollectAnims && state.coinCollectAnims.length > 0) {
@@ -3956,6 +4348,14 @@ const Game = () => {
       ctx.fillStyle = diffColor;
       ctx.globalAlpha = 0.6;
       ctx.fillText(diffLabel, 12, 18 * ts + safeTop);
+      // Player level badge
+      if (progressionRef.current && progressionRef.current.getLevel() > 1) {
+        const lvl = progressionRef.current.getLevel();
+        const lvlX = 12 + ctx.measureText(diffLabel).width + 10;
+        ctx.font = `bold ${Math.round(10 * ts)}px Orbitron, Arial`;
+        ctx.fillStyle = '#88ccff';
+        ctx.fillText(`LV${lvl}`, lvlX, 18 * ts + safeTop);
+      }
       ctx.restore();
 
       // Zone name announcement
@@ -5074,7 +5474,7 @@ const Game = () => {
               ctx.fillStyle = fg; ctx.fillRect(0, headerH, width, 30);
             }
           }
-        } else {
+        } else if (activeTab === 'trails') {
           // === TRAILS TAB ===
           const trailKeys = Object.keys(Trails);
           const cardW = shopSmall ? Math.min(width - 40, Math.round(280 * shopTs)) : Math.min(width - 30, Math.round(340 * shopTs));
@@ -5251,6 +5651,108 @@ const Game = () => {
               ctx.fillStyle = fg; ctx.fillRect(0, headerH, width, 30);
             }
           }
+        } else if (activeTab === 'upgrades') {
+          // --- Upgrades tab ---
+          const um = upgradeRef.current;
+          const upgradeKeys = Object.keys(um.getAllDefs());
+          const ugCardW = Math.min(width - 30, Math.round(340 * shopTs));
+          const ugCardH = Math.round(70 * shopTs);
+          const ugGap = Math.round(10 * shopTs);
+          const ugStartX = width / 2 - ugCardW / 2;
+          const ugGridStartY = headerH;
+          const ugTotalH = upgradeKeys.length * (ugCardH + ugGap);
+          const ugVisibleH = height - headerH - footerH;
+          const ugMaxScroll = Math.max(0, ugTotalH - ugVisibleH + 10);
+          if (shopScrollRef.current > ugMaxScroll) shopScrollRef.current = ugMaxScroll;
+          if (shopScrollRef.current < 0) shopScrollRef.current = 0;
+          const ugScrollY = shopScrollRef.current;
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, headerH, width, ugVisibleH);
+          ctx.clip();
+
+          upgradeKeys.forEach((key, idx) => {
+            const def = um.getDef(key);
+            const lvl = um.getLevel(key);
+            const cost = um.getCost(key);
+            const maxed = um.isMaxed(key);
+            const cy = ugGridStartY + idx * (ugCardH + ugGap) - ugScrollY;
+            if (cy + ugCardH < headerH || cy > height - footerH) {
+              gameStateRef.current['_upg_' + key] = null;
+              return;
+            }
+
+            const canAfford = cost != null && totalCoinsRef.current >= cost;
+            ctx.save();
+            ctx.fillStyle = maxed ? 'rgba(50, 70, 50, 0.8)' : 'rgba(40, 30, 60, 0.8)';
+            ctx.fillRect(ugStartX, cy, ugCardW, ugCardH);
+            ctx.strokeStyle = maxed ? '#55aa55' : canAfford ? '#ba55d3' : '#444466';
+            ctx.lineWidth = canAfford && !maxed ? 2 : 1;
+            ctx.strokeRect(ugStartX, cy, ugCardW, ugCardH);
+            ctx.restore();
+
+            // Icon
+            ctx.save();
+            ctx.font = `${Math.round(22 * shopTs)}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.fillText(def.icon, ugStartX + Math.round(25 * shopTs), cy + ugCardH / 2 + Math.round(8 * shopTs));
+            ctx.restore();
+
+            // Name + desc
+            ctx.save();
+            ctx.font = `bold ${Math.round(13 * shopTs)}px Orbitron, Arial`;
+            ctx.textAlign = 'left';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(def.name, ugStartX + Math.round(48 * shopTs), cy + Math.round(25 * shopTs));
+            ctx.font = `${Math.round(10 * shopTs)}px Orbitron, Arial`;
+            ctx.fillStyle = '#aaaacc';
+            ctx.fillText(def.desc, ugStartX + Math.round(48 * shopTs), cy + Math.round(42 * shopTs));
+            ctx.restore();
+
+            // Level pips
+            ctx.save();
+            const pipX = ugStartX + Math.round(48 * shopTs);
+            const pipY = cy + Math.round(54 * shopTs);
+            const pipR = Math.round(4 * shopTs);
+            for (let p = 0; p < def.maxLevel; p++) {
+              ctx.beginPath();
+              ctx.arc(pipX + p * (pipR * 2 + 4), pipY, pipR, 0, Math.PI * 2);
+              ctx.fillStyle = p < lvl ? '#44ee66' : 'rgba(255,255,255,0.2)';
+              ctx.fill();
+            }
+            ctx.restore();
+
+            // Cost / MAX
+            ctx.save();
+            ctx.font = `bold ${Math.round(13 * shopTs)}px Orbitron, Arial`;
+            ctx.textAlign = 'right';
+            if (maxed) {
+              ctx.fillStyle = '#44ee66';
+              ctx.fillText('MAX', ugStartX + ugCardW - Math.round(12 * shopTs), cy + ugCardH / 2 + Math.round(5 * shopTs));
+            } else {
+              ctx.fillStyle = canAfford ? '#ffd700' : '#ff6666';
+              ctx.fillText(`${cost}`, ugStartX + ugCardW - Math.round(12 * shopTs), cy + ugCardH / 2 + Math.round(5 * shopTs));
+            }
+            ctx.restore();
+
+            gameStateRef.current['_upg_' + key] = { x: ugStartX, y: cy, w: ugCardW, h: ugCardH, key };
+          });
+
+          ctx.restore(); // end scroll clip
+
+          if (ugMaxScroll > 0) {
+            if (ugScrollY < ugMaxScroll - 5) {
+              const fg = ctx.createLinearGradient(0, height - footerH - 30, 0, height - footerH);
+              fg.addColorStop(0, 'rgba(0,0,0,0)'); fg.addColorStop(1, 'rgba(0,0,0,0.7)');
+              ctx.fillStyle = fg; ctx.fillRect(0, height - footerH - 30, width, 30);
+            }
+            if (ugScrollY > 5) {
+              const fg = ctx.createLinearGradient(0, headerH, 0, headerH + 30);
+              fg.addColorStop(0, 'rgba(0,0,0,0.7)'); fg.addColorStop(1, 'rgba(0,0,0,0)');
+              ctx.fillStyle = fg; ctx.fillRect(0, headerH, width, 30);
+            }
+          }
         }
 
         // --- Header (drawn on top) ---
@@ -5285,13 +5787,14 @@ const Game = () => {
         ctx.restore();
 
         // Tab buttons
-        const tabW = Math.round(100 * shopTs);
+        const tabW = Math.round(85 * shopTs);
         const tabH = Math.round(36 * shopTs);
         const tabY = headerH - tabH - Math.round(10 * shopTs);
-        const tabGap = Math.round(12 * shopTs);
+        const tabGap = Math.round(8 * shopTs);
         const tabs = [
           { tab: 'skins', label: t('shop.birds') },
           { tab: 'trails', label: t('shop.trails') },
+          { tab: 'upgrades', label: 'UPGRADES' },
         ];
         const totalTabW = tabs.length * tabW + (tabs.length - 1) * tabGap;
         const tabStartX = width / 2 - totalTabW / 2;
@@ -5642,6 +6145,20 @@ const Game = () => {
           ctx.fillStyle = '#aa88ff';
           ctx.fillRect(width / 2 - xpW / 2, titleY + Math.round((isSmallScreen ? 18 : 22) * menuTs), xpW * xpProg, xpH);
           ctx.restore();
+        }
+
+        // Daily theme name
+        if (themeRef.current) {
+          const dTheme = themeRef.current.getCurrentTheme();
+          if (dTheme.name && dTheme.name !== 'Deep Space') {
+            ctx.save();
+            ctx.font = `${Math.round(9 * menuTs)}px Orbitron, Arial`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = dTheme.edgeGlow || '#888888';
+            ctx.globalAlpha = 0.7;
+            ctx.fillText(`Today: ${dTheme.name}`, width / 2, titleY + Math.round((isSmallScreen ? 30 : 34) * menuTs));
+            ctx.restore();
+          }
         }
 
         // --- Coins + skin name row ---
