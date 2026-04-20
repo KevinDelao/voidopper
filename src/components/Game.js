@@ -226,7 +226,12 @@ const Game = () => {
     if (gameStarted && !isGameOver && !isPaused) {
       hideBanner().then(() => window.dispatchEvent(new Event('resize')));
     } else {
-      showBanner().then(() => window.dispatchEvent(new Event('resize')));
+      showBanner().then(() => {
+        window.dispatchEvent(new Event('resize'));
+        // Native banner may not be fully laid out yet; fire a second resize
+        // after a short delay to account for the ad rendering asynchronously.
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 150);
+      });
     }
   }, [gameStarted, isGameOver, isPaused]);
 
@@ -335,6 +340,8 @@ const Game = () => {
       }
     };
     resizeCanvas();
+    // The ad banner may still be loading on first mount; re-measure once it's ready.
+    setTimeout(resizeCanvas, 200);
     window.addEventListener('resize', resizeCanvas);
     // Mobile browsers fire visualViewport resize when URL bar hides/shows
     if (window.visualViewport) {
@@ -1330,10 +1337,13 @@ const Game = () => {
       }
       const am = audioManagerRef.current;
       if (!am) return;
-      // Remember what was playing so we can restart after reinit
-      am._wasGameMusicPlaying = am.isMusicPlaying;
-      am._wasMenuMusicPlaying = am.isMenuMusicPlaying;
-      am._savedDifficulty = am.currentDifficulty;
+      // Only overwrite flags if music is currently playing — preserve
+      // existing flags from a prior suspend that hasn't recovered yet
+      if (am.isMusicPlaying || am.isMenuMusicPlaying) {
+        am._wasGameMusicPlaying = am.isMusicPlaying;
+        am._wasMenuMusicPlaying = am.isMenuMusicPlaying;
+        am._savedDifficulty = am.currentDifficulty;
+      }
       // Stop music intervals so oscillators don't pile up in background
       if (am.isMusicPlaying) am.stopMusic();
       if (am.isMenuMusicPlaying) am.stopMenuMusic();
@@ -1351,20 +1361,31 @@ const Game = () => {
         await am.forceReinitialize();
         if (am.audioContext && am.audioContext.state === 'running') {
           am._needsResume = false;
+          // Only clear flags AFTER successfully starting music
           if (am._wasGameMusicPlaying) {
-            am.startMusic(am._savedDifficulty || difficultyRef.current);
+            await am.startMusic(am._savedDifficulty || difficultyRef.current);
             am._wasGameMusicPlaying = false;
           } else if (am._wasMenuMusicPlaying) {
-            am.startMenuMusic();
+            await am.startMenuMusic();
             am._wasMenuMusicPlaying = false;
           }
         }
+        // If context isn't running, leave _needsResume true and flags intact
+        // so the touch handler can recover with user gesture
       } catch (e) { /* touch handler will recover */ }
     };
     const handleVisibility = () => {
       if (document.hidden) suspendAudio(); else resumeAudio();
     };
     document.addEventListener('visibilitychange', handleVisibility);
+    // Kill audio instantly on app termination to prevent beep/click artifacts
+    const handlePageHide = () => {
+      const am = audioManagerRef.current;
+      if (am && am.masterGain && am.audioContext && am.audioContext.state !== 'closed') {
+        try { am.masterGain.gain.setValueAtTime(0, am.audioContext.currentTime); } catch (e) {}
+      }
+    };
+    window.addEventListener('pagehide', handlePageHide);
     // Capacitor App plugin fires appStateChange reliably on iOS native
     // Clean up previous listener before adding a new one (effect re-fires on deps change)
     if (appStateListenerRef.current) {
@@ -1390,6 +1411,7 @@ const Game = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pagehide', handlePageHide);
       window.removeEventListener('memorywarning', handleMemoryWarning);
       if (appStateListenerRef.current) { appStateListenerRef.current.remove(); appStateListenerRef.current = null; }
       cancelAnimationFrame(animationFrameId);
@@ -1854,9 +1876,10 @@ const Game = () => {
     const moodSpeed = player.getSpeedMultiplier();
     const boostMult = player.hasSpeedBoost ? 1.5 : 1.0;
 
-    // Apply gravity (scaled by deltaTime for frame-rate independence)
-    // Scale gravity for wider screens so bird rises proportionally faster
-    player.applyGravity(state.gravity * moodSpeed * 60 * (state.speedScale || 1), playerDeltaTime);
+    // Apply gravity only when flying — prevents vy from accumulating while stuck
+    if (!player.isStuck) {
+      player.applyGravity(state.gravity * moodSpeed * 60 * (state.speedScale || 1), playerDeltaTime);
+    }
 
     // Speed boost: amplify player's upward velocity
     if (player.hasSpeedBoost && player.vy < 0) {
@@ -1920,6 +1943,16 @@ const Game = () => {
       }
       if (player.x > rightBoundary - player.radius) {
         player.x = rightBoundary - player.radius;
+      }
+
+      // Clear launchSide once the bird has crossed the corridor midpoint,
+      // so it can re-stick to the same wall if it boomerangs back.
+      if (player.launchSide) {
+        const midX = (leftBoundary + rightBoundary) / 2;
+        if ((player.launchSide === 'left' && player.x > midX) ||
+            (player.launchSide === 'right' && player.x < midX)) {
+          player.launchSide = null;
+        }
       }
 
       // Wall stick checks — skip the wall the bird just launched from to prevent

@@ -1374,6 +1374,10 @@ class AudioManager {
 
   dispose() {
     this._stopWatchdog();
+    // Kill master gain instantly to prevent click/beep on AudioContext close
+    if (this.masterGain) {
+      try { this.masterGain.gain.setValueAtTime(0, this.audioContext.currentTime); } catch (e) {}
+    }
     this.stopMusic();
     this.stopMenuMusic();
     this.stopVoidStormAmbience();
