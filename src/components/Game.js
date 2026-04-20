@@ -2924,7 +2924,7 @@ const Game = () => {
     }
 
     // Near-miss detection — enemy passed close but didn't hit (once per enemy)
-    if (!player.isStuck) {
+    if (!player.isStuck && !state.deathSlowmo) {
       if (!state._nearMissedEnemies) state._nearMissedEnemies = new Set();
       // Use squared distance for quick rejection (35+maxRadius)^2 ~ 2500
       const nearMissMaxSq = 60 * 60;
