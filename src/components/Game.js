@@ -1403,6 +1403,10 @@ const Game = () => {
       }
       const am = audioManagerRef.current;
       if (!am) return;
+      // Zero master gain immediately to prevent any audible artifact
+      if (am.masterGain && am.audioContext && am.audioContext.state !== 'closed') {
+        try { am.masterGain.gain.setValueAtTime(0, am.audioContext.currentTime); } catch (e) {}
+      }
       // Only overwrite flags if music is currently playing — preserve
       // existing flags from a prior suspend that hasn't recovered yet
       if (am.isMusicPlaying || am.isMenuMusicPlaying) {
