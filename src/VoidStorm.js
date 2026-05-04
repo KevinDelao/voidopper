@@ -92,6 +92,9 @@ class VoidStorm {
       }
     }
 
+    // Cap combined speed (surge + catchup) to prevent absurd spikes
+    this.currentSpeed = Math.min(this.currentSpeed, this.baseSpeed * 5);
+
     // Void never slows below base speed — always rising
     this.y -= this.currentSpeed * deltaTime;
 
@@ -125,18 +128,24 @@ class VoidStorm {
 
     ctx.save();
 
-    // Main void gradient — deep purple/crimson energy wall
+    // Main void gradient — deep purple/crimson energy wall (cached, translated per frame)
     const gradHeight = 250;
     const gradTop = screenY - gradHeight;
-    const gradient = ctx.createLinearGradient(0, gradTop, 0, screenY + 100);
-    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    gradient.addColorStop(0.2, 'rgba(40, 0, 30, 0.3)');
-    gradient.addColorStop(0.5, 'rgba(80, 0, 50, 0.6)');
-    gradient.addColorStop(0.75, 'rgba(120, 10, 60, 0.85)');
-    gradient.addColorStop(1, 'rgba(150, 20, 40, 1)');
+    if (!this._cachedDrawGradient) {
+      // Normalized gradient from y=0 to y=350 (gradHeight + 100)
+      this._cachedDrawGradient = ctx.createLinearGradient(0, 0, 0, gradHeight + 100);
+      this._cachedDrawGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      this._cachedDrawGradient.addColorStop(0.2, 'rgba(40, 0, 30, 0.3)');
+      this._cachedDrawGradient.addColorStop(0.5, 'rgba(80, 0, 50, 0.6)');
+      this._cachedDrawGradient.addColorStop(0.75, 'rgba(120, 10, 60, 0.85)');
+      this._cachedDrawGradient.addColorStop(1, 'rgba(150, 20, 40, 1)');
+    }
 
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, gradTop, canvasWidth, gradHeight + 100);
+    ctx.save();
+    ctx.translate(0, gradTop);
+    ctx.fillStyle = this._cachedDrawGradient;
+    ctx.fillRect(0, 0, canvasWidth, gradHeight + 100);
+    ctx.restore();
 
     // Solid void below the gradient line (everything below is consumed)
     ctx.fillStyle = '#1a0008';
@@ -191,12 +200,18 @@ class VoidStorm {
     ctx.save();
 
     // Bottom screen tint — intensifies as void gets closer
+    // Cache warning gradient (only depends on canvasHeight, alpha applied via globalAlpha)
+    if (this._cachedWarnHeight !== canvasHeight) {
+      this._cachedWarnHeight = canvasHeight;
+      this._cachedWarnGradient = ctx.createLinearGradient(0, canvasHeight, 0, canvasHeight * 0.5);
+      this._cachedWarnGradient.addColorStop(0, 'rgba(200, 0, 40, 1)');
+      this._cachedWarnGradient.addColorStop(1, 'rgba(200, 0, 40, 0)');
+    }
     const tintAlpha = proximity * 0.35;
-    const tintGrad = ctx.createLinearGradient(0, canvasHeight, 0, canvasHeight * 0.5);
-    tintGrad.addColorStop(0, `rgba(200, 0, 40, ${tintAlpha})`);
-    tintGrad.addColorStop(1, 'rgba(200, 0, 40, 0)');
-    ctx.fillStyle = tintGrad;
+    ctx.globalAlpha = tintAlpha;
+    ctx.fillStyle = this._cachedWarnGradient;
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    ctx.globalAlpha = 1.0;
 
     // Pulsing border when very close
     if (proximity > 0.5) {

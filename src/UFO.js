@@ -200,6 +200,7 @@ class UFO {
   }
 
   explode(ctx, cameraY) {
+    this.active = false;
     const screenY = this.y - cameraY;
 
     // Create explosion particles

@@ -359,6 +359,12 @@ class CosmicSerpent {
   }
 
   checkCollision(player) {
+    // Broad-phase: skip per-segment checks if player is far from head
+    const maxReach = this.segments.length * this.segmentSpacing + player.radius + this.radius;
+    const bpDx = player.x - this.x;
+    const bpDy = player.y - this.y;
+    if (bpDx * bpDx + bpDy * bpDy > maxReach * maxReach) return false;
+
     const dx = player.x - this.x;
     const dy = player.y - this.y;
     const headDist = Math.sqrt(dx * dx + dy * dy);

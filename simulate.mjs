@@ -594,7 +594,7 @@ function simulate(difficulty, godMode = false) {
       enemy.update(deltaTime);
 
       if (enemy instanceof BlackHole && !player.isStuck) {
-        enemy.applyGravity(player);
+        enemy.applyGravity(player, deltaTime);
       }
 
       // Keep enemies in corridor

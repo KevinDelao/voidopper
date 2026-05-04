@@ -227,7 +227,7 @@ class Terrain {
         }
 
         case 'drift': {
-          const driftAmount = 80 + difficulty * 40;
+          const driftAmount = 60 + difficulty * 20;
           const drift = Math.sin(absSegIndex * 0.05) * driftAmount;
           const wave = Math.sin(absSegIndex * 0.2) * 30;
           targetX = isLeft
@@ -717,7 +717,7 @@ class Terrain {
 
   getSlopeAt(y) {
     for (let i = 0; i < this.hillPoints.length - 1; i++) {
-      if (y >= this.hillPoints[i].y && y <= this.hillPoints[i + 1].y) {
+      if (y <= this.hillPoints[i].y && y >= this.hillPoints[i + 1].y) {
         const p1 = this.hillPoints[i];
         const p2 = this.hillPoints[i + 1];
         const dx = p2.x - p1.x;

@@ -181,6 +181,7 @@ const Game = () => {
     lastComboAction: '',   // label for the last action that built combo
     comboScoreAccum: 0,    // bonus distance score accumulated from high combos
     _nearMissedEnemies: new Set(),
+    _isFirstRun: !getItem('voidHopper_hasPlayed'),
     // Power-ups
     powerUps: [],
     lastPowerUpSpawnY: 0,
@@ -2340,8 +2341,7 @@ const Game = () => {
     }
 
     // First-run softening: no enemies for first 200m on very first game ever
-    const isFirstRun = !getItem('voidHopper_hasPlayed');
-    if (isFirstRun && heightClimbed < 2000) {
+    if (state._isFirstRun && heightClimbed < 2000) {
       spawnInterval *= 3.0; // Much fewer enemies in first 200m of first game
     }
 
@@ -3092,9 +3092,11 @@ const Game = () => {
           }
         }
       }
-      // Clean up references to removed enemies when Set grows
-      if (state._nearMissedEnemies.size > 10) {
-        state._nearMissedEnemies.clear();
+      // Clean up references to dead/removed enemies to prevent memory leaks
+      if (state._nearMissedEnemies.size > 0) {
+        for (const e of state._nearMissedEnemies) {
+          if (!e.active) state._nearMissedEnemies.delete(e);
+        }
       }
     }
 
@@ -3512,7 +3514,8 @@ const Game = () => {
     const state = gameStateRef.current;
     state.pendingRevive = false;
     // Mark that the player has played at least once (for first-run softening)
-    if (!getItem('voidHopper_hasPlayed')) {
+    if (state._isFirstRun) {
+      state._isFirstRun = false;
       setItem('voidHopper_hasPlayed', 'true');
     }
     // Clear in-game overlays so they don't overlap with game over screen

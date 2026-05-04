@@ -471,6 +471,12 @@ class Guardian {
       p.y += p.vy * deltaTime;
       p.life -= deltaTime;
       p.phase = (p.phase || 0) + 0.1;
+      // Offscreen culling: kill projectiles too far from guardian
+      const pdx = p.x - this.x;
+      const pdy = p.y - this.y;
+      if (pdx * pdx + pdy * pdy > 1000000) { // 1000px distance squared
+        p.life = 0;
+      }
     });
     { let w = 0; for (let i = 0; i < this.projectiles.length; i++) { if (this.projectiles[i].life > 0) this.projectiles[w++] = this.projectiles[i]; } this.projectiles.length = w; }
 
@@ -560,6 +566,9 @@ class Guardian {
   }
 
   _executeAttack(playerX, playerY) {
+    // Cap projectiles to prevent unbounded growth during long fights
+    if (this.projectiles.length >= 30) return;
+
     const params = this.config.attackParams;
     const ss = this.screenScale || 1; // screen scale for iPad
 
@@ -623,9 +632,11 @@ class Guardian {
         break;
       }
       case 'minion_spawn': {
+        if (this.minions.length >= 12) break;
         const count = params.count || 3;
         const mSpeed = (params.minionSpeed || 80) * this.difficultyScale;
         for (let i = 0; i < count; i++) {
+          if (this.minions.length >= 12) break;
           const angle = (i / count) * Math.PI * 2;
           this.minions.push({
             x: this.x + Math.cos(angle) * 30,
@@ -660,8 +671,10 @@ class Guardian {
       case 'gravity_pull': {
         this.vortexActive = true;
         this.vortexTimer = 2.5;
-        this.vortexRadius = (params.radius || 350) * ss;
-        this.vortexStrength = (params.strength || 100) * this.difficultyScale;
+        const radius = (params.radius || 150) * ss;
+        const strength = (params.strength || 200) * ss;
+        this.vortexRadius = radius;
+        this.vortexStrength = strength * this.difficultyScale;
         break;
       }
       case 'homing_volley': {
@@ -835,6 +848,7 @@ class Guardian {
           // Minion spawn
           const mCount = params.minionCount || 3;
           for (let i = 0; i < mCount; i++) {
+            if (this.minions.length >= 12) break;
             const angle = (i / mCount) * Math.PI * 2;
             this.minions.push({
               x: this.x + Math.cos(angle) * 40,
@@ -950,15 +964,15 @@ class Guardian {
     }
   }
 
-  applyVortex(player, dt = 0.016) {
+  applyVortex(player, deltaTime = 0.016) {
     if (!this.vortexActive) return;
     const dx = this.x - player.x;
     const dy = this.y - player.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < this.vortexRadius && dist > 0) {
       const force = this.vortexStrength / (dist * 0.5);
-      player.vx += (dx / dist) * force * dt;
-      player.vy += (dy / dist) * force * dt;
+      player.vx += (dx / dist) * force * deltaTime;
+      player.vy += (dy / dist) * force * deltaTime;
     }
   }
 

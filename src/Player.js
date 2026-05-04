@@ -472,9 +472,12 @@ class Player {
       this.trailParticles.push(particle);
     }
 
-    // Cap particle count
+    // Cap particle count (keep newest 60, avoid splice allocation)
     if (this.trailParticles.length > 60) {
-      this.trailParticles.splice(0, this.trailParticles.length - 60);
+      const keep = 60;
+      const start = this.trailParticles.length - keep;
+      for (let i = 0; i < keep; i++) this.trailParticles[i] = this.trailParticles[start + i];
+      this.trailParticles.length = keep;
     }
   }
 
@@ -774,9 +777,12 @@ class Player {
     }
     this.animParticles.length = aw;
 
-    // Cap particles
+    // Cap particles (keep newest 30, avoid splice allocation)
     if (this.animParticles.length > 30) {
-      this.animParticles.splice(0, this.animParticles.length - 30);
+      const keep = 30;
+      const start = this.animParticles.length - keep;
+      for (let i = 0; i < keep; i++) this.animParticles[i] = this.animParticles[start + i];
+      this.animParticles.length = keep;
     }
   }
 
@@ -975,10 +981,10 @@ class Player {
     const birdType = this.getBirdType();
     const allowShadow = gfxLevel !== 'low';
 
-    // Hide trail when dead
+    // Hide trail when dead (clear in-place to avoid allocating new arrays every frame)
     if (this.isDying) {
-      this.trail = [];
-      this.trailParticles = [];
+      if (this.trail.length > 0) this.trail.length = 0;
+      if (this.trailParticles.length > 0) this.trailParticles.length = 0;
     }
 
     // Draw trail — batched into single path

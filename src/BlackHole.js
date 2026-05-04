@@ -73,7 +73,7 @@ class BlackHole {
   }
 
   // Apply gravitational pull to the player — called from Game.js
-  applyGravity(player, dt = 0.016) {
+  applyGravity(player, dt = 1/60) {
     const dx = this.x - player.x;
     const dy = this.y - player.y;
     const distance = Math.sqrt(dx * dx + dy * dy);

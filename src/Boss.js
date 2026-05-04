@@ -191,6 +191,15 @@ class Boss {
       this.vortexTimer -= deltaTime;
       if (this.vortexTimer <= 0) this.vortexActive = false;
     }
+
+    // Time slow countdown
+    if (this.timeSlowActive) {
+      this.timeSlowTimer -= deltaTime;
+      if (this.timeSlowTimer <= 0) {
+        this.timeSlowActive = false;
+        this.timeSlowTimer = 0;
+      }
+    }
   }
 
   _updateMovement(deltaTime, phase, playerX, playerY) {
@@ -253,11 +262,12 @@ class Boss {
 
     switch (phase.attackPattern) {
       case 'projectile_burst': {
+        if (this.projectiles.length >= 30) break;
         const count = params.count || 5;
         const speed = params.speed || 120;
         const spread = params.spread || 1.2;
         const baseAngle = Math.atan2(playerY - this.y, playerX - this.x);
-        for (let i = 0; i < count; i++) {
+        for (let i = 0; i < count && this.projectiles.length < 30; i++) {
           const angle = baseAngle + (i - (count - 1) / 2) * (spread / count);
           this.projectiles.push({
             x: this.x, y: this.y,
@@ -276,9 +286,10 @@ class Boss {
         break;
       }
       case 'minion_spawn': {
+        if (this.minions.length >= 15) break;
         const count = params.count || 3;
         const mSpeed = params.minionSpeed || 80;
-        for (let i = 0; i < count; i++) {
+        for (let i = 0; i < count && this.minions.length < 15; i++) {
           const angle = (i / count) * Math.PI * 2;
           this.minions.push({
             x: this.x + Math.cos(angle) * 30,
@@ -302,9 +313,10 @@ class Boss {
         break;
       }
       case 'homing_orbs': {
+        if (this.projectiles.length >= 30) break;
         const count = params.count || 3;
         const speed = params.speed || 80;
-        for (let i = 0; i < count; i++) {
+        for (let i = 0; i < count && this.projectiles.length < 30; i++) {
           const angle = Math.random() * Math.PI * 2;
           this.projectiles.push({
             x: this.x, y: this.y,
@@ -380,15 +392,15 @@ class Boss {
   }
 
   // Apply vortex gravity pull to the player
-  applyVortex(player) {
+  applyVortex(player, deltaTime = 0.016) {
     if (!this.vortexActive) return;
     const dx = this.x - player.x;
     const dy = this.y - player.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < this.vortexRadius && dist > 0) {
       const force = this.vortexStrength / (dist * 0.5);
-      player.vx += (dx / dist) * force * 0.016;
-      player.vy += (dy / dist) * force * 0.016;
+      player.vx += (dx / dist) * force * deltaTime;
+      player.vy += (dy / dist) * force * deltaTime;
     }
   }
 
@@ -497,21 +509,29 @@ class Boss {
       }
     }
 
-    // Outer glow aura
-    const auraGrad = ctx.createRadialGradient(0, 0, this.radius * 0.5, 0, 0, this.radius * 2);
-    auraGrad.addColorStop(0, this.color.glow + '40');
-    auraGrad.addColorStop(1, this.color.glow + '00');
-    ctx.fillStyle = auraGrad;
+    // Outer glow aura (cached gradient)
+    if (!this._cachedAuraGrad || this._cachedAuraRadius !== this.radius || this._cachedAuraColor !== this.color.glow) {
+      this._cachedAuraGrad = ctx.createRadialGradient(0, 0, this.radius * 0.5, 0, 0, this.radius * 2);
+      this._cachedAuraGrad.addColorStop(0, this.color.glow + '40');
+      this._cachedAuraGrad.addColorStop(1, this.color.glow + '00');
+      this._cachedAuraRadius = this.radius;
+      this._cachedAuraColor = this.color.glow;
+    }
+    ctx.fillStyle = this._cachedAuraGrad;
     ctx.beginPath();
     ctx.arc(0, 0, this.radius * 2, 0, Math.PI * 2);
     ctx.fill();
 
-    // Main body
-    const bodyGrad = ctx.createRadialGradient(-this.radius * 0.2, -this.radius * 0.2, 0, 0, 0, this.radius * pulse);
-    bodyGrad.addColorStop(0, flash ? '#ffffff' : this.color.primary);
-    bodyGrad.addColorStop(0.6, this.color.secondary);
-    bodyGrad.addColorStop(1, this.color.secondary + '88');
-    ctx.fillStyle = bodyGrad;
+    // Main body (cached gradient — recreate when pulse or flash changes significantly)
+    const bodyGradKey = `${flash ? 'f' : 'n'}_${pulse.toFixed(2)}`;
+    if (!this._cachedBodyGrad || this._cachedBodyGradKey !== bodyGradKey) {
+      this._cachedBodyGrad = ctx.createRadialGradient(-this.radius * 0.2, -this.radius * 0.2, 0, 0, 0, this.radius * pulse);
+      this._cachedBodyGrad.addColorStop(0, flash ? '#ffffff' : this.color.primary);
+      this._cachedBodyGrad.addColorStop(0.6, this.color.secondary);
+      this._cachedBodyGrad.addColorStop(1, this.color.secondary + '88');
+      this._cachedBodyGradKey = bodyGradKey;
+    }
+    ctx.fillStyle = this._cachedBodyGrad;
     ctx.shadowBlur = _noShadow ? 0 : 12;
     ctx.shadowColor = this.color.glow;
     ctx.beginPath();
@@ -673,10 +693,8 @@ class Boss {
     ctx.font = 'bold 11px Arial';
     ctx.textAlign = 'center';
     ctx.fillStyle = this.color.glow;
-    ctx.shadowBlur = _noShadow ? 0 : 4;
-    ctx.shadowColor = this.color.glow;
-    ctx.fillText(this.name, this.x, barY - 6);
     ctx.shadowBlur = 0;
+    ctx.fillText(this.name, this.x, barY - 6);
 
     // Background
     ctx.fillStyle = '#1a1a2e';
