@@ -5935,6 +5935,10 @@ const Game = () => {
         const headerH = Math.round(140 * shopTs); // taller to fit tabs
         const activeTab = shopTabRef.current;
 
+        // Full-screen dark backdrop for shop
+        ctx.fillStyle = 'rgba(8, 4, 20, 0.92)';
+        ctx.fillRect(0, 0, width, height);
+
         // --- Tab-dependent content ---
         const shopSmall = width < 380;
         const cols = shopSmall ? 1 : 2;
@@ -5972,24 +5976,22 @@ const Game = () => {
             const isPremium = skin.premium;
 
             ctx.save();
+            const skinCardR = Math.round(12 * shopTs);
             if (isPremium && !isSelected) {
               const shimH = (now / 20 + idx * 40) % 360;
-              ctx.fillStyle = 'rgba(30, 20, 50, 0.9)';
-              ctx.fillRect(cx, cy, cardW, cardH);
+              drawRoundRect(ctx, cx, cy, cardW, cardH, skinCardR);
+              ctx.fillStyle = 'rgba(20, 12, 40, 0.9)';
+              ctx.fill();
               ctx.strokeStyle = `hsl(${shimH}, 70%, 55%)`;
-              ctx.lineWidth = 2;
-              ctx.shadowBlur = 6;
-              ctx.shadowColor = `hsl(${shimH}, 70%, 55%)`;
-              ctx.strokeRect(cx, cy, cardW, cardH);
+              ctx.lineWidth = 1.5;
+              ctx.stroke();
             } else {
-              ctx.fillStyle = isSelected ? 'rgba(147, 112, 219, 0.5)' : 'rgba(40, 30, 60, 0.8)';
-              ctx.fillRect(cx, cy, cardW, cardH);
-              ctx.strokeStyle = isSelected ? '#ba55d3' : isUnlocked ? '#555577' : '#333344';
-              ctx.lineWidth = isSelected ? 3 : 1;
-              if (isSelected) { ctx.shadowBlur = 8; ctx.shadowColor = '#ba55d3'; }
-              ctx.strokeRect(cx, cy, cardW, cardH);
+              drawGlassPanel(ctx, cx, cy, cardW, cardH, {
+                radius: skinCardR,
+                bg: isSelected ? 'rgba(124, 58, 237, 0.35)' : 'rgba(20, 14, 40, 0.8)',
+                border: isSelected ? 'rgba(167, 139, 250, 0.7)' : isUnlocked ? 'rgba(100, 90, 140, 0.3)' : 'rgba(60, 50, 80, 0.2)',
+              });
             }
-            ctx.shadowBlur = 0;
             ctx.restore();
 
             ctx.save();
@@ -6019,9 +6021,7 @@ const Game = () => {
               ctx.font = `bold ${skinNameSize}px Orbitron, Arial`;
             }
             ctx.textAlign = 'left';
-            ctx.shadowBlur = 4;
-            ctx.shadowColor = isSelected ? '#ba55d3' : '#444466';
-            ctx.fillStyle = isPremium ? '#ffdd88' : '#ffffff';
+            ctx.fillStyle = isPremium ? '#ffdd88' : isSelected ? '#e0d4ff' : '#d0d0e0';
             ctx.fillText(skin.name, skinTextX, cy + Math.round(30 * shopTs));
             ctx.restore();
 
@@ -6030,19 +6030,16 @@ const Game = () => {
             let skinStatusSize = Math.round(11 * shopTs);
             let skinStatusText = '';
             if (isSelected) {
-              ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
-              ctx.fillStyle = '#44ff88';
+              ctx.fillStyle = '#44ee88';
               skinStatusText = t('shop.equipped');
             } else if (isUnlocked) {
-              ctx.fillStyle = '#bbbbcc';
+              ctx.fillStyle = '#9999bb';
               skinStatusText = t('shop.equip');
             } else if (totalCoinsRef.current >= skin.cost) {
-              ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
-              ctx.fillStyle = '#44ff88';
+              ctx.fillStyle = '#ffd700';
               skinStatusText = t('shop.cost', { cost: skin.cost });
             } else {
-              ctx.shadowBlur = 4; ctx.shadowColor = '#ff4444';
-              ctx.fillStyle = '#ff6666';
+              ctx.fillStyle = '#776688';
               skinStatusText = t('shop.cost', { cost: skin.cost });
             }
             ctx.font = `bold ${skinStatusSize}px Orbitron, Arial`;
@@ -6109,26 +6106,24 @@ const Game = () => {
             const isEquipped = selectedTrailRef.current === key;
             const isPremium = trail.premium;
 
-            // Card bg
+            // Card bg — rounded glass
             ctx.save();
+            const trailCardR = Math.round(12 * shopTs);
             if (isPremium && !isEquipped) {
               const shimH = (now / 20 + idx * 50) % 360;
-              ctx.fillStyle = 'rgba(30, 20, 50, 0.9)';
-              ctx.fillRect(cx, cy, cardW, cardH);
+              drawRoundRect(ctx, cx, cy, cardW, cardH, trailCardR);
+              ctx.fillStyle = 'rgba(20, 12, 40, 0.9)';
+              ctx.fill();
               ctx.strokeStyle = `hsl(${shimH}, 70%, 55%)`;
-              ctx.lineWidth = 2;
-              ctx.shadowBlur = 6;
-              ctx.shadowColor = `hsl(${shimH}, 70%, 55%)`;
-              ctx.strokeRect(cx, cy, cardW, cardH);
+              ctx.lineWidth = 1.5;
+              ctx.stroke();
             } else {
-              ctx.fillStyle = isEquipped ? 'rgba(147, 112, 219, 0.5)' : 'rgba(40, 30, 60, 0.8)';
-              ctx.fillRect(cx, cy, cardW, cardH);
-              ctx.strokeStyle = isEquipped ? '#ba55d3' : isOwned ? '#555577' : '#333344';
-              ctx.lineWidth = isEquipped ? 3 : 1;
-              if (isEquipped) { ctx.shadowBlur = 8; ctx.shadowColor = '#ba55d3'; }
-              ctx.strokeRect(cx, cy, cardW, cardH);
+              drawGlassPanel(ctx, cx, cy, cardW, cardH, {
+                radius: trailCardR,
+                bg: isEquipped ? 'rgba(124, 58, 237, 0.35)' : 'rgba(20, 14, 40, 0.8)',
+                border: isEquipped ? 'rgba(167, 139, 250, 0.7)' : isOwned ? 'rgba(100, 90, 140, 0.3)' : 'rgba(60, 50, 80, 0.2)',
+              });
             }
-            ctx.shadowBlur = 0;
             ctx.restore();
 
             // Trail preview — color swatches
@@ -6212,22 +6207,19 @@ const Game = () => {
             let trailStatusSize = Math.round(11 * shopTs);
             let trailStatusText = '';
             if (isEquipped) {
-              ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
-              ctx.fillStyle = '#44ff88';
+              ctx.fillStyle = '#44ee88';
               trailStatusText = t('shop.equipped');
             } else if (isOwned) {
-              ctx.fillStyle = '#bbbbcc';
+              ctx.fillStyle = '#9999bb';
               trailStatusText = t('shop.equip');
             } else if (trail.cost === 0) {
-              ctx.fillStyle = '#44ff88';
+              ctx.fillStyle = '#44ee88';
               trailStatusText = t('shop.cost', { cost: 0 });
             } else if (totalCoinsRef.current >= trail.cost) {
-              ctx.shadowBlur = 6; ctx.shadowColor = '#44ff88';
-              ctx.fillStyle = '#44ff88';
+              ctx.fillStyle = '#ffd700';
               trailStatusText = t('shop.cost', { cost: trail.cost });
             } else {
-              ctx.shadowBlur = 4; ctx.shadowColor = '#ff4444';
-              ctx.fillStyle = '#ff6666';
+              ctx.fillStyle = '#776688';
               trailStatusText = t('shop.cost', { cost: trail.cost });
             }
             ctx.font = `bold ${trailStatusSize}px Orbitron, Arial`;
@@ -6290,11 +6282,12 @@ const Game = () => {
 
             const canAfford = cost != null && totalCoinsRef.current >= cost;
             ctx.save();
-            ctx.fillStyle = maxed ? 'rgba(50, 70, 50, 0.8)' : 'rgba(40, 30, 60, 0.8)';
-            ctx.fillRect(ugStartX, cy, ugCardW, ugCardH);
-            ctx.strokeStyle = maxed ? '#55aa55' : canAfford ? '#ba55d3' : '#444466';
-            ctx.lineWidth = canAfford && !maxed ? 2 : 1;
-            ctx.strokeRect(ugStartX, cy, ugCardW, ugCardH);
+            const ugCardR = Math.round(12 * shopTs);
+            drawGlassPanel(ctx, ugStartX, cy, ugCardW, ugCardH, {
+              radius: ugCardR,
+              bg: maxed ? 'rgba(30, 60, 40, 0.7)' : 'rgba(20, 14, 40, 0.8)',
+              border: maxed ? 'rgba(68, 238, 102, 0.4)' : canAfford ? 'rgba(167, 139, 250, 0.5)' : 'rgba(60, 50, 80, 0.2)',
+            });
             ctx.restore();
 
             // Icon
@@ -6315,29 +6308,47 @@ const Game = () => {
             ctx.fillText(def.desc, ugStartX + Math.round(48 * shopTs), cy + Math.round(42 * shopTs));
             ctx.restore();
 
-            // Level pips
+            // Level pips — rounded bar segments
             ctx.save();
             const pipX = ugStartX + Math.round(48 * shopTs);
             const pipY = cy + Math.round(54 * shopTs);
-            const pipR = Math.round(4 * shopTs);
+            const pipW = Math.round(12 * shopTs);
+            const pipH = Math.round(6 * shopTs);
+            const pipGap = Math.round(3 * shopTs);
             for (let p = 0; p < def.maxLevel; p++) {
-              ctx.beginPath();
-              ctx.arc(pipX + p * (pipR * 2 + 4), pipY, pipR, 0, Math.PI * 2);
-              ctx.fillStyle = p < lvl ? '#44ee66' : 'rgba(255,255,255,0.2)';
-              ctx.fill();
+              const px = pipX + p * (pipW + pipGap);
+              drawRoundRect(ctx, px, pipY - pipH / 2, pipW, pipH, pipH / 2);
+              if (p < lvl) {
+                ctx.fillStyle = '#44ee66';
+                ctx.fill();
+              } else {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.lineWidth = 0.5;
+                ctx.stroke();
+              }
             }
             ctx.restore();
 
-            // Cost / MAX
+            // Cost / MAX — styled badge
             ctx.save();
-            ctx.font = `bold ${Math.round(13 * shopTs)}px Orbitron, Arial`;
+            ctx.font = `bold ${Math.round(12 * shopTs)}px Orbitron, Arial`;
             ctx.textAlign = 'right';
+            const costX = ugStartX + ugCardW - Math.round(16 * shopTs);
+            const costY = cy + ugCardH / 2;
             if (maxed) {
               ctx.fillStyle = '#44ee66';
-              ctx.fillText('MAX', ugStartX + ugCardW - Math.round(12 * shopTs), cy + ugCardH / 2 + Math.round(5 * shopTs));
+              ctx.fillText('MAX', costX, costY + Math.round(5 * shopTs));
             } else {
-              ctx.fillStyle = canAfford ? '#ffd700' : '#ff6666';
-              ctx.fillText(`${cost}`, ugStartX + ugCardW - Math.round(12 * shopTs), cy + ugCardH / 2 + Math.round(5 * shopTs));
+              ctx.fillStyle = canAfford ? '#ffd700' : '#666688';
+              const costStr = `${cost}`;
+              ctx.fillText(costStr, costX, costY + Math.round(5 * shopTs));
+              // Coin dot
+              ctx.beginPath();
+              ctx.arc(costX - ctx.measureText(costStr).width - Math.round(8 * shopTs), costY + Math.round(1 * shopTs), Math.round(4 * shopTs), 0, Math.PI * 2);
+              ctx.fillStyle = '#ffd700';
+              ctx.fill();
             }
             ctx.restore();
 
@@ -6360,41 +6371,56 @@ const Game = () => {
           }
         }
 
-        // --- Header (drawn on top) ---
-        ctx.fillStyle = 'rgba(18, 14, 41, 0.95)';
-        ctx.fillRect(0, 0, width, headerH);
+        // --- Header (drawn on top) — glass panel with gradient ---
+        drawGlassPanel(ctx, 0, 0, width, headerH, {
+          radius: 0, bg: 'rgba(10, 6, 24, 0.96)', border: 'rgba(167, 139, 250, 0.15)', highlight: false
+        });
+        // Subtle bottom edge glow
+        ctx.save();
+        const headerEdgeGrad = ctx.createLinearGradient(0, headerH - 2, 0, headerH);
+        headerEdgeGrad.addColorStop(0, 'rgba(147, 112, 219, 0.4)');
+        headerEdgeGrad.addColorStop(1, 'rgba(147, 112, 219, 0)');
+        ctx.fillStyle = headerEdgeGrad;
+        ctx.fillRect(0, headerH - 2, width, 2);
+        ctx.restore();
 
         // Title
         ctx.save();
-        ctx.font = `900 ${Math.round(28 * shopTs)}px Orbitron, Arial`;
+        ctx.font = `900 ${Math.round(26 * shopTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = '#ba55d3';
-        ctx.strokeStyle = '#4a1a6a';
-        ctx.lineWidth = 4;
-        ctx.strokeText('SHOP', width / 2, Math.round(38 * shopTs));
-        const shopGrad = ctx.createLinearGradient(width / 2 - 80, 15, width / 2 + 80, 45);
-        shopGrad.addColorStop(0, '#ee88ff');
-        shopGrad.addColorStop(0.5, '#ffffff');
-        shopGrad.addColorStop(1, '#ee88ff');
+        const shopGrad = ctx.createLinearGradient(width / 2 - 60, 20, width / 2 + 60, 50);
+        shopGrad.addColorStop(0, '#c084fc');
+        shopGrad.addColorStop(0.5, '#f0f0ff');
+        shopGrad.addColorStop(1, '#c084fc');
         ctx.fillStyle = shopGrad;
-        ctx.fillText(t('shop.title'), width / 2, Math.round(38 * shopTs));
+        ctx.fillText(t('shop.title'), width / 2, Math.round(36 * shopTs));
         ctx.restore();
 
-        // Coins
+        // Coins — pill badge
         ctx.save();
-        ctx.font = `bold ${Math.round(16 * shopTs)}px Orbitron, Arial`;
+        const coinLabel = t('shop.coins', { coins: totalCoinsRef.current });
+        ctx.font = `bold ${Math.round(14 * shopTs)}px Orbitron, Arial`;
+        const coinLabelW = ctx.measureText(coinLabel).width;
+        const coinPillW = coinLabelW + Math.round(24 * shopTs);
+        const coinPillH = Math.round(26 * shopTs);
+        const coinPillX = width / 2 - coinPillW / 2;
+        const coinPillY = Math.round(48 * shopTs);
+        drawRoundRect(ctx, coinPillX, coinPillY, coinPillW, coinPillH, coinPillH / 2);
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.12)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
         ctx.textAlign = 'center';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = '#ffaa00';
         ctx.fillStyle = '#ffd700';
-        ctx.fillText(t('shop.coins', { coins: totalCoinsRef.current }), width / 2, Math.round(62 * shopTs));
+        ctx.fillText(coinLabel, width / 2, coinPillY + coinPillH / 2 + Math.round(5 * shopTs));
         ctx.restore();
 
-        // Tab buttons
+        // Tab buttons — rounded pills with active glow
         const tabW = Math.round(85 * shopTs);
-        const tabH = Math.round(36 * shopTs);
-        const tabY = headerH - tabH - Math.round(10 * shopTs);
+        const tabH = Math.round(34 * shopTs);
+        const tabR = tabH / 2;
+        const tabY = headerH - tabH - Math.round(12 * shopTs);
         const tabGap = Math.round(8 * shopTs);
         const tabs = [
           { tab: 'skins', label: t('shop.birds') },
@@ -6409,43 +6435,55 @@ const Game = () => {
           const tx = tabStartX + i * (tabW + tabGap);
           const isActive = activeTab === t.tab;
           ctx.save();
-          ctx.fillStyle = isActive ? 'rgba(147, 112, 219, 0.7)' : 'rgba(40, 30, 60, 0.8)';
-          ctx.fillRect(tx, tabY, tabW, tabH);
-          ctx.strokeStyle = isActive ? '#ba55d3' : '#555577';
-          ctx.lineWidth = isActive ? 2 : 1;
-          ctx.strokeRect(tx, tabY, tabW, tabH);
-          ctx.font = `bold ${Math.round(13 * shopTs)}px Orbitron, Arial`;
+          drawRoundRect(ctx, tx, tabY, tabW, tabH, tabR);
+          if (isActive) {
+            const tabGr = ctx.createLinearGradient(tx, tabY, tx, tabY + tabH);
+            tabGr.addColorStop(0, 'rgba(147, 112, 219, 0.8)');
+            tabGr.addColorStop(1, 'rgba(99, 60, 180, 0.6)');
+            ctx.fillStyle = tabGr;
+          } else {
+            ctx.fillStyle = 'rgba(30, 20, 50, 0.7)';
+          }
+          ctx.fill();
+          ctx.strokeStyle = isActive ? 'rgba(167, 139, 250, 0.7)' : 'rgba(255, 255, 255, 0.08)';
+          ctx.lineWidth = isActive ? 1.5 : 1;
+          ctx.stroke();
+          ctx.font = `bold ${Math.round(12 * shopTs)}px Orbitron, Arial`;
           ctx.textAlign = 'center';
-          ctx.fillStyle = isActive ? '#ffffff' : '#888899';
-          ctx.fillText(t.label, tx + tabW / 2, tabY + tabH / 2 + Math.round(5 * shopTs));
+          ctx.fillStyle = isActive ? '#ffffff' : '#777799';
+          ctx.fillText(t.label, tx + tabW / 2, tabY + tabH / 2 + Math.round(4 * shopTs));
           ctx.restore();
           tabBounds.push({ x: tx, y: tabY, w: tabW, h: tabH, tab: t.tab });
         });
         gameStateRef.current._shopTabBounds = tabBounds;
 
-        // Footer background
-        ctx.fillStyle = 'rgba(18, 14, 41, 0.95)';
-        ctx.fillRect(0, height - footerH, width, footerH);
+        // Footer — glass panel
+        drawGlassPanel(ctx, 0, height - footerH, width, footerH, {
+          radius: 0, bg: 'rgba(10, 6, 24, 0.96)', border: 'rgba(147, 112, 219, 0.1)', highlight: false
+        });
 
-        // Back button
+        // Back button — rounded glass with violet accent
         ctx.save();
-        const backBtnW = Math.round(160 * shopTs);
-        const backBtnH = Math.round(50 * shopTs);
-        const backBtnY = height - shopSafeBot - shopAdPad - Math.round(68 * shopTs);
-        ctx.fillStyle = 'rgba(60, 40, 100, 0.9)';
-        ctx.fillRect(width / 2 - backBtnW / 2, backBtnY, backBtnW, backBtnH);
-        ctx.strokeStyle = '#9966cc';
-        ctx.lineWidth = 2;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = '#9966cc';
-        ctx.strokeRect(width / 2 - backBtnW / 2, backBtnY, backBtnW, backBtnH);
-        ctx.shadowBlur = 0;
-        ctx.font = `bold ${Math.round(18 * shopTs)}px Orbitron, Arial`;
+        const backBtnW = Math.round(150 * shopTs);
+        const backBtnH = Math.round(46 * shopTs);
+        const backBtnR = backBtnH / 2;
+        const backBtnY = height - shopSafeBot - shopAdPad - Math.round(64 * shopTs);
+        const backBtnX = width / 2 - backBtnW / 2;
+        drawRoundRect(ctx, backBtnX, backBtnY, backBtnW, backBtnH, backBtnR);
+        const backGr = ctx.createLinearGradient(backBtnX, backBtnY, backBtnX, backBtnY + backBtnH);
+        backGr.addColorStop(0, 'rgba(124, 58, 237, 0.5)');
+        backGr.addColorStop(1, 'rgba(80, 30, 160, 0.4)');
+        ctx.fillStyle = backGr;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(167, 139, 250, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.font = `bold ${Math.round(16 * shopTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(t('menu.back'), width / 2, backBtnY + Math.round(31 * shopTs));
+        ctx.fillStyle = '#f0f0ff';
+        ctx.fillText(t('menu.back'), width / 2, backBtnY + backBtnH / 2 + Math.round(5 * shopTs));
         ctx.restore();
-        gameStateRef.current._shopBackBtnBounds = { x: width / 2 - backBtnW / 2, y: backBtnY, w: backBtnW, h: backBtnH };
+        gameStateRef.current._shopBackBtnBounds = { x: backBtnX, y: backBtnY, w: backBtnW, h: backBtnH };
 
       } else if (showSettingsRef.current) {
         // === SETTINGS PANEL ===
