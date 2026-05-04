@@ -56,6 +56,43 @@ const GFX = {
   },
 };
 
+// --- UI Helper: draw a rounded rectangle path (cross-platform) ---
+const drawRoundRect = (ctx, x, y, w, h, r) => {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+};
+
+// --- UI Helper: draw a frosted glass panel ---
+const drawGlassPanel = (ctx, x, y, w, h, opts = {}) => {
+  const r = opts.radius || 12;
+  const bg = opts.bg || 'rgba(15, 10, 30, 0.75)';
+  const border = opts.border || 'rgba(255, 255, 255, 0.08)';
+  const highlight = opts.highlight !== false;
+  drawRoundRect(ctx, x, y, w, h, r);
+  ctx.fillStyle = bg;
+  ctx.fill();
+  ctx.strokeStyle = border;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  if (highlight) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y + 0.5);
+    ctx.lineTo(x + w - r, y + 0.5);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+};
+
 const Game = () => {
   const canvasRef = useRef(null);
   const [score, setScore] = useState(0);
@@ -4047,51 +4084,71 @@ const Game = () => {
       ctx.fillStyle = bgBiome ? bgBiome.bg : '#120e29';
       ctx.fillRect(0, 0, width, height);
 
-      // Draw dimmed overlay
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      // Draw dimmed overlay with gradient
+      const pauseDimGrad = ctx.createLinearGradient(0, 0, 0, height);
+      pauseDimGrad.addColorStop(0, 'rgba(10, 5, 25, 0.6)');
+      pauseDimGrad.addColorStop(1, 'rgba(5, 2, 15, 0.75)');
+      ctx.fillStyle = pauseDimGrad;
       ctx.fillRect(0, 0, width, height);
 
-      // Pause text
+      // Pause text with glass backdrop
       const pauseTs = Math.max(1, width / 390);
       const pauseSmall = width < 420;
       const pauseFontSize = pauseSmall ? Math.max(36, Math.floor(width * 0.1)) : Math.round(52 * pauseTs);
+
+      // Glass panel behind PAUSED text and buttons
+      const pausePanelW = Math.min(Math.round(260 * pauseTs), width - 40);
+      const pausePanelH = Math.round(220 * pauseTs);
+      const pausePanelX = width / 2 - pausePanelW / 2;
+      const pausePanelY = height / 2 - Math.round(60 * pauseTs);
+      drawGlassPanel(ctx, pausePanelX, pausePanelY, pausePanelW, pausePanelH, {
+        radius: 20, bg: 'rgba(15, 10, 30, 0.82)', border: 'rgba(124, 58, 237, 0.2)'
+      });
+
       ctx.font = `900 ${pauseFontSize}px Orbitron, Arial`;
       ctx.textAlign = 'center';
-      ctx.strokeStyle = '#1a3366';
-      ctx.lineWidth = 5;
-      ctx.strokeText(t('pause.title'), width / 2, height / 2);
-      const pauseGrad = ctx.createLinearGradient(width / 2 - 100, height / 2 - 25, width / 2 + 100, height / 2 + 10);
-      pauseGrad.addColorStop(0, '#44ccff');
-      pauseGrad.addColorStop(0.5, '#ffffff');
-      pauseGrad.addColorStop(1, '#44ccff');
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(124, 58, 237, 0.4)';
+      ctx.lineWidth = 4;
+      ctx.strokeText(t('pause.title'), width / 2, height / 2 - Math.round(10 * pauseTs));
+      const pauseGrad = ctx.createLinearGradient(width / 2 - 100, height / 2 - 35, width / 2 + 100, height / 2);
+      pauseGrad.addColorStop(0, '#7c3aed');
+      pauseGrad.addColorStop(0.5, '#f0f0ff');
+      pauseGrad.addColorStop(1, '#06b6d4');
       ctx.fillStyle = pauseGrad;
-      ctx.fillText(t('pause.title'), width / 2, height / 2);
+      ctx.fillText(t('pause.title'), width / 2, height / 2 - Math.round(10 * pauseTs));
 
-      // Resume button
-      const pBtnW = Math.min(Math.round(200 * pauseTs), width - 40);
+      // Resume button — pill shape with glow
+      const pBtnW = Math.min(Math.round(200 * pauseTs), width - 60);
       const pBtnH = Math.max(44, Math.round(50 * pauseTs * (height < 600 ? height / 700 : 1)));
+      const pBtnR = pBtnH / 2;
       const resumeBtnX = width / 2 - pBtnW / 2;
-      const resumeBtnY = height / 2 + Math.round(40 * pauseTs);
-      ctx.fillStyle = 'rgba(30, 100, 160, 0.9)';
-      ctx.fillRect(resumeBtnX, resumeBtnY, pBtnW, pBtnH);
-      ctx.strokeStyle = '#4dccff';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(resumeBtnX, resumeBtnY, pBtnW, pBtnH);
-      ctx.fillStyle = '#ffffff';
+      const resumeBtnY = height / 2 + Math.round(30 * pauseTs);
+      drawRoundRect(ctx, resumeBtnX, resumeBtnY, pBtnW, pBtnH, pBtnR);
+      const resumeGrad = ctx.createLinearGradient(resumeBtnX, resumeBtnY, resumeBtnX, resumeBtnY + pBtnH);
+      resumeGrad.addColorStop(0, 'rgba(124, 58, 237, 0.9)');
+      resumeGrad.addColorStop(1, 'rgba(88, 28, 200, 0.9)');
+      ctx.fillStyle = resumeGrad;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(167, 139, 250, 0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = '#f0f0ff';
       ctx.font = `bold ${Math.round(20 * pauseTs)}px Orbitron, Arial, sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText(t('pause.resume'), width / 2, resumeBtnY + pBtnH / 2 + 7);
       state._resumeBtnBounds = { x: resumeBtnX, y: resumeBtnY, w: pBtnW, h: pBtnH };
 
-      // Main Menu button
+      // Main Menu button — pill shape, subtler
       const menuBtnX = width / 2 - pBtnW / 2;
-      const menuBtnY = resumeBtnY + pBtnH + Math.round(12 * pauseTs);
-      ctx.fillStyle = 'rgba(60, 40, 100, 0.9)';
-      ctx.fillRect(menuBtnX, menuBtnY, pBtnW, pBtnH);
-      ctx.strokeStyle = '#9966cc';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(menuBtnX, menuBtnY, pBtnW, pBtnH);
-      ctx.fillStyle = '#ffffff';
+      const menuBtnY = resumeBtnY + pBtnH + Math.round(14 * pauseTs);
+      drawRoundRect(ctx, menuBtnX, menuBtnY, pBtnW, pBtnH, pBtnR);
+      ctx.fillStyle = 'rgba(15, 10, 30, 0.8)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(200, 200, 240, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(200, 200, 240, 0.8)';
       ctx.font = `bold ${Math.round(18 * pauseTs)}px Orbitron, Arial, sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText(t('pause.mainMenu'), width / 2, menuBtnY + pBtnH / 2 + 6);
@@ -4679,24 +4736,37 @@ const Game = () => {
 
     // Only draw gameplay HUD when game is active (not on start menu)
     if (gameStartedRef.current && !isGameOverRef.current) {
-      // Draw difficulty badge (top left)
+      // Draw difficulty badge (top left) — rounded pill
       const diffKey = state.difficulty || 'medium';
       const diffLabelMap = { easy: t('diff.easy'), medium: t('diff.med'), hard: t('diff.hard') };
       const diffLabel = diffLabelMap[diffKey] || diffKey.toUpperCase();
       const diffColor = diffKey === 'easy' ? '#44cc66' : diffKey === 'hard' ? '#ff4444' : '#ffaa22';
       ctx.save();
-      ctx.font = `bold ${Math.round(12 * ts)}px Orbitron, Arial`;
+      ctx.font = `bold ${Math.round(11 * ts)}px Orbitron, Arial`;
       ctx.textAlign = 'left';
+      const diffTextW = ctx.measureText(diffLabel).width;
+      const diffPillW = diffTextW + Math.round(16 * ts);
+      const diffPillH = Math.round(20 * ts);
+      const diffPillX = 10;
+      const diffPillY = Math.round(10 * ts) + safeTop;
+      drawRoundRect(ctx, diffPillX, diffPillY, diffPillW, diffPillH, diffPillH / 2);
+      ctx.fillStyle = 'rgba(15, 10, 30, 0.6)';
+      ctx.fill();
+      ctx.strokeStyle = diffColor;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.7;
+      ctx.stroke();
+      ctx.globalAlpha = 0.85;
       ctx.fillStyle = diffColor;
-      ctx.globalAlpha = 0.6;
-      ctx.fillText(diffLabel, 12, 18 * ts + safeTop);
+      ctx.fillText(diffLabel, diffPillX + Math.round(8 * ts), diffPillY + diffPillH / 2 + Math.round(4 * ts));
       // Player level badge
       if (progressionRef.current && progressionRef.current.getLevel() > 1) {
         const lvl = progressionRef.current.getLevel();
-        const lvlX = 12 + ctx.measureText(diffLabel).width + 10;
+        const lvlX = diffPillX + diffPillW + 8;
         ctx.font = `bold ${Math.round(10 * ts)}px Orbitron, Arial`;
         ctx.fillStyle = '#88ccff';
-        ctx.fillText(`LV${lvl}`, lvlX, 18 * ts + safeTop);
+        ctx.globalAlpha = 0.7;
+        ctx.fillText(`LV${lvl}`, lvlX, diffPillY + diffPillH / 2 + Math.round(4 * ts));
       }
       ctx.restore();
 
@@ -4713,64 +4783,66 @@ const Game = () => {
         ctx.restore();
       }
 
-      // Draw distance score — glowing outline
+      // Draw distance + coin score in a glass pill at top center
       ctx.save();
-      ctx.font = `bold ${Math.round(30 * ts)}px Orbitron, Arial`;
+      ctx.font = `bold ${Math.round(28 * ts)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
-      ctx.shadowBlur = getGfx().shadowBlurMed;
-      ctx.shadowColor = '#4dccff';
-      ctx.strokeStyle = 'rgba(77, 204, 255, 0.4)';
-      ctx.lineWidth = 3;
-      ctx.strokeText(`${state.currentScore}m`, width / 2, 50 * ts + safeTop);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(`${state.currentScore}m`, width / 2, 50 * ts + safeTop);
-      ctx.restore();
-
-      // Draw coin score with canvas-drawn coin icon
-      ctx.save();
-      ctx.fillStyle = '#ffd700';
-      ctx.font = `bold ${Math.round(24 * ts)}px Orbitron, Arial`;
+      const scoreText = `${state.currentScore}m`;
+      const scoreTextW = ctx.measureText(scoreText).width;
+      ctx.font = `bold ${Math.round(16 * ts)}px Orbitron, Arial`;
+      const coinText = `${state.currentCoinScore}`;
+      const coinTextW = ctx.measureText(coinText).width;
+      const hudPillW = Math.max(scoreTextW, coinTextW + Math.round(24 * ts)) + Math.round(40 * ts);
+      const hudPillH = Math.round(62 * ts);
+      const hudPillX = width / 2 - hudPillW / 2;
+      const hudPillY = Math.round(24 * ts) + safeTop;
+      drawGlassPanel(ctx, hudPillX, hudPillY, hudPillW, hudPillH, {
+        radius: hudPillH / 2, bg: 'rgba(15, 10, 30, 0.5)', border: 'rgba(255, 255, 255, 0.06)'
+      });
+      // Distance score
+      ctx.font = `bold ${Math.round(28 * ts)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
+      ctx.fillStyle = '#f0f0ff';
       ctx.shadowBlur = getGfx().shadowBlurSmall;
-      ctx.shadowColor = '#000000';
-      // Draw small coin circle
-      const coinIconX = width / 2 - ctx.measureText(` ${state.currentCoinScore}`).width / 2 - 10 * ts;
+      ctx.shadowColor = 'rgba(6, 182, 212, 0.4)';
+      ctx.fillText(scoreText, width / 2, hudPillY + Math.round(28 * ts));
+      ctx.shadowBlur = 0;
+      // Coin score (smaller, below)
+      ctx.font = `bold ${Math.round(16 * ts)}px Orbitron, Arial`;
+      ctx.fillStyle = '#ffd700';
+      const coinIconX = width / 2 - coinTextW / 2 - Math.round(12 * ts);
       ctx.beginPath();
-      ctx.arc(coinIconX, 74 * ts + safeTop, 8 * ts, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffd700';
+      ctx.arc(coinIconX, hudPillY + Math.round(48 * ts), Math.round(5 * ts), 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = '#cc9900';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.fillStyle = '#cc9900';
-      ctx.font = `bold ${Math.round(10 * ts)}px Orbitron, Arial`;
-      ctx.fillText('$', coinIconX, 78 * ts + safeTop);
-      // Draw score text
       ctx.fillStyle = '#ffd700';
-      ctx.font = `bold ${Math.round(24 * ts)}px Orbitron, Arial`;
-      ctx.fillText(`${state.currentCoinScore}`, width / 2 + 5, 80 * ts + safeTop);
+      ctx.fillText(coinText, width / 2 + Math.round(4 * ts), hudPillY + Math.round(52 * ts));
       ctx.restore();
     }
 
     // Flowing Y tracker for center HUD elements below coin score
     let hudFlowY = 102 * ts + safeTop; // default: just below mood meter bar (92+6+4)
 
-    // Draw mood meter bar
+    // Draw mood meter bar — capsule shape
     const player = state.player;
     if (player && gameStartedRef.current && !isGameOverRef.current) {
       ctx.save();
       const meterW = 80 * ts;
-      const meterH = 6 * ts;
+      const meterH = 8 * ts;
+      const meterR = meterH / 2;
       const meterX = width / 2 - meterW / 2;
       const meterY = 92 * ts + safeTop;
       const moodPct = player.moodDisplay / 100;
       const tier = player.getMoodTier();
 
-      // Background bar
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-      ctx.fillRect(meterX, meterY, meterW, meterH);
+      // Background capsule
+      drawRoundRect(ctx, meterX, meterY, meterW, meterH, meterR);
+      ctx.fillStyle = 'rgba(15, 10, 30, 0.5)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
 
-      // Mood fill — color shifts with mood
+      // Mood fill — color shifts with mood, clipped to capsule
       let moodColor;
       if (tier === 'onfire') {
         const pulse = Math.sin(Date.now() / 80) * 0.15 + 0.85;
@@ -4782,6 +4854,9 @@ const Game = () => {
       } else {
         moodColor = '#88aacc';
       }
+      ctx.save();
+      drawRoundRect(ctx, meterX, meterY, meterW, meterH, meterR);
+      ctx.clip();
       ctx.fillStyle = moodColor;
       ctx.fillRect(meterX, meterY, meterW * moodPct, meterH);
 
@@ -4794,15 +4869,17 @@ const Game = () => {
       }
 
       // Tier markers
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
       [0.2, 0.51, 0.76].forEach(mark => {
         ctx.fillRect(meterX + meterW * mark - 0.5, meterY, 1, meterH);
       });
+      ctx.restore();
 
-      // Border
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      // Capsule border on top
+      drawRoundRect(ctx, meterX, meterY, meterW, meterH, meterR);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
       ctx.lineWidth = 1;
-      ctx.strokeRect(meterX, meterY, meterW, meterH);
+      ctx.stroke();
 
       // Tier label (only when not neutral)
       if (tier !== 'neutral') {
@@ -4822,7 +4899,7 @@ const Game = () => {
           onfire: t('mood.onFireEffect'),
         };
         ctx.font = `${Math.round(8 * ts)}px Orbitron, Arial`;
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.fillStyle = 'rgba(200, 200, 240, 0.6)';
         ctx.fillText(effects[tier], width / 2, meterY + meterH + Math.round(22 * ts));
         hudFlowY = meterY + meterH + Math.round(44 * ts); // below effect hint plus font ascent + padding
       } else {
@@ -4834,7 +4911,8 @@ const Game = () => {
         const flashAlpha = player.moodFlashTimer * 0.5;
         ctx.globalAlpha = flashAlpha;
         ctx.fillStyle = player.moodFlashDir > 0 ? '#ffaa00' : '#4466aa';
-        ctx.fillRect(meterX - 2, meterY - 2, meterW + 4, meterH + 4);
+        drawRoundRect(ctx, meterX - 2, meterY - 2, meterW + 4, meterH + 4, meterR + 2);
+        ctx.fill();
       }
 
       ctx.restore();
@@ -5083,18 +5161,17 @@ const Game = () => {
       ctx.restore();
     }
 
-    // Draw mute toggle button — scaled for iPad (flipped for left-hand mode)
+    // Draw mute toggle button — scaled for iPad (flipped for left-hand mode, glass style)
     ctx.save();
     const btnSize = Math.round(50 * ts);
     const btnX = leftHandRef.current ? Math.round(20 * ts) : width - Math.round(70 * ts);
     const btnY = Math.round(20 * ts) + safeTop;
     const muted = isMutedRef.current;
-    ctx.fillStyle = muted ? 'rgba(100, 100, 100, 0.8)' : 'rgba(147, 112, 219, 0.8)';
-    ctx.beginPath();
-    ctx.roundRect(btnX, btnY, btnSize, btnSize, Math.round(8 * ts));
+    drawRoundRect(ctx, btnX, btnY, btnSize, btnSize, Math.round(10 * ts));
+    ctx.fillStyle = muted ? 'rgba(30, 20, 40, 0.6)' : 'rgba(124, 58, 237, 0.4)';
     ctx.fill();
-    ctx.strokeStyle = muted ? '#666666' : '#bb88ff';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = muted ? 'rgba(255, 255, 255, 0.1)' : 'rgba(167, 139, 250, 0.5)';
+    ctx.lineWidth = 1;
     ctx.stroke();
     state._muteBtnBounds = { x: btnX, y: btnY, w: btnSize, h: btnSize };
 
@@ -5136,16 +5213,17 @@ const Game = () => {
     }
     ctx.restore();
 
-    // Draw pause button (next to mute button, flipped for left-hand mode)
+    // Draw pause button (next to mute button, flipped for left-hand mode) — rounded
     if (gameStartedRef.current && !isGameOverRef.current) {
       ctx.save();
       const pbX = leftHandRef.current ? btnX + btnSize + Math.round(10 * ts) : width - Math.round(130 * ts);
       const pbY = Math.round(20 * ts) + safeTop;
-      ctx.fillStyle = isPausedRef.current ? 'rgba(77, 204, 255, 0.8)' : 'rgba(100, 100, 100, 0.8)';
-      ctx.fillRect(pbX, pbY, btnSize, btnSize);
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(pbX, pbY, btnSize, btnSize);
+      drawRoundRect(ctx, pbX, pbY, btnSize, btnSize, Math.round(10 * ts));
+      ctx.fillStyle = isPausedRef.current ? 'rgba(124, 58, 237, 0.7)' : 'rgba(15, 10, 30, 0.6)';
+      ctx.fill();
+      ctx.strokeStyle = isPausedRef.current ? 'rgba(167, 139, 250, 0.6)' : 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
       state._pauseBtnBounds = { x: pbX, y: pbY, w: btnSize, h: btnSize };
 
       // Draw pause/play icon (scaled)
@@ -5167,58 +5245,78 @@ const Game = () => {
       ctx.restore();
     }
 
-    // Draw pause overlay
+    // Draw pause overlay — glass-morphism style
     if (isPausedRef.current) {
       ctx.save();
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      const pauseDimGrad2 = ctx.createLinearGradient(0, 0, 0, height);
+      pauseDimGrad2.addColorStop(0, 'rgba(10, 5, 25, 0.6)');
+      pauseDimGrad2.addColorStop(1, 'rgba(5, 2, 15, 0.75)');
+      ctx.fillStyle = pauseDimGrad2;
       ctx.fillRect(0, 0, width, height);
 
-      ctx.save();
       const pauseTs2 = Math.max(1, width / 390);
-      const pauseSmall = width < 420;
-      const pauseFontSize = pauseSmall ? Math.max(36, Math.floor(width * 0.1)) : Math.round(52 * pauseTs2);
-      ctx.font = `900 ${pauseFontSize}px Orbitron, Arial`;
+      const pauseSmall2 = width < 420;
+      const pauseFontSize2 = pauseSmall2 ? Math.max(36, Math.floor(width * 0.1)) : Math.round(52 * pauseTs2);
+
+      // Glass panel behind PAUSED text and buttons
+      const pp2W = Math.min(Math.round(260 * pauseTs2), width - 40);
+      const pp2H = Math.round(220 * pauseTs2);
+      const pp2X = width / 2 - pp2W / 2;
+      const pp2Y = height / 2 - Math.round(60 * pauseTs2);
+      drawGlassPanel(ctx, pp2X, pp2Y, pp2W, pp2H, {
+        radius: 20, bg: 'rgba(15, 10, 30, 0.82)', border: 'rgba(124, 58, 237, 0.2)'
+      });
+
+      ctx.save();
+      ctx.font = `900 ${pauseFontSize2}px Orbitron, Arial`;
       ctx.textAlign = 'center';
-      ctx.strokeStyle = '#1a3366';
-      ctx.lineWidth = 5;
-      ctx.strokeText(t('pause.title'), width / 2, height / 2);
-      const pauseGrad = ctx.createLinearGradient(width / 2 - 100, height / 2 - 25, width / 2 + 100, height / 2 + 10);
-      pauseGrad.addColorStop(0, '#44ccff');
-      pauseGrad.addColorStop(0.5, '#ffffff');
-      pauseGrad.addColorStop(1, '#44ccff');
-      ctx.fillStyle = pauseGrad;
-      ctx.fillText(t('pause.title'), width / 2, height / 2);
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(124, 58, 237, 0.4)';
+      ctx.lineWidth = 4;
+      ctx.strokeText(t('pause.title'), width / 2, height / 2 - Math.round(10 * pauseTs2));
+      const pauseGrad2 = ctx.createLinearGradient(width / 2 - 100, height / 2 - 35, width / 2 + 100, height / 2);
+      pauseGrad2.addColorStop(0, '#7c3aed');
+      pauseGrad2.addColorStop(0.5, '#f0f0ff');
+      pauseGrad2.addColorStop(1, '#06b6d4');
+      ctx.fillStyle = pauseGrad2;
+      ctx.fillText(t('pause.title'), width / 2, height / 2 - Math.round(10 * pauseTs2));
       ctx.restore();
 
-      // Resume button
-      const pBtnW = Math.min(Math.round(200 * pauseTs2), width - 40);
-      const pBtnH = Math.max(44, Math.round(50 * pauseTs2 * (height < 600 ? height / 700 : 1)));
-      const resumeBtnX = width / 2 - pBtnW / 2;
-      const resumeBtnY = height / 2 + Math.round(40 * pauseTs2);
-      ctx.fillStyle = 'rgba(30, 100, 160, 0.9)';
-      ctx.fillRect(resumeBtnX, resumeBtnY, pBtnW, pBtnH);
-      ctx.strokeStyle = '#4dccff';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(resumeBtnX, resumeBtnY, pBtnW, pBtnH);
-      ctx.fillStyle = '#ffffff';
+      // Resume button — pill shape with glow
+      const pBtnW2 = Math.min(Math.round(200 * pauseTs2), width - 60);
+      const pBtnH2 = Math.max(44, Math.round(50 * pauseTs2 * (height < 600 ? height / 700 : 1)));
+      const pBtnR2 = pBtnH2 / 2;
+      const resumeBtnX2 = width / 2 - pBtnW2 / 2;
+      const resumeBtnY2 = height / 2 + Math.round(30 * pauseTs2);
+      drawRoundRect(ctx, resumeBtnX2, resumeBtnY2, pBtnW2, pBtnH2, pBtnR2);
+      const resumeGrad2 = ctx.createLinearGradient(resumeBtnX2, resumeBtnY2, resumeBtnX2, resumeBtnY2 + pBtnH2);
+      resumeGrad2.addColorStop(0, 'rgba(124, 58, 237, 0.9)');
+      resumeGrad2.addColorStop(1, 'rgba(88, 28, 200, 0.9)');
+      ctx.fillStyle = resumeGrad2;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(167, 139, 250, 0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = '#f0f0ff';
       ctx.font = `bold ${Math.round(20 * pauseTs2)}px Orbitron, Arial, sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText(t('pause.resume'), width / 2, resumeBtnY + pBtnH / 2 + 7);
-      gameStateRef.current._resumeBtnBounds = { x: resumeBtnX, y: resumeBtnY, w: pBtnW, h: pBtnH };
+      ctx.fillText(t('pause.resume'), width / 2, resumeBtnY2 + pBtnH2 / 2 + 7);
+      gameStateRef.current._resumeBtnBounds = { x: resumeBtnX2, y: resumeBtnY2, w: pBtnW2, h: pBtnH2 };
 
-      // Main Menu button
-      const menuBtnX = width / 2 - pBtnW / 2;
-      const menuBtnY = resumeBtnY + pBtnH + Math.round(12 * pauseTs2);
-      ctx.fillStyle = 'rgba(60, 40, 100, 0.9)';
-      ctx.fillRect(menuBtnX, menuBtnY, pBtnW, pBtnH);
-      ctx.strokeStyle = '#9966cc';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(menuBtnX, menuBtnY, pBtnW, pBtnH);
-      ctx.fillStyle = '#ffffff';
+      // Main Menu button — pill shape, subtler
+      const menuBtnX2 = width / 2 - pBtnW2 / 2;
+      const menuBtnY2 = resumeBtnY2 + pBtnH2 + Math.round(14 * pauseTs2);
+      drawRoundRect(ctx, menuBtnX2, menuBtnY2, pBtnW2, pBtnH2, pBtnR2);
+      ctx.fillStyle = 'rgba(15, 10, 30, 0.8)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(200, 200, 240, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(200, 200, 240, 0.8)';
       ctx.font = `bold ${Math.round(18 * pauseTs2)}px Orbitron, Arial, sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText(t('pause.mainMenu'), width / 2, menuBtnY + pBtnH / 2 + 6);
-      gameStateRef.current._pauseMenuBtnBounds = { x: menuBtnX, y: menuBtnY, w: pBtnW, h: pBtnH };
+      ctx.fillText(t('pause.mainMenu'), width / 2, menuBtnY2 + pBtnH2 / 2 + 6);
+      gameStateRef.current._pauseMenuBtnBounds = { x: menuBtnX2, y: menuBtnY2, w: pBtnW2, h: pBtnH2 };
       ctx.restore();
     }
 
@@ -5385,8 +5483,12 @@ const Game = () => {
     if (isGameOverRef.current) {
       ctx.save();
 
-      // Semi-transparent overlay
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      // Gradient overlay — dark cosmic
+      const goOverlayGrad = ctx.createLinearGradient(0, 0, 0, height);
+      goOverlayGrad.addColorStop(0, 'rgba(15, 5, 30, 0.7)');
+      goOverlayGrad.addColorStop(0.5, 'rgba(10, 3, 20, 0.75)');
+      goOverlayGrad.addColorStop(1, 'rgba(5, 2, 12, 0.85)');
+      ctx.fillStyle = goOverlayGrad;
       ctx.fillRect(0, 0, width, height);
 
       // Responsive layout — scale spacing for short screens
@@ -5428,18 +5530,25 @@ const Game = () => {
       const goOffset = Math.max(60, (availGoH - totalGoH) / 2 + (gameStateRef.current.safeTop || 0));
       let goY = goOffset;
 
-      // Game Over text — red gradient, no shadowBlur for clean iOS rendering
+      // Game Over text — with glass backdrop panel
       ctx.save();
       const goFontSize = goSmall ? Math.max(30, Math.floor(width * 0.085)) : Math.round(52 * goScale);
+      // Backdrop panel behind title
+      const goTitleW = Math.min(width - 40, Math.round(300 * goScale));
+      const goTitleH = Math.round(70 * goScale);
+      drawGlassPanel(ctx, cx - goTitleW / 2, goY - Math.round(45 * goScale), goTitleW, goTitleH, {
+        radius: 16, bg: 'rgba(30, 10, 20, 0.6)', border: 'rgba(255, 68, 102, 0.15)'
+      });
       ctx.font = `900 ${goFontSize}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = '#660022';
-      ctx.lineWidth = 5;
+      ctx.strokeStyle = 'rgba(124, 58, 237, 0.4)';
+      ctx.lineWidth = 4;
       ctx.strokeText(t('gameover.title'), cx, goY);
       const goGrad = ctx.createLinearGradient(cx - 140, goY - 25, cx + 140, goY + 10);
       goGrad.addColorStop(0, '#ff4466');
-      goGrad.addColorStop(0.5, '#ffffff');
+      goGrad.addColorStop(0.4, '#f0f0ff');
+      goGrad.addColorStop(0.6, '#f0f0ff');
       goGrad.addColorStop(1, '#ff4466');
       ctx.fillStyle = goGrad;
       ctx.fillText(t('gameover.title'), cx, goY);
@@ -5458,11 +5567,22 @@ const Game = () => {
         goY += Math.round(28 * goScale);
       }
 
-      // Final score
+      // Final score — inside glass stats panel
+      const goStatsPanelW = Math.min(width - 40, Math.round(280 * goScale));
+      const goStatsPanelX = cx - goStatsPanelW / 2;
+      const goStatsPanelY = goY - Math.round(14 * goScale);
+      // Estimate stats panel height
+      let goStatsPanelH = Math.round(80 * goScale);
+      if (gameStateRef.current.maxCombo >= 2) goStatsPanelH += Math.round(28 * goScale);
+      if (gameStateRef.current.runStats && (gameStateRef.current.runStats.wallBounces > 0 || gameStateRef.current.runStats.nearMisses > 0 || gameStateRef.current.runStats.guardiansDefeated > 0)) goStatsPanelH += Math.round(22 * goScale);
+      drawGlassPanel(ctx, goStatsPanelX, goStatsPanelY, goStatsPanelW, goStatsPanelH, {
+        radius: 14, bg: 'rgba(15, 10, 30, 0.6)', border: 'rgba(255, 255, 255, 0.06)'
+      });
+
       ctx.save();
       ctx.font = `bold ${Math.round(28 * goScale)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#f0f0ff';
       ctx.fillText(t('gameover.distance', { score }), cx, goY);
       ctx.restore();
       goY += Math.round(36 * goScale);
@@ -5476,7 +5596,7 @@ const Game = () => {
 
       // Max combo
       if (gameStateRef.current.maxCombo >= 2) {
-        ctx.fillStyle = '#44ddff';
+        ctx.fillStyle = '#06b6d4';
         ctx.font = `${Math.round(20 * goScale)}px Orbitron, Arial`;
         ctx.fillText(t('gameover.bestCombo', { combo: gameStateRef.current.maxCombo }), cx, goY);
         goY += Math.round(30 * goScale);
@@ -5486,7 +5606,7 @@ const Game = () => {
       const rs = gameStateRef.current.runStats;
       if (rs && (rs.wallBounces > 0 || rs.nearMisses > 0 || rs.guardiansDefeated > 0)) {
         ctx.font = `${Math.round(12 * goScale)}px Orbitron, Arial`;
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.fillStyle = 'rgba(200, 200, 240, 0.6)';
         const statsLine = [
           rs.wallBounces > 0 ? `${rs.wallBounces} bounces` : null,
           rs.nearMisses > 0 ? `${rs.nearMisses} near-misses` : null,
@@ -5536,21 +5656,41 @@ const Game = () => {
       const goBest = highScoresRef.current[goDiff] || 0;
       if (goBest > 0) {
         ctx.font = `${Math.round(20 * goScale)}px Orbitron, Arial`;
-        ctx.fillStyle = '#4dccff';
+        ctx.fillStyle = '#06b6d4';
         const goDiffLabels = { easy: t('diff.easy'), medium: t('diff.med'), hard: t('diff.hard') };
         ctx.fillText(t('gameover.best', { diff: goDiffLabels[goDiff] || goDiff.toUpperCase(), score: goBest }), cx, goY);
       }
 
+      // Thin decorative separator line
+      goY += Math.round(10 * goScale);
+      ctx.save();
+      const sepGrad = ctx.createLinearGradient(cx - 80, 0, cx + 80, 0);
+      sepGrad.addColorStop(0, 'rgba(124, 58, 237, 0)');
+      sepGrad.addColorStop(0.5, 'rgba(124, 58, 237, 0.5)');
+      sepGrad.addColorStop(1, 'rgba(124, 58, 237, 0)');
+      ctx.strokeStyle = sepGrad;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - 80, goY);
+      ctx.lineTo(cx + 80, goY);
+      ctx.stroke();
+      ctx.restore();
+
       // Buttons — flow after stats content
-      goY += goGap;
-      const goBtnW = Math.min(200, width - 40);
-      const goBtnH = Math.round(Math.max(44, 50 * goScale));
-      const goBtnGap = Math.round(12 * goScale);
+      goY += Math.round(30 * goScale);
+      const goBtnW = Math.min(220, width - 40);
+      const goBtnH = Math.round(Math.max(46, 50 * goScale));
+      const goBtnR = goBtnH / 2;
+      const goBtnGap = Math.round(14 * goScale);
       const goRestartY = goY;
       const goMenuY = goRestartY + goBtnH + goBtnGap;
       const goRestartX = cx - goBtnW / 2;
 
-      // Restart button
+      // Determine accent color from difficulty
+      const goDiffAccent = (gameStateRef.current.difficulty === 'easy') ? '#44cc66' :
+        (gameStateRef.current.difficulty === 'hard') ? '#ff4444' : '#ffaa22';
+
+      // Restart button — pill with glow
       const timeSinceGO = gameOverTimeRef.current ? Date.now() - gameOverTimeRef.current : 0;
       const restartReady = timeSinceGO >= 500;
       if (restartReady) {
@@ -5560,68 +5700,77 @@ const Game = () => {
         ctx.translate(cx, goRestartY + goBtnH / 2);
         ctx.scale(btnPulse, btnPulse);
         ctx.translate(-cx, -(goRestartY + goBtnH / 2));
-        ctx.fillStyle = 'rgba(30, 100, 160, 0.9)';
-        ctx.fillRect(goRestartX, goRestartY, goBtnW, goBtnH);
-        ctx.strokeStyle = '#4dccff';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(goRestartX, goRestartY, goBtnW, goBtnH);
-        ctx.fillStyle = '#ffffff';
+        drawRoundRect(ctx, goRestartX, goRestartY, goBtnW, goBtnH, goBtnR);
+        const restartGrad = ctx.createLinearGradient(goRestartX, goRestartY, goRestartX, goRestartY + goBtnH);
+        restartGrad.addColorStop(0, 'rgba(124, 58, 237, 0.9)');
+        restartGrad.addColorStop(1, 'rgba(88, 28, 200, 0.9)');
+        ctx.fillStyle = restartGrad;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(167, 139, 250, 0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.fillStyle = '#f0f0ff';
         ctx.font = `bold ${Math.round(18 * goScale)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillText(t('gameover.restart'), cx, goRestartY + goBtnH / 2 + 7);
         ctx.restore();
       } else {
-        ctx.fillStyle = 'rgba(40, 40, 60, 0.7)';
-        ctx.fillRect(goRestartX, goRestartY, goBtnW, goBtnH);
-        ctx.strokeStyle = 'rgba(77, 204, 255, 0.3)';
+        drawRoundRect(ctx, goRestartX, goRestartY, goBtnW, goBtnH, goBtnR);
+        ctx.fillStyle = 'rgba(15, 10, 30, 0.7)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(124, 58, 237, 0.2)';
         ctx.lineWidth = 1;
-        ctx.strokeRect(goRestartX, goRestartY, goBtnW, goBtnH);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(200, 200, 240, 0.3)';
         ctx.font = `bold ${Math.round(16 * goScale)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillText(t('gameover.restartTimer', { seconds: Math.ceil((500 - timeSinceGO) / 1000) }), cx, goRestartY + goBtnH / 2 + 6);
       }
       gameStateRef.current._restartBtnBounds = { x: goRestartX, y: goRestartY, w: goBtnW, h: goBtnH };
 
-      // Main Menu button
+      // Main Menu button — pill, subtler
       const goMenuX = cx - goBtnW / 2;
-      ctx.fillStyle = 'rgba(60, 40, 100, 0.9)';
-      ctx.fillRect(goMenuX, goMenuY, goBtnW, goBtnH);
-      ctx.strokeStyle = '#9966cc';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(goMenuX, goMenuY, goBtnW, goBtnH);
-      ctx.fillStyle = '#ffffff';
+      drawRoundRect(ctx, goMenuX, goMenuY, goBtnW, goBtnH, goBtnR);
+      ctx.fillStyle = 'rgba(15, 10, 30, 0.75)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(200, 200, 240, 0.12)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(200, 200, 240, 0.8)';
       ctx.font = `bold ${Math.round(16 * goScale)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.globalAlpha = 1;
       ctx.fillText(t('gameover.mainMenu'), cx, goMenuY + goBtnH / 2 + 6);
       gameStateRef.current._goMenuBtnBounds = { x: goMenuX, y: goMenuY, w: goBtnW, h: goBtnH };
 
-      // Share Score button
+      // Share Score button — pill
       const goShareY = goMenuY + goBtnH + goBtnGap;
       const goShareX = cx - goBtnW / 2;
-      ctx.fillStyle = 'rgba(40, 120, 80, 0.9)';
-      ctx.fillRect(goShareX, goShareY, goBtnW, Math.round(goBtnH * 0.8));
-      ctx.strokeStyle = '#44ff88';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(goShareX, goShareY, goBtnW, Math.round(goBtnH * 0.8));
-      ctx.fillStyle = '#ffffff';
+      const goShareH = Math.round(goBtnH * 0.8);
+      drawRoundRect(ctx, goShareX, goShareY, goBtnW, goShareH, goShareH / 2);
+      ctx.fillStyle = 'rgba(15, 10, 30, 0.6)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(68, 255, 136, 0.25)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = '#44ff88';
       ctx.font = `bold ${Math.round(14 * goScale)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
-      ctx.fillText(t('gameover.share'), cx, goShareY + Math.round(goBtnH * 0.4) + 5);
-      gameStateRef.current._shareBtnBounds = { x: goShareX, y: goShareY, w: goBtnW, h: Math.round(goBtnH * 0.8) };
+      ctx.fillText(t('gameover.share'), cx, goShareY + goShareH / 2 + 5);
+      gameStateRef.current._shareBtnBounds = { x: goShareX, y: goShareY, w: goBtnW, h: goShareH };
 
-      // Leaderboard button (Game Center)
+      // Leaderboard button (Game Center) — pill
       if (isGCAuthenticated()) {
-        const goLbY = goShareY + Math.round(goBtnH * 0.8) + goBtnGap;
+        const goLbY = goShareY + goShareH + goBtnGap;
         const goLbX = cx - goBtnW / 2;
         const goLbH = Math.round(goBtnH * 0.8);
-        ctx.fillStyle = 'rgba(40, 80, 140, 0.9)';
-        ctx.fillRect(goLbX, goLbY, goBtnW, goLbH);
-        ctx.strokeStyle = '#4488ff';
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(goLbX, goLbY, goBtnW, goLbH);
-        ctx.fillStyle = '#ffffff';
+        drawRoundRect(ctx, goLbX, goLbY, goBtnW, goLbH, goLbH / 2);
+        ctx.fillStyle = 'rgba(15, 10, 30, 0.6)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(68, 136, 255, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = '#88bbff';
         ctx.font = `bold ${Math.round(14 * goScale)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillText(t('menu.leaderboard'), cx, goLbY + goLbH / 2 + 5);
@@ -5722,7 +5871,10 @@ const Game = () => {
     if (!gameStartedRef.current && !isGameOverRef.current) {
       ctx.save();
 
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      const menuOverlayGrad = ctx.createLinearGradient(0, 0, 0, height);
+      menuOverlayGrad.addColorStop(0, 'rgba(10, 5, 25, 0.65)');
+      menuOverlayGrad.addColorStop(1, 'rgba(5, 2, 15, 0.8)');
+      ctx.fillStyle = menuOverlayGrad;
       ctx.fillRect(0, 0, width, height);
 
       if (showShopRef.current) {
@@ -6580,7 +6732,7 @@ const Game = () => {
         }
         curY += menuPad + Math.round(8 * menuTs);
 
-        // --- Daily login reward popup (flows in curY) ---
+        // --- Daily login reward popup (flows in curY) — glass with gold accent ---
         state._dailyRewardBounds = null;
         if (progressionRef.current && progressionRef.current.pendingDailyReward > 0 && !state._dailyRewardClaimed) {
           const drInfo = progressionRef.current.getDailyRewardInfo();
@@ -6591,16 +6743,15 @@ const Game = () => {
           ctx.translate(width / 2, curY + drH / 2);
           ctx.scale(drPulse, drPulse);
           ctx.translate(-width / 2, -(curY + drH / 2));
-          ctx.fillStyle = 'rgba(255, 170, 0, 0.9)';
-          ctx.fillRect(drX, curY, drW, drH);
-          ctx.strokeStyle = '#ffd700';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(drX, curY, drW, drH);
-          ctx.fillStyle = '#000000';
+          drawGlassPanel(ctx, drX, curY, drW, drH, {
+            radius: 14, bg: 'rgba(60, 40, 0, 0.7)', border: 'rgba(255, 215, 0, 0.4)'
+          });
+          ctx.fillStyle = '#ffd700';
           ctx.font = `bold ${Math.round((isSmallScreen ? 11 : 13) * menuTs)}px Orbitron, Arial`;
           ctx.textAlign = 'center';
           ctx.fillText(t('menu.dailyBonus', { amount: drInfo.pending }), width / 2, curY + drH / 2 - 3);
           ctx.font = `${Math.round((isSmallScreen ? 8 : 9) * menuTs)}px Orbitron, Arial, sans-serif`;
+          ctx.fillStyle = 'rgba(255, 230, 150, 0.8)';
           ctx.fillText(t('menu.dailyClaim', { day: drInfo.day }), width / 2, curY + drH / 2 + 10);
           ctx.restore();
           state._dailyRewardBounds = { x: drX, y: curY, w: drW, h: drH };
@@ -6622,7 +6773,7 @@ const Game = () => {
           }
         }
 
-        // --- Difficulty row (horizontal) ---
+        // --- Difficulty row (horizontal) — pill-shaped buttons ---
         const difficulties = [
           { key: 'easy', label: t('diff.easy'), color: '#44cc66', desc: t('diff.easyDesc') },
           { key: 'medium', label: t('diff.med'), color: '#ffaa22', desc: t('diff.medDesc') },
@@ -6632,6 +6783,7 @@ const Game = () => {
         const diffGap = Math.round(8 * menuTs);
         const diffBtnW = (diffTotalW - diffGap * 2) / 3;
         const diffBtnH = Math.round((isSmallScreen ? 44 : 50) * menuTs);
+        const diffBtnR = diffBtnH / 2;
         const diffStartX = width / 2 - diffTotalW / 2;
 
         difficulties.forEach((d, i) => {
@@ -6640,17 +6792,22 @@ const Game = () => {
           const isSelected = difficultyRef.current === d.key;
           const best = highScoresRef.current[d.key] || 0;
 
-          ctx.fillStyle = isSelected ? d.color : 'rgba(30, 20, 50, 0.9)';
-          ctx.fillRect(bx, by, diffBtnW, diffBtnH);
-          ctx.strokeStyle = d.color;
-          ctx.lineWidth = isSelected ? 2.5 : 1;
-          ctx.strokeRect(bx, by, diffBtnW, diffBtnH);
-
+          drawRoundRect(ctx, bx, by, diffBtnW, diffBtnH, diffBtnR);
           if (isSelected) {
-            ctx.shadowBlur = 8;
+            ctx.fillStyle = d.color;
+            ctx.fill();
+            ctx.shadowBlur = 10;
             ctx.shadowColor = d.color;
-            ctx.strokeRect(bx, by, diffBtnW, diffBtnH);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
             ctx.shadowBlur = 0;
+          } else {
+            ctx.fillStyle = 'rgba(15, 10, 30, 0.7)';
+            ctx.fill();
+            ctx.strokeStyle = d.color;
+            ctx.lineWidth = 1;
+            ctx.stroke();
           }
 
           ctx.fillStyle = isSelected ? '#000000' : d.color;
@@ -6659,7 +6816,7 @@ const Game = () => {
           ctx.fillText(d.label, bx + diffBtnW / 2, by + Math.round((isSmallScreen ? 18 : 20) * menuTs));
 
           ctx.font = `${Math.round((isSmallScreen ? 9 : 10) * menuTs)}px Orbitron, Arial`;
-          ctx.fillStyle = isSelected ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.35)';
+          ctx.fillStyle = isSelected ? 'rgba(0,0,0,0.5)' : 'rgba(200, 200, 240, 0.4)';
           ctx.fillText(best > 0 ? t('diff.best', { score: best }) : d.desc, bx + diffBtnW / 2, by + Math.round((isSmallScreen ? 36 : 40) * menuTs));
 
           d._bounds = { x: bx, y: by, w: diffBtnW, h: diffBtnH };
@@ -6667,9 +6824,10 @@ const Game = () => {
         gameStateRef.current._difficultyButtons = difficulties;
         curY += diffBtnH + menuPad;
 
-        // --- PLAY button ---
+        // --- PLAY button — rounded with gradient fill ---
         const playBtnW = Math.min(width - 30, menuMaxW);
         const playBtnH = Math.round((isSmallScreen ? 48 : 54) * menuTs);
+        const playBtnR = 16;
         const playBtnX = width / 2 - playBtnW / 2;
         const playBtnY = curY;
         const selDiff = difficulties.find(d => d.key === difficultyRef.current) || difficulties[1];
@@ -6679,14 +6837,25 @@ const Game = () => {
         ctx.translate(width / 2, playBtnY + playBtnH / 2);
         ctx.scale(playPulse, playPulse);
         ctx.translate(-width / 2, -(playBtnY + playBtnH / 2));
-        ctx.fillStyle = selDiff.color;
-        ctx.fillRect(playBtnX, playBtnY, playBtnW, playBtnH);
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
+        drawRoundRect(ctx, playBtnX, playBtnY, playBtnW, playBtnH, playBtnR);
+        const playGrad = ctx.createLinearGradient(playBtnX, playBtnY, playBtnX + playBtnW, playBtnY + playBtnH);
+        playGrad.addColorStop(0, selDiff.color);
+        playGrad.addColorStop(1, selDiff.color + 'cc');
+        ctx.fillStyle = playGrad;
+        ctx.fill();
         ctx.shadowBlur = 12;
         ctx.shadowColor = selDiff.color;
-        ctx.strokeRect(playBtnX, playBtnY, playBtnW, playBtnH);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
         ctx.shadowBlur = 0;
+        // Top highlight edge
+        ctx.beginPath();
+        ctx.moveTo(playBtnX + playBtnR, playBtnY + 0.5);
+        ctx.lineTo(playBtnX + playBtnW - playBtnR, playBtnY + 0.5);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
         ctx.fillStyle = '#000000';
         ctx.font = `bold ${Math.round((isSmallScreen ? 20 : 24) * menuTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
@@ -6695,51 +6864,50 @@ const Game = () => {
         gameStateRef.current._playBtnBounds = { x: playBtnX, y: playBtnY, w: playBtnW, h: playBtnH };
         curY += playBtnH + menuPad;
 
-        // --- SHOP + GFX row (side by side) ---
+        // --- SHOP + SETTINGS row (side by side) — glass panels ---
         const rowW = Math.min(width - 30, menuMaxW);
         const rowStartX = width / 2 - rowW / 2;
         const shopBtnW = Math.floor(rowW * 0.48);
         const shopBtnH = Math.round((isSmallScreen ? 40 : 44) * menuTs);
         const rowGap = Math.round(8 * menuTs);
         const gfxBtnW = rowW - shopBtnW - rowGap;
+        const rowBtnR = 12;
 
-        // Shop button
-        ctx.fillStyle = 'rgba(147, 112, 219, 0.8)';
-        ctx.fillRect(rowStartX, curY, shopBtnW, shopBtnH);
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(rowStartX, curY, shopBtnW, shopBtnH);
-        ctx.fillStyle = '#ffffff';
+        // Shop button — glass panel with violet accent
+        drawGlassPanel(ctx, rowStartX, curY, shopBtnW, shopBtnH, {
+          radius: rowBtnR, bg: 'rgba(124, 58, 237, 0.25)', border: 'rgba(167, 139, 250, 0.3)'
+        });
+        ctx.fillStyle = '#f0f0ff';
         ctx.font = `bold ${Math.round((isSmallScreen ? 16 : 18) * menuTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillText(t('menu.shop'), rowStartX + shopBtnW / 2, curY + shopBtnH / 2 + Math.round(6 * menuTs));
         gameStateRef.current._shopBtnBounds = { x: rowStartX, y: curY, w: shopBtnW, h: shopBtnH };
 
-        // Settings button
+        // Settings button — glass panel with cyan accent
         const settingsBtnX = rowStartX + shopBtnW + rowGap;
-        ctx.fillStyle = 'rgba(30, 20, 50, 0.9)';
-        ctx.fillRect(settingsBtnX, curY, gfxBtnW, shopBtnH);
-        ctx.strokeStyle = '#88aacc';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(settingsBtnX, curY, gfxBtnW, shopBtnH);
+        drawGlassPanel(ctx, settingsBtnX, curY, gfxBtnW, shopBtnH, {
+          radius: rowBtnR, bg: 'rgba(15, 10, 30, 0.75)', border: 'rgba(6, 182, 212, 0.2)'
+        });
         ctx.font = `bold ${Math.round((isSmallScreen ? 14 : 16) * menuTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = 'rgba(200, 200, 240, 0.8)';
         ctx.fillText(t('menu.settings'), settingsBtnX + gfxBtnW / 2, curY + shopBtnH / 2 + Math.round(5 * menuTs));
         gameStateRef.current._settingsBtnBounds = { x: settingsBtnX, y: curY, w: gfxBtnW, h: shopBtnH };
         curY += shopBtnH + menuPad;
 
-        // --- Leaderboard button (Game Center) ---
+        // --- Leaderboard button (Game Center) — rounded pill ---
         if (isGCAuthenticated()) {
           const lbBtnW = Math.min(width - 30, menuMaxW);
           const lbBtnH = Math.round((isSmallScreen ? 36 : 40) * menuTs);
+          const lbBtnR = lbBtnH / 2;
           const lbBtnX = width / 2 - lbBtnW / 2;
-          ctx.fillStyle = 'rgba(40, 80, 140, 0.85)';
-          ctx.fillRect(lbBtnX, curY, lbBtnW, lbBtnH);
-          ctx.strokeStyle = '#4488ff';
-          ctx.lineWidth = 1.5;
-          ctx.strokeRect(lbBtnX, curY, lbBtnW, lbBtnH);
-          ctx.fillStyle = '#ffffff';
+          drawRoundRect(ctx, lbBtnX, curY, lbBtnW, lbBtnH, lbBtnR);
+          ctx.fillStyle = 'rgba(15, 10, 30, 0.6)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(68, 136, 255, 0.3)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.fillStyle = '#88bbff';
           ctx.font = `bold ${Math.round((isSmallScreen ? 14 : 16) * menuTs)}px Orbitron, Arial`;
           ctx.textAlign = 'center';
           ctx.fillText(t('menu.leaderboard'), width / 2, curY + lbBtnH / 2 + Math.round(5 * menuTs));
