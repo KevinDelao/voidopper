@@ -2119,11 +2119,14 @@ const Game = () => {
         }
       }
 
-      // Wall stick checks — skip the wall the bird just launched from to prevent
-      // getting stuck under hills. Only stick to the opposite wall.
-      if (player.x <= leftBoundary + player.radius + 1 && player.launchSide !== 'left') {
+      // Wall stick checks — skip during rocket burst (bird flies straight through)
+      // Also skip the wall the bird just launched from to prevent getting stuck under hills.
+      if (state.rocketBurstActive) {
+        // During burst, just clamp to corridor but don't stick
+        player.x = Math.max(leftBoundary + player.radius, Math.min(rightBoundary - player.radius, player.x));
+      } else if (player.x <= leftBoundary + player.radius + 1 && player.launchSide !== 'left') {
         // Determine bounce quality based on perfect bounce window
-        const bounceQuality = player.perfectBounceWindow > 0 ? 'perfect' : (player.perfectBounceWindow > -0.3 ? 'good' : 'normal');
+        const bounceQuality = player.perfectBounceWindow > 0 ? 'perfect' : (player.perfectBounceWindow > -0.15 ? 'good' : 'normal');
         player.stickToWall('left', leftBoundary + player.radius, player.y);
         player.addStreakBounce(bounceQuality);
 
@@ -2161,7 +2164,7 @@ const Game = () => {
         }
 
         // Check for rocket burst trigger (8+ streak)
-        if (player.momentumStreak >= 8 && !player.rocketBurst && !state.rocketBurstActive) {
+        if (player.momentumStreak >= 8 && !player.rocketBurst && !state.rocketBurstActive && player.rocketBurstCooldown <= 0) {
           triggerRocketBurst(state, player);
         }
 
@@ -2173,7 +2176,7 @@ const Game = () => {
           audioManagerRef.current.playBounceSound();
         }
       } else if (player.x >= rightBoundary - player.radius - 1 && player.launchSide !== 'right') {
-        const bounceQuality = player.perfectBounceWindow > 0 ? 'perfect' : (player.perfectBounceWindow > -0.3 ? 'good' : 'normal');
+        const bounceQuality = player.perfectBounceWindow > 0 ? 'perfect' : (player.perfectBounceWindow > -0.15 ? 'good' : 'normal');
         player.stickToWall('right', rightBoundary - player.radius, player.y);
         player.addStreakBounce(bounceQuality);
 
@@ -2207,7 +2210,7 @@ const Game = () => {
           });
         }
 
-        if (player.momentumStreak >= 8 && !player.rocketBurst && !state.rocketBurstActive) {
+        if (player.momentumStreak >= 8 && !player.rocketBurst && !state.rocketBurstActive && player.rocketBurstCooldown <= 0) {
           triggerRocketBurst(state, player);
         }
 

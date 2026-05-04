@@ -93,6 +93,7 @@ class Player {
     this.rocketBurst = false;
     this.rocketBurstTimer = 0;
     this.rocketBurstDuration = 2.0;
+    this.rocketBurstCooldown = 0;
 
     // === GRAZE SYSTEM (enhanced near-miss) ===
     this.grazeTimer = 0;            // Brief slow-mo on graze
@@ -241,11 +242,13 @@ class Player {
   triggerRocketBurst() {
     this.rocketBurst = true;
     this.rocketBurstTimer = this.rocketBurstDuration;
+    this.rocketBurstCooldown = 12.0;
     this.invincibleTimer = this.rocketBurstDuration;
     this.addMood(20);
   }
 
   updateRocketBurst(deltaTime) {
+    if (this.rocketBurstCooldown > 0) this.rocketBurstCooldown -= deltaTime;
     if (this.rocketBurst) {
       this.rocketBurstTimer -= deltaTime;
       if (this.rocketBurstTimer <= 0) {
@@ -844,8 +847,8 @@ class Player {
       this.launchY = this.y;
       // Set stretch based on charge (visual spring release)
       this.stretch = 1.0 + this.chargeLevel * 0.5;
-      // Open perfect bounce window — player has a window to hit opposite wall for "perfect"
-      this.perfectBounceWindow = 0.8 + this.chargeLevel * 0.4;
+      // Open perfect bounce window — tighter window rewards quick crossings
+      this.perfectBounceWindow = 0.35 + this.chargeLevel * 0.15;
     }
   }
 
