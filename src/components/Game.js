@@ -468,23 +468,40 @@ const Game = () => {
 
     // Compute safe area insets for notched phones and gesture bars (cached)
     if (!Game._cachedInsets) {
-      const el = document.createElement('div');
-      el.style.position = 'fixed';
-      el.style.top = 'env(safe-area-inset-top, 0px)';
-      el.style.bottom = 'env(safe-area-inset-bottom, 0px)';
-      el.style.left = '0';
-      el.style.right = '0';
-      el.style.pointerEvents = 'none';
-      el.style.visibility = 'hidden';
-      document.body.appendChild(el);
-      const top = el.offsetTop || 0;
-      const totalH = window.innerHeight;
-      const bottom = totalH - el.offsetTop - el.offsetHeight;
-      document.body.removeChild(el);
+      let top = 0, bottom = 0;
+      // Method 1: CSS custom property (most reliable with viewport-fit=cover)
+      const rootStyles = getComputedStyle(document.documentElement);
+      const satStr = rootStyles.getPropertyValue('--sat').trim();
+      const sabStr = rootStyles.getPropertyValue('--sab').trim();
+      if (satStr) top = parseInt(satStr, 10) || 0;
+      if (sabStr) bottom = parseInt(sabStr, 10) || 0;
+      // Method 2: DOM measurement fallback
+      if (top === 0 && isMobile) {
+        const el = document.createElement('div');
+        el.style.cssText = 'position:fixed;top:env(safe-area-inset-top,0px);bottom:env(safe-area-inset-bottom,0px);left:0;right:0;pointer-events:none;visibility:hidden';
+        document.body.appendChild(el);
+        top = el.offsetTop || 0;
+        bottom = Math.max(0, window.innerHeight - el.offsetTop - el.offsetHeight);
+        document.body.removeChild(el);
+      }
+      // Method 3: Device heuristic fallback for known iPhone sizes
+      if (top === 0 && isMobile && /iPhone/i.test(navigator.userAgent)) {
+        const h = window.screen.height;
+        const w = window.screen.width;
+        const screenH = Math.max(h, w);
+        if (screenH >= 932) { top = 59; bottom = 34; }       // iPhone 15 Pro Max / 16 Pro Max (Dynamic Island)
+        else if (screenH >= 896) { top = 59; bottom = 34; }  // iPhone 14 Pro / 15 / 16 (Dynamic Island)
+        else if (screenH >= 844) { top = 47; bottom = 34; }  // iPhone 12/13/14
+        else if (screenH >= 812) { top = 44; bottom = 34; }  // iPhone X/XS/11 Pro
+        // Non-notched iPhones (SE, 8): top stays 0
+      }
       Game._cachedInsets = { top: Math.max(0, top), bottom: Math.max(0, bottom) };
     }
     const insets = Game._cachedInsets;
-    gameStateRef.current.safeTop = insets.top;
+    // On Capacitor native builds, guarantee minimum safe area even if detection fails
+    const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+    const minTop = isNative ? 20 : 0;
+    gameStateRef.current.safeTop = Math.max(insets.top, minTop);
     gameStateRef.current.safeBottom = Math.max(insets.bottom, getBannerHeight());
 
     // Game loop
@@ -4734,8 +4751,8 @@ const Game = () => {
     const state = gameStateRef.current;
     // Scale text for wider screens (iPad) so HUD remains readable
     const ts = Math.min(2, Math.max(1, width / 390));
-    // Safe area offset for notched phones (iPhone X+)
-    const safeTop = isMobile ? (state.safeTop || 0) : 0;
+    // Safe area offset — always apply (notch, Dynamic Island, status bar)
+    const safeTop = state.safeTop || 0;
 
     // Only draw gameplay HUD when game is active (not on start menu)
     if (gameStartedRef.current && !isGameOverRef.current) {
@@ -4782,7 +4799,7 @@ const Game = () => {
         ctx.textAlign = 'right';
         const zoneBiome = state.leftTerrain ? state.leftTerrain.getBiomeAt(state.cameraY + height * 0.5) : null;
         ctx.fillStyle = zoneBiome ? (zoneBiome.accent || '#aaaaff') : '#aaaaff';
-        ctx.fillText(state.zoneAnnounceName, width - 12, 18 * ts + safeTop);
+        ctx.fillText(state.zoneAnnounceName, width - Math.round(75 * ts), diffPillY + Math.round(10 * ts));
         ctx.restore();
       }
 
@@ -6404,7 +6421,7 @@ const Game = () => {
       } else if (showSettingsRef.current) {
         // === SETTINGS PANEL ===
         const sTs = Math.min(1.8, Math.max(1, width / 390));
-        const sSafeTop = isMobile ? (gameStateRef.current.safeTop || 0) : 0;
+        const sSafeTop = gameStateRef.current.safeTop || 0;
         const sSafeBot = gameStateRef.current.safeBottom || 0;
         const sAdPad = getBannerHeight();
         const sFooterH = Math.round(80 * sTs) + sSafeBot + sAdPad;
