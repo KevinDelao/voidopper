@@ -70,6 +70,34 @@ class Player {
 
     // Danger pulse — spikes when near enemies, used for visual feedback
     this.dangerPulse = 0; // 0-1, decays quickly
+
+    // === MOMENTUM STREAK SYSTEM ===
+    this.momentumStreak = 0;        // Consecutive perfect/good bounces
+    this.maxMomentumStreak = 0;
+    this.momentumMultiplier = 1.0;  // Scales launch power with streak
+    this.streakFlash = 0;           // Visual flash on streak increment
+
+    // === PERFECT BOUNCE SYSTEM ===
+    this.lastBounceQuality = 'normal'; // 'perfect', 'good', 'normal'
+    this.perfectBounceWindow = 0;      // Countdown timer for perfect window
+    this.perfectBounceFlash = 0;       // Visual indicator
+
+    // === CHARGE SYSTEM (wall stick compression) ===
+    this.chargeTime = 0;            // How long stuck to wall (builds power)
+    this.maxChargeTime = 1.2;       // Full charge at 1.2s
+    this.chargeLevel = 0;           // 0-1 normalized charge
+    this.squash = 1.0;              // Squash factor for visuals (< 1 = compressed)
+    this.stretch = 1.0;             // Stretch factor for flight (> 1 = elongated)
+
+    // === ROCKET BURST (fever burst from momentum) ===
+    this.rocketBurst = false;
+    this.rocketBurstTimer = 0;
+    this.rocketBurstDuration = 2.0;
+
+    // === GRAZE SYSTEM (enhanced near-miss) ===
+    this.grazeTimer = 0;            // Brief slow-mo on graze
+    this.grazeFlash = 0;
+    this.totalGrazes = 0;
   }
 
   // Mood tier: 'chill', 'neutral', 'firedup', 'onfire'
@@ -158,6 +186,88 @@ class Player {
     this.addMood(8);
   }
 
+  // === MOMENTUM STREAK ===
+  addStreakBounce(quality) {
+    this.lastBounceQuality = quality;
+    if (quality === 'perfect') {
+      this.momentumStreak += 2;
+      this.streakFlash = 0.4;
+      this.addMood(6);
+    } else if (quality === 'good') {
+      this.momentumStreak += 1;
+      this.streakFlash = 0.2;
+      this.addMood(3);
+    } else {
+      this.momentumStreak = Math.max(0, this.momentumStreak - 1);
+    }
+    if (this.momentumStreak > this.maxMomentumStreak) {
+      this.maxMomentumStreak = this.momentumStreak;
+    }
+    this.momentumMultiplier = 1.0 + Math.min(this.momentumStreak * 0.04, 0.6);
+  }
+
+  breakStreak() {
+    this.momentumStreak = 0;
+    this.momentumMultiplier = 1.0;
+  }
+
+  getMomentumTier() {
+    if (this.momentumStreak >= 12) return 'blazing';
+    if (this.momentumStreak >= 8) return 'hot';
+    if (this.momentumStreak >= 4) return 'warm';
+    return 'cold';
+  }
+
+  // === CHARGE SYSTEM ===
+  updateCharge(deltaTime) {
+    if (this.isStuck) {
+      this.chargeTime = Math.min(this.chargeTime + deltaTime, this.maxChargeTime);
+      this.chargeLevel = this.chargeTime / this.maxChargeTime;
+      this.squash = 1.0 - this.chargeLevel * 0.3;
+    } else {
+      this.chargeTime = 0;
+      this.chargeLevel = 0;
+      this.squash = 1.0;
+      const targetStretch = 1.0;
+      this.stretch += (targetStretch - this.stretch) * deltaTime * 5;
+    }
+  }
+
+  getChargePowerMultiplier() {
+    return 1.0 + this.chargeLevel * 0.35;
+  }
+
+  // === ROCKET BURST ===
+  triggerRocketBurst() {
+    this.rocketBurst = true;
+    this.rocketBurstTimer = this.rocketBurstDuration;
+    this.invincibleTimer = this.rocketBurstDuration;
+    this.addMood(20);
+  }
+
+  updateRocketBurst(deltaTime) {
+    if (this.rocketBurst) {
+      this.rocketBurstTimer -= deltaTime;
+      if (this.rocketBurstTimer <= 0) {
+        this.rocketBurst = false;
+        this.rocketBurstTimer = 0;
+      }
+    }
+  }
+
+  // === GRAZE ===
+  registerGraze() {
+    this.grazeTimer = 0.15;
+    this.grazeFlash = 0.3;
+    this.totalGrazes++;
+    this.addMood(5);
+  }
+
+  updateGraze(deltaTime) {
+    if (this.grazeTimer > 0) this.grazeTimer -= deltaTime;
+    if (this.grazeFlash > 0) this.grazeFlash -= deltaTime;
+  }
+
   applyGravity(gravity, deltaTime) {
     this.vy += gravity * deltaTime;
   }
@@ -177,6 +287,19 @@ class Player {
 
     // Tick down invincibility frames
     if (this.invincibleTimer > 0) this.invincibleTimer -= deltaTime;
+
+    // Update excitement systems
+    this.updateCharge(deltaTime);
+    this.updateRocketBurst(deltaTime);
+    this.updateGraze(deltaTime);
+    if (this.streakFlash > 0) this.streakFlash -= deltaTime;
+    if (this.perfectBounceFlash > 0) this.perfectBounceFlash -= deltaTime;
+    if (this.perfectBounceWindow > 0) this.perfectBounceWindow -= deltaTime;
+
+    // Stretch decays back to 1.0 during flight
+    if (!this.isStuck && this.stretch > 1.0) {
+      this.stretch = Math.max(1.0, this.stretch - deltaTime * 3);
+    }
 
     // Velocity cap — prevent clipping through walls at extreme speed
     const maxSpeed = 1800 * (this.screenScale || 1);
@@ -710,14 +833,19 @@ class Player {
 
   launch() {
     if (this.isStuck && this.isAiming) {
-      // Launch in the aimed direction, modified by emotion and skin ability
-      const power = this.aimPower * this.getLaunchPowerMultiplier() * (this.skinLaunchMult || 1);
+      // Launch in the aimed direction, modified by emotion, skin, charge, and momentum
+      const chargeMult = this.getChargePowerMultiplier();
+      const power = this.aimPower * this.getLaunchPowerMultiplier() * (this.skinLaunchMult || 1) * chargeMult * this.momentumMultiplier;
       this.vx = Math.cos(this.aimAngle) * power;
       this.vy = Math.sin(this.aimAngle) * power;
       this.isStuck = false;
       this.isAiming = false;
-      this.launchSide = this.currentSide; // Remember which wall we launched from
-      this.launchY = this.y; // Store Y position at launch
+      this.launchSide = this.currentSide;
+      this.launchY = this.y;
+      // Set stretch based on charge (visual spring release)
+      this.stretch = 1.0 + this.chargeLevel * 0.5;
+      // Open perfect bounce window — player has a window to hit opposite wall for "perfect"
+      this.perfectBounceWindow = 0.8 + this.chargeLevel * 0.4;
     }
   }
 
@@ -729,7 +857,10 @@ class Player {
     this.vx = 0;
     this.vy = 0;
     this.isAiming = false;
-    this.launchSide = null; // Clear launch side when sticking to a new wall
+    this.launchSide = null;
+    // Reset charge for new wall stick
+    this.chargeTime = 0;
+    this.chargeLevel = 0;
   }
 
   drawTrajectory(ctx, cameraY, gravity) {

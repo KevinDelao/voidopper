@@ -234,6 +234,18 @@ const Game = () => {
     feverActive: false,
     feverTimer: 0,
     feverCooldown: 0,
+    // === EXCITEMENT SYSTEMS ===
+    // Speed lines (rendered during high momentum)
+    speedLines: [],
+    // Rocket burst state
+    rocketBurstActive: false,
+    rocketBurstTimer: 0,
+    rocketBurstHeight: 0,
+    // Hitstop (freeze frames on impact)
+    hitstopTimer: 0,
+    // Void surge warning overlay
+    voidSurgeWarning: false,
+    voidSurgeActive: false,
   });
 
   // Keep refs in sync with state for use inside closures
@@ -465,7 +477,14 @@ const Game = () => {
           handleGameOver();
         }
       } else if (gameStateRef.current.isRunning && !isGameOver && gameStarted && !isPausedRef.current) {
-        update(deltaTime, getW(), getH());
+        // Hitstop: skip game update during freeze frames (still render)
+        if (gameStateRef.current.hitstopTimer > 0) {
+          gameStateRef.current.hitstopTimer -= deltaTime;
+        } else {
+          // Graze time dilation: brief slow-mo on near-miss
+          const grazeSlowFactor = (gameStateRef.current.player && gameStateRef.current.player.grazeTimer > 0) ? 0.4 : 1.0;
+          update(deltaTime * grazeSlowFactor, getW(), getH());
+        }
       } else if (isGameOver || gameStateRef.current.pendingRevive) {
         // Update particles even when game is over or revive pending
         const state = gameStateRef.current;
@@ -1743,6 +1762,13 @@ const Game = () => {
     state.lastComboAction = '';
     state.comboScoreAccum = 0;
     state._nearMissedEnemies = new Set();
+    // Reset excitement systems
+    state.speedLines = [];
+    state.rocketBurstActive = false;
+    state.rocketBurstTimer = 0;
+    state.hitstopTimer = 0;
+    state.voidSurgeWarning = false;
+    state.voidSurgeActive = false;
     state.activePowerUpDisplay = [];
     state.difficulty = difficultyRef.current;
     const voidStorm = new VoidStorm(startY, width);
@@ -1893,6 +1919,26 @@ const Game = () => {
     if (newTier && newTier !== oldTier && audioManagerRef.current && audioManagerRef.current.playComboTierUpSound) {
       const tierLevel = state.combo >= 15 ? 4 : state.combo >= 10 ? 3 : state.combo >= 5 ? 2 : 1;
       audioManagerRef.current.playComboTierUpSound(tierLevel);
+    }
+  };
+
+  // Trigger rocket burst — bird blasts upward through hazards
+  const triggerRocketBurst = (state, player) => {
+    player.triggerRocketBurst();
+    state.rocketBurstActive = true;
+    state.rocketBurstTimer = player.rocketBurstDuration;
+    state.rocketBurstHeight = 0;
+    state.shakeIntensity = 10;
+    heavyTap();
+    state.floatingTexts.push({
+      x: player.x, y: player.y,
+      label: 'ROCKET BURST!',
+      desc: 'Invincible!',
+      color: '#ff8800',
+      life: 1.5, maxLife: 1.5, vy: -100,
+    });
+    if (audioManagerRef.current && audioManagerRef.current.playComboTierUpSound) {
+      audioManagerRef.current.playComboTierUpSound(4);
     }
   };
 
@@ -2076,12 +2122,49 @@ const Game = () => {
       // Wall stick checks — skip the wall the bird just launched from to prevent
       // getting stuck under hills. Only stick to the opposite wall.
       if (player.x <= leftBoundary + player.radius + 1 && player.launchSide !== 'left') {
+        // Determine bounce quality based on perfect bounce window
+        const bounceQuality = player.perfectBounceWindow > 0 ? 'perfect' : (player.perfectBounceWindow > -0.3 ? 'good' : 'normal');
         player.stickToWall('left', leftBoundary + player.radius, player.y);
-        state.shakeIntensity = Math.min(2 + state.combo * 0.15, 5);
+        player.addStreakBounce(bounceQuality);
+
+        // Hitstop: freeze frames on high-momentum impacts
+        if (player.momentumStreak >= 4) {
+          state.hitstopTimer = 0.03 + Math.min(player.momentumStreak * 0.005, 0.04);
+        }
+
+        // Enhanced shake scales with momentum
+        state.shakeIntensity = Math.min(2 + state.combo * 0.15 + player.momentumStreak * 0.3, 8);
         spawnWallParticles(state, player.x, player.y, 1);
         if (state.leftTerrain) state.leftTerrain.addBounceImpact(player.y);
         player.addMood(3);
         state.runStats.wallBounces++;
+
+        // Perfect bounce feedback
+        if (bounceQuality === 'perfect') {
+          player.perfectBounceFlash = 0.4;
+          addCombo(state, 1, 'PERFECT');
+          state.floatingTexts.push({
+            x: player.x, y: player.y,
+            label: 'PERFECT!',
+            desc: `${player.momentumStreak}x streak`,
+            color: '#ffdd00',
+            life: 0.8, maxLife: 0.8, vy: -80,
+          });
+        } else if (bounceQuality === 'good') {
+          state.floatingTexts.push({
+            x: player.x, y: player.y,
+            label: 'GOOD',
+            desc: '',
+            color: '#66ddff',
+            life: 0.5, maxLife: 0.5, vy: -60,
+          });
+        }
+
+        // Check for rocket burst trigger (8+ streak)
+        if (player.momentumStreak >= 8 && !player.rocketBurst && !state.rocketBurstActive) {
+          triggerRocketBurst(state, player);
+        }
+
         if (state.runStats.wallBounces === 1) {
           showHint(state, 'wallBounce', t('hint.comboText'), t('hint.comboSub'));
         }
@@ -2090,12 +2173,44 @@ const Game = () => {
           audioManagerRef.current.playBounceSound();
         }
       } else if (player.x >= rightBoundary - player.radius - 1 && player.launchSide !== 'right') {
+        const bounceQuality = player.perfectBounceWindow > 0 ? 'perfect' : (player.perfectBounceWindow > -0.3 ? 'good' : 'normal');
         player.stickToWall('right', rightBoundary - player.radius, player.y);
-        state.shakeIntensity = Math.min(2 + state.combo * 0.15, 5);
+        player.addStreakBounce(bounceQuality);
+
+        if (player.momentumStreak >= 4) {
+          state.hitstopTimer = 0.03 + Math.min(player.momentumStreak * 0.005, 0.04);
+        }
+
+        state.shakeIntensity = Math.min(2 + state.combo * 0.15 + player.momentumStreak * 0.3, 8);
         spawnWallParticles(state, player.x, player.y, -1);
         if (state.rightTerrain) state.rightTerrain.addBounceImpact(player.y);
         player.addMood(3);
         state.runStats.wallBounces++;
+
+        if (bounceQuality === 'perfect') {
+          player.perfectBounceFlash = 0.4;
+          addCombo(state, 1, 'PERFECT');
+          state.floatingTexts.push({
+            x: player.x, y: player.y,
+            label: 'PERFECT!',
+            desc: `${player.momentumStreak}x streak`,
+            color: '#ffdd00',
+            life: 0.8, maxLife: 0.8, vy: -80,
+          });
+        } else if (bounceQuality === 'good') {
+          state.floatingTexts.push({
+            x: player.x, y: player.y,
+            label: 'GOOD',
+            desc: '',
+            color: '#66ddff',
+            life: 0.5, maxLife: 0.5, vy: -60,
+          });
+        }
+
+        if (player.momentumStreak >= 8 && !player.rocketBurst && !state.rocketBurstActive) {
+          triggerRocketBurst(state, player);
+        }
+
         if (state.runStats.wallBounces === 1) {
           showHint(state, 'wallBounce', t('hint.comboText'), t('hint.comboSub'));
         }
@@ -2534,9 +2649,9 @@ const Game = () => {
           player.shieldTimer = 0;
           player.invincibleTimer = 0.3;
           state.shakeIntensity = 6;
-          // Shield absorbing a hit breaks combo
           state.combo = 0;
           state.comboTimer = 0;
+          player.breakStreak();
           shieldAbsorbedThisFrame = true;
           if (audioManagerRef.current) audioManagerRef.current.playBounceSound();
         } else {
@@ -2612,7 +2727,7 @@ const Game = () => {
           player.shieldTimer = 0;
           player.invincibleTimer = 0.3;
           state.shakeIntensity = 6;
-          state.combo = 0; state.comboTimer = 0; player.drainMood(25);
+          state.combo = 0; state.comboTimer = 0; player.breakStreak(); player.drainMood(25);
           shieldAbsorbedThisFrame = true;
           if (audioManagerRef.current) audioManagerRef.current.playBounceSound();
         } else {
@@ -2848,7 +2963,7 @@ const Game = () => {
           player.invincibleTimer = 0.3;
           enemy.active = false;
           state.shakeIntensity = 6;
-          state.combo = 0; state.comboTimer = 0; player.drainMood(25);
+          state.combo = 0; state.comboTimer = 0; player.breakStreak(); player.drainMood(25);
           shieldAbsorbedThisFrame = true;
           if (audioManagerRef.current) {
             audioManagerRef.current.playBounceSound();
@@ -2946,19 +3061,29 @@ const Game = () => {
         const dotAway = dx * player.vx + dy * player.vy;
         if (dist > 5 && dist < 35 + nearMissBonus && dotAway > 0) {
           state._nearMissedEnemies.add(enemy);
-          player.registerNearMiss(); // adds +8 mood internally
+          player.registerNearMiss();
+          player.registerGraze();
           addCombo(state, 2, 'CLOSE CALL');
           state.runStats.nearMisses++;
           const nearMissCoins = 2 + Math.floor(state.combo * 0.5);
           state.currentCoinScore += nearMissCoins;
           setCoinScore(state.currentCoinScore);
+          // Graze: extra-close passes get bonus feedback
+          const isGraze = dist < 15;
           state.floatingTexts.push({
             x: px, y: py,
-            label: 'CLOSE CALL!',
-            desc: `+2 combo  +${nearMissCoins} coins`,
-            color: '#ff66aa',
+            label: isGraze ? 'GRAZE!' : 'CLOSE CALL!',
+            desc: isGraze ? `+3 combo  +${nearMissCoins + 2} coins` : `+2 combo  +${nearMissCoins} coins`,
+            color: isGraze ? '#ff2266' : '#ff66aa',
             life: 1.2, maxLife: 1.2, vy: -60,
           });
+          if (isGraze) {
+            addCombo(state, 1, 'GRAZE');
+            state.currentCoinScore += 2;
+            setCoinScore(state.currentCoinScore);
+            state.shakeIntensity = Math.min(state.shakeIntensity + 2, 8);
+            player.addMood(4);
+          }
           if (audioManagerRef.current && audioManagerRef.current.playNearMissSound) {
             audioManagerRef.current.playNearMissSound();
           }
@@ -3084,7 +3209,7 @@ const Game = () => {
             player.shieldTimer = 0;
             player.invincibleTimer = 0.3;
             state.shakeIntensity = 6;
-            state.combo = 0; state.comboTimer = 0; player.drainMood(25);
+            state.combo = 0; state.comboTimer = 0; player.breakStreak(); player.drainMood(25);
             shieldAbsorbedThisFrame = true;
             if (audioManagerRef.current) audioManagerRef.current.playBounceSound();
           } else {
@@ -3222,6 +3347,75 @@ const Game = () => {
         state.feverActive = false;
         state.feverCooldown = 10.0;
       }
+    }
+
+    // === EXCITEMENT SYSTEMS UPDATE ===
+
+    // Rocket burst: force bird upward, smash through enemies
+    if (state.rocketBurstActive) {
+      state.rocketBurstTimer -= deltaTime;
+      const burstSpeed = -800 * (player.screenScale || 1);
+      player.vy = Math.min(player.vy, burstSpeed);
+      player.isStuck = false;
+      state.rocketBurstHeight += Math.abs(burstSpeed * deltaTime);
+      // Destroy nearby enemies during burst
+      for (let i = 0; i < state.enemies.length; i++) {
+        const e = state.enemies[i];
+        if (!e.active) continue;
+        const dx = player.x - e.x;
+        const dy = player.y - e.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 80 * (player.screenScale || 1)) {
+          e.active = false;
+          state.shakeIntensity = Math.min(state.shakeIntensity + 3, 12);
+          state.currentCoinScore += 3;
+          setCoinScore(state.currentCoinScore);
+        }
+      }
+      if (state.rocketBurstTimer <= 0) {
+        state.rocketBurstActive = false;
+        player.rocketBurst = false;
+        player.momentumStreak = Math.floor(player.momentumStreak / 2);
+      }
+    }
+
+    // Speed lines — spawn when moving fast or during streak
+    const playerSpeed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
+    const speedThreshold = 500 * (player.screenScale || 1);
+    if ((playerSpeed > speedThreshold || player.momentumStreak >= 4) && !player.isStuck && state.speedLines.length < 40) {
+      const intensity = Math.min((playerSpeed - speedThreshold) / 600, 1);
+      const spawnCount = Math.ceil(intensity * 3 + (player.momentumStreak >= 8 ? 2 : 0));
+      for (let i = 0; i < spawnCount; i++) {
+        state.speedLines.push({
+          x: Math.random() * width,
+          y: state.cameraY - 20,
+          length: 20 + Math.random() * 40 + intensity * 30,
+          speed: 600 + Math.random() * 400 + playerSpeed * 0.5,
+          alpha: 0.2 + intensity * 0.4,
+          life: 0.5 + Math.random() * 0.3,
+        });
+      }
+    }
+    // Update speed lines
+    for (let i = state.speedLines.length - 1; i >= 0; i--) {
+      const sl = state.speedLines[i];
+      sl.y += sl.speed * deltaTime;
+      sl.life -= deltaTime;
+      if (sl.life <= 0) {
+        state.speedLines[i] = state.speedLines[state.speedLines.length - 1];
+        state.speedLines.pop();
+      }
+    }
+
+    // Void surge state propagation for overlay rendering
+    if (state.voidStorm) {
+      state.voidSurgeWarning = state.voidStorm.surgeWarning;
+      state.voidSurgeActive = state.voidStorm.surgeActive;
+    }
+
+    // Hitstop: brief freeze on powerful wall impacts
+    if (state.hitstopTimer > 0) {
+      state.hitstopTimer -= deltaTime;
     }
 
     // Update background stars twinkle
@@ -3999,6 +4193,24 @@ const Game = () => {
     }
     ctx.fill();
 
+    // Draw speed lines (behind terrain for depth)
+    if (state.speedLines && state.speedLines.length > 0) {
+      ctx.save();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < state.speedLines.length; i++) {
+        const sl = state.speedLines[i];
+        const screenY = sl.y - renderCam;
+        if (screenY < -50 || screenY > height + 50) continue;
+        ctx.globalAlpha = sl.alpha * Math.min(1, sl.life * 3);
+        ctx.beginPath();
+        ctx.moveTo(sl.x, screenY);
+        ctx.lineTo(sl.x, screenY + sl.length);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     // Draw terrain
     if (state.leftTerrain) {
       state.leftTerrain.draw(ctx, renderCam);
@@ -4077,9 +4289,54 @@ const Game = () => {
       if (state.player.invincibleTimer > 0 && Math.floor(state.player.invincibleTimer * 20) % 2 === 0) {
         ctx.globalAlpha = 0.4;
       }
+
+      // Charge indicator: pulsing ring around bird while stuck
+      if (state.player.isStuck && state.player.chargeLevel > 0.1) {
+        const pScreenY = state.player.y - renderCam;
+        const chargeR = state.player.radius + 8 + state.player.chargeLevel * 12;
+        const chargePulse = 0.4 + Math.sin(Date.now() / 100) * 0.2;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(state.player.x, pScreenY, chargeR, 0, Math.PI * 2 * state.player.chargeLevel);
+        ctx.strokeStyle = `rgba(255, ${Math.floor(200 - state.player.chargeLevel * 150)}, 0, ${chargePulse + state.player.chargeLevel * 0.4})`;
+        ctx.lineWidth = 2 + state.player.chargeLevel * 3;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Apply squash/stretch transform for player drawing
+      if (state.player.squash !== 1.0 || state.player.stretch !== 1.0) {
+        const pScreenY = state.player.y - renderCam;
+        ctx.save();
+        ctx.translate(state.player.x, pScreenY);
+        const sx = state.player.isStuck ? (2 - state.player.squash) : (2 - state.player.stretch);
+        const sy = state.player.isStuck ? state.player.squash : state.player.stretch;
+        ctx.scale(sx, sy);
+        ctx.translate(-state.player.x, -pScreenY);
+      }
+
       state.player.draw(ctx, renderCam, graphicsRef.current);
+
+      if (state.player.squash !== 1.0 || state.player.stretch !== 1.0) {
+        ctx.restore();
+      }
+
       ctx.globalAlpha = 1;
       state.player.drawTrajectory(ctx, renderCam, state.gravity);
+
+      // Perfect bounce flash (ring burst)
+      if (state.player.perfectBounceFlash > 0) {
+        const pScreenY = state.player.y - renderCam;
+        const flashProgress = 1 - state.player.perfectBounceFlash / 0.4;
+        const flashR = state.player.radius + flashProgress * 30;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(state.player.x, pScreenY, flashR, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 220, 0, ${(1 - flashProgress) * 0.8})`;
+        ctx.lineWidth = 3 * (1 - flashProgress);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
     // Draw wall-stick particles — batched by color, no per-particle save/restore
@@ -4228,6 +4485,69 @@ const Game = () => {
       ctx.strokeStyle = `rgba(255, 160, 0, ${feverPulse})`;
       ctx.lineWidth = 6;
       ctx.strokeRect(0, 0, width, height);
+      ctx.restore();
+    }
+
+    // Rocket burst: intense orange/red border + radial speed overlay
+    if (state.rocketBurstActive && state.rocketBurstTimer > 0) {
+      ctx.save();
+      const burstPulse = 0.5 + Math.sin(Date.now() / 50) * 0.3;
+      ctx.strokeStyle = `rgba(255, 100, 0, ${burstPulse})`;
+      ctx.lineWidth = 8;
+      ctx.strokeRect(0, 0, width, height);
+      // Radial motion blur effect
+      const grad = ctx.createRadialGradient(width / 2, height / 2, height * 0.3, width / 2, height / 2, height * 0.7);
+      grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      grad.addColorStop(1, `rgba(255, 80, 0, ${0.15 * burstPulse})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+      ctx.restore();
+    }
+
+    // Void surge warning: red pulsing bottom edge
+    if (state.voidSurgeWarning && !state.voidSurgeActive) {
+      ctx.save();
+      const warnPulse = 0.3 + Math.sin(Date.now() / 150) * 0.3;
+      const warnGrad = ctx.createLinearGradient(0, height, 0, height - 80);
+      warnGrad.addColorStop(0, `rgba(200, 0, 0, ${warnPulse})`);
+      warnGrad.addColorStop(1, 'rgba(200, 0, 0, 0)');
+      ctx.fillStyle = warnGrad;
+      ctx.fillRect(0, height - 80, width, 80);
+      ctx.restore();
+    }
+
+    // Void surge active: intense red flash at bottom
+    if (state.voidSurgeActive) {
+      ctx.save();
+      const surgePulse = 0.4 + Math.sin(Date.now() / 80) * 0.3;
+      const surgeGrad = ctx.createLinearGradient(0, height, 0, height - 120);
+      surgeGrad.addColorStop(0, `rgba(255, 20, 0, ${surgePulse})`);
+      surgeGrad.addColorStop(1, 'rgba(255, 20, 0, 0)');
+      ctx.fillStyle = surgeGrad;
+      ctx.fillRect(0, height - 120, width, 120);
+      ctx.restore();
+    }
+
+    // Graze slow-mo flash
+    if (state.player && state.player.grazeFlash > 0) {
+      ctx.save();
+      ctx.globalAlpha = state.player.grazeFlash * 0.3;
+      ctx.fillStyle = '#ff66aa';
+      ctx.fillRect(0, 0, width, height);
+      ctx.restore();
+    }
+
+    // Momentum streak visual: screen edge glow intensifies with streak
+    if (state.player && state.player.momentumStreak >= 4) {
+      ctx.save();
+      const streakIntensity = Math.min((state.player.momentumStreak - 4) / 12, 1);
+      const streakColor = state.player.momentumStreak >= 12 ? '255, 50, 0' :
+        state.player.momentumStreak >= 8 ? '255, 150, 0' : '100, 200, 255';
+      const edgeGrad = ctx.createRadialGradient(width / 2, height / 2, width * 0.3, width / 2, height / 2, width * 0.75);
+      edgeGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      edgeGrad.addColorStop(1, `rgba(${streakColor}, ${0.08 + streakIntensity * 0.15})`);
+      ctx.fillStyle = edgeGrad;
+      ctx.fillRect(0, 0, width, height);
       ctx.restore();
     }
 
@@ -4583,6 +4903,67 @@ const Game = () => {
       ctx.fillStyle = comboColor;
       ctx.fillRect(barX, barY, barW * timerPct, barH);
 
+      ctx.restore();
+    }
+
+    // Draw momentum streak indicator (right side)
+    if (player && player.momentumStreak >= 2 && gameStarted && !isGameOver) {
+      ctx.save();
+      const streakTier = player.getMomentumTier();
+      const streakColor = streakTier === 'blazing' ? '#ff3300' :
+        streakTier === 'hot' ? '#ff8800' : streakTier === 'warm' ? '#ffcc00' : '#66ccff';
+      const streakSize = Math.round((14 + Math.min(player.momentumStreak, 12)) * ts);
+      const streakX = width - Math.round(16 * ts);
+      const streakY = Math.round(30 * ts) + safeTop;
+      ctx.font = `900 ${streakSize}px Orbitron, Arial`;
+      ctx.textAlign = 'right';
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.lineWidth = 3;
+      const streakLabel = `${player.momentumStreak}`;
+      ctx.strokeText(streakLabel, streakX, streakY);
+      ctx.fillStyle = streakColor;
+      ctx.fillText(streakLabel, streakX, streakY);
+      // Sub-label
+      ctx.font = `bold ${Math.round(9 * ts)}px Orbitron, Arial`;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.fillText('STREAK', streakX, streakY + Math.round(14 * ts));
+      // Pulsing outline when close to rocket burst (6+)
+      if (player.momentumStreak >= 6) {
+        const rocketPulse = 0.4 + Math.sin(Date.now() / 100) * 0.3;
+        ctx.font = `900 ${streakSize}px Orbitron, Arial`;
+        ctx.strokeStyle = `rgba(${streakTier === 'blazing' ? '255, 50, 0' : '255, 136, 0'}, ${rocketPulse})`;
+        ctx.lineWidth = 2;
+        ctx.strokeText(streakLabel, streakX, streakY);
+      }
+      ctx.restore();
+    }
+
+    // Void surge warning text
+    if (state.voidSurgeWarning && !state.voidSurgeActive && gameStarted && !isGameOver) {
+      ctx.save();
+      const warnPulse = 0.5 + Math.sin(Date.now() / 120) * 0.5;
+      ctx.globalAlpha = warnPulse;
+      ctx.font = `bold ${Math.round(16 * ts)}px Orbitron, Arial`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ff3333';
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.lineWidth = 3;
+      ctx.strokeText('VOID SURGE INCOMING', width / 2, height - Math.round(40 * ts));
+      ctx.fillText('VOID SURGE INCOMING', width / 2, height - Math.round(40 * ts));
+      ctx.restore();
+    }
+
+    if (state.voidSurgeActive && gameStarted && !isGameOver) {
+      ctx.save();
+      const surgePulse = 0.6 + Math.sin(Date.now() / 60) * 0.4;
+      ctx.globalAlpha = surgePulse;
+      ctx.font = `bold ${Math.round(20 * ts)}px Orbitron, Arial`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ff0000';
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.lineWidth = 4;
+      ctx.strokeText('SURGE!', width / 2, height - Math.round(30 * ts));
+      ctx.fillText('SURGE!', width / 2, height - Math.round(30 * ts));
       ctx.restore();
     }
 

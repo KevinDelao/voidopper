@@ -32,23 +32,64 @@ class VoidStorm {
         width: 3 + Math.random() * 5,
       });
     }
+
+    // Surge system — periodic speed bursts that create panic moments
+    this.surgeTimer = 0;
+    this.surgeInterval = 35;       // Seconds between surges
+    this.surgeDuration = 3.0;      // How long a surge lasts
+    this.surgeActive = false;
+    this.surgeProgress = 0;        // 0-1 progress through current surge
+    this.surgeSpeedMult = 2.5;     // Speed multiplier during surge
+    this.surgeWarningTime = 2.0;   // Warning before surge hits
+    this.surgeWarning = false;
+    this.totalSurges = 0;
   }
 
   update(deltaTime, playerY, heightClimbed, difficulty) {
     this.phase += deltaTime * 2;
 
     // Speed increases with height — rate varies by difficulty
-    // Easy: slow ramp (+30 max over 15k). Hard: fast ramp (+60 max over 8k).
     const maxBonus = difficulty === 'easy' ? 30 : difficulty === 'hard' ? 60 : 40;
     const rampDist = difficulty === 'easy' ? 15000 : difficulty === 'hard' ? 8000 : 12000;
     const heightBonus = maxBonus * Math.min(heightClimbed / rampDist, 1.0);
     this.currentSpeed = this.baseSpeed + heightBonus;
 
     // If player is far ahead, the void accelerates to maintain tension
-    const gap = this.y - playerY; // Positive = void is below player
+    const gap = this.y - playerY;
     if (gap > 800) {
-      // Player is very far ahead — void rushes to close the gap
       this.currentSpeed += (gap - 800) * 0.05;
+    }
+
+    // === SURGE SYSTEM ===
+    this.surgeTimer += deltaTime;
+    // Surge interval decreases with height (more frequent as game progresses)
+    const effectiveInterval = Math.max(20, this.surgeInterval - heightClimbed / 2000);
+
+    if (!this.surgeActive && !this.surgeWarning) {
+      if (this.surgeTimer >= effectiveInterval - this.surgeWarningTime) {
+        this.surgeWarning = true;
+      }
+    }
+
+    if (this.surgeWarning && !this.surgeActive) {
+      if (this.surgeTimer >= effectiveInterval) {
+        this.surgeActive = true;
+        this.surgeWarning = false;
+        this.surgeProgress = 0;
+        this.totalSurges++;
+      }
+    }
+
+    if (this.surgeActive) {
+      this.surgeProgress += deltaTime / this.surgeDuration;
+      // Surge speed ramps up then down (bell curve)
+      const surgeIntensity = Math.sin(this.surgeProgress * Math.PI);
+      this.currentSpeed *= (1 + (this.surgeSpeedMult - 1) * surgeIntensity);
+
+      if (this.surgeProgress >= 1.0) {
+        this.surgeActive = false;
+        this.surgeTimer = 0;
+      }
     }
 
     // Void never slows below base speed — always rising
