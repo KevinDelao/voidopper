@@ -4686,35 +4686,91 @@ const Game = () => {
       ctx.restore();
     }
 
-    // Achievement toast
+    // Achievement toast — positioned below HUD to avoid overlap
     if (state.achievementToastTimer > 0) {
       state.achievementToastTimer -= dt || 0.016;
       const toast = state.achievementToast;
       if (toast) {
         const toastTs = Math.max(1, width / 390);
         const toastAlpha = state.achievementToastTimer > 2.5 ? Math.min(1, (3.0 - state.achievementToastTimer) * 2) : Math.min(1, state.achievementToastTimer / 0.5);
-        const toastW = Math.min(width - 20, Math.round(280 * toastTs));
-        const toastH = Math.round(50 * toastTs);
+        const toastW = Math.min(width - 30, Math.round(260 * toastTs));
+        const toastH = Math.round(54 * toastTs);
+        const toastR = Math.round(14 * toastTs);
         const toastX = width / 2 - toastW / 2;
         const toastSafeTop = state.safeTop || 0;
-        const toastY = toastSafeTop + 10;
+        // Position below the score pill and mood bar (approx 120*ts below safe top)
+        const toastY = toastSafeTop + Math.round(120 * toastTs);
+
+        // Slide-in animation
+        const slideProgress = state.achievementToastTimer > 2.5 ? (3.0 - state.achievementToastTimer) / 0.5 : 1;
+        const slideOffsetY = (1 - Math.min(1, slideProgress)) * -20;
+
         ctx.save();
         ctx.globalAlpha = toastAlpha;
-        ctx.fillStyle = 'rgba(50, 30, 80, 0.9)';
-        ctx.fillRect(toastX, toastY, toastW, toastH);
+        ctx.translate(0, slideOffsetY);
+
+        // Glass panel background
+        drawRoundRect(ctx, toastX, toastY, toastW, toastH, toastR);
+        ctx.fillStyle = 'rgba(15, 10, 30, 0.9)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        // Top highlight
+        ctx.beginPath();
+        ctx.moveTo(toastX + toastR, toastY + 0.5);
+        ctx.lineTo(toastX + toastW - toastR, toastY + 0.5);
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Trophy/star icon (canvas-drawn, no emoji)
+        const iconCx = toastX + Math.round(26 * toastTs);
+        const iconCy = toastY + toastH / 2;
+        const iconR = Math.round(12 * toastTs);
+        // Gold circle background
+        ctx.beginPath();
+        ctx.arc(iconCx, iconCy, iconR, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.2)';
+        ctx.fill();
         ctx.strokeStyle = '#ffd700';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(toastX, toastY, toastW, toastH);
-        ctx.font = `${Math.round(18 * toastTs)}px Arial`;
-        ctx.textAlign = 'left';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(toast.icon || '', toastX + 12, toastY + toastH / 2 + 6);
-        ctx.font = `bold ${Math.round(12 * toastTs)}px Orbitron, Arial`;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        // Star shape inside
         ctx.fillStyle = '#ffd700';
-        ctx.fillText(toast.name, toastX + 40, toastY + Math.round(20 * toastTs));
+        ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+          const a = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+          const r = i === 0 ? iconR * 0.6 : iconR * 0.6;
+          const method = i === 0 ? 'moveTo' : 'lineTo';
+          ctx[method](iconCx + Math.cos(a) * r, iconCy + Math.sin(a) * r);
+          const a2 = a + (2 * Math.PI) / 10;
+          ctx.lineTo(iconCx + Math.cos(a2) * iconR * 0.3, iconCy + Math.sin(a2) * iconR * 0.3);
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Achievement text
+        const textX = toastX + Math.round(46 * toastTs);
+        const textMaxW = toastW - Math.round(56 * toastTs);
+        ctx.font = `bold ${Math.round(12 * toastTs)}px Orbitron, Arial`;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#ffd700';
+        let achNameSize = Math.round(12 * toastTs);
+        while (achNameSize > 8 && ctx.measureText(toast.name).width > textMaxW) {
+          achNameSize--;
+          ctx.font = `bold ${achNameSize}px Orbitron, Arial`;
+        }
+        ctx.fillText(toast.name, textX, toastY + Math.round(22 * toastTs));
         ctx.font = `${Math.round(10 * toastTs)}px Orbitron, Arial`;
-        ctx.fillStyle = '#ccccee';
-        ctx.fillText(toast.desc, toastX + 40, toastY + Math.round(36 * toastTs));
+        ctx.fillStyle = 'rgba(200, 200, 240, 0.8)';
+        let achDescSize = Math.round(10 * toastTs);
+        while (achDescSize > 7 && ctx.measureText(toast.desc).width > textMaxW) {
+          achDescSize--;
+          ctx.font = `${achDescSize}px Orbitron, Arial`;
+        }
+        ctx.fillText(toast.desc, textX, toastY + Math.round(38 * toastTs));
+
         ctx.restore();
       }
     } else if (achievementRef.current) {
