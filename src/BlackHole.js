@@ -49,8 +49,8 @@ class BlackHole {
   }
 
   update(deltaTime) {
-    this.phase += 0.04;
-    this.rotationAngle += 0.02;
+    this.phase += 0.04 * deltaTime * 60;
+    this.rotationAngle += 0.02 * deltaTime * 60;
 
     // Rotate accretion disk
     this.diskParticles.forEach(p => {

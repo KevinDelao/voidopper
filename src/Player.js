@@ -584,13 +584,14 @@ class Player {
           break;
         }
         case 'nebula': {
-          ctx.globalAlpha = alpha * 0.6;
-          const grad = ctx.createRadialGradient(p.x, screenY, 0, p.x, screenY, p.size);
-          grad.addColorStop(0, p.color);
-          grad.addColorStop(1, 'transparent');
-          ctx.fillStyle = grad;
+          ctx.globalAlpha = alpha * 0.4;
+          ctx.fillStyle = p.color;
           ctx.beginPath();
           ctx.arc(p.x, screenY, p.size, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = alpha * 0.2;
+          ctx.beginPath();
+          ctx.arc(p.x, screenY, p.size * 1.5, 0, Math.PI * 2);
           ctx.fill();
           break;
         }
@@ -617,24 +618,15 @@ class Player {
         }
         case 'void': {
           ctx.globalAlpha = alpha * 0.7;
-          const vGrad = ctx.createRadialGradient(p.x, screenY, 0, p.x, screenY, p.size);
-          vGrad.addColorStop(0, '#000000');
-          vGrad.addColorStop(0.6, p.color);
-          vGrad.addColorStop(1, 'transparent');
-          ctx.fillStyle = vGrad;
+          ctx.fillStyle = '#000000';
           ctx.beginPath();
-          ctx.arc(p.x, screenY, p.size * (1.2 - alpha * 0.2), 0, Math.PI * 2);
+          ctx.arc(p.x, screenY, p.size * 0.6, 0, Math.PI * 2);
           ctx.fill();
-          // Edge glow
-          if (allowShadow) {
-            ctx.strokeStyle = '#8800ff';
-            ctx.lineWidth = 1;
-            ctx.shadowBlur = 6;
-            ctx.shadowColor = '#8800ff';
-            ctx.globalAlpha = alpha * 0.4;
-            ctx.stroke();
-            ctx.shadowBlur = 0;
-          }
+          ctx.globalAlpha = alpha * 0.4;
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, screenY, p.size, 0, Math.PI * 2);
+          ctx.fill();
           break;
         }
         case 'glitch': {
@@ -870,6 +862,7 @@ class Player {
     // Reset charge for new wall stick
     this.chargeTime = 0;
     this.chargeLevel = 0;
+    this.trail.length = 0;
   }
 
   drawTrajectory(ctx, cameraY, gravity) {
@@ -896,7 +889,7 @@ class Player {
     let velY = vy;
 
     for (let i = 0; i < steps; i++) {
-      velY += gravity * 60 * dt; // Apply gravity (scaled to match deltaTime-based physics)
+      velY += gravity * dt;
       x += velX * dt;
       y += velY * dt;
 

@@ -39,10 +39,17 @@ class AudioManager {
 
     // Cached noise buffers (created on first init)
     this._noiseBuffers = {};
+
+    // iOS resume: pending SFX queue and mutex
+    this._pendingSfx = [];
+    this._resuming = false;
+    this._initializing = false;
   }
 
   async initialize() {
+    if (this._initializing) return;
     if (this.isInitialized && this.audioContext && this.audioContext.state === 'running') return;
+    this._initializing = true;
     // Close old context if it's stuck in suspended/interrupted state (e.g. iOS after YouTube)
     if (this.audioContext && this.audioContext.state !== 'closed') {
       try { this.audioContext.close(); } catch (e) {}
@@ -97,7 +104,9 @@ class AudioManager {
       };
 
       this.isInitialized = true;
+      this._initializing = false;
     } catch (error) {
+      this._initializing = false;
       if (this.audioContext) {
         try { this.audioContext.close(); } catch (e) {}
         this.audioContext = null;
@@ -907,12 +916,18 @@ class AudioManager {
 
   ensureContextRunning() {
     if (!this.audioContext) return false;
-    // Attempt to resume if suspended/interrupted — during gameplay the user is
-    // actively touching the screen so the resume call is allowed on iOS.
     if (this.audioContext.state === 'suspended' || this.audioContext.state === 'interrupted') {
-      this.audioContext.resume().then(() => {
-        this._recoverAfterInterruption();
-      }).catch(() => {});
+      if (!this._resuming) {
+        this._resuming = true;
+        this.audioContext.resume().then(() => {
+          this._resuming = false;
+          this._recoverAfterInterruption();
+          const pending = this._pendingSfx.splice(0);
+          for (const sfx of pending) {
+            try { this[sfx.method](...sfx.args); } catch(e) {}
+          }
+        }).catch(() => { this._resuming = false; });
+      }
       return false;
     }
     return this.audioContext.state === 'running';
@@ -966,7 +981,10 @@ class AudioManager {
   // ── SOUND EFFECTS ────────────────────────────────────
 
   playBoostSound() {
-    if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (!this.isInitialized || !this.ensureContextRunning()) {
+      if (this._pendingSfx.length < 3) this._pendingSfx.push({ method: 'playBoostSound', args: [] });
+      return;
+    }
     if (this._sfxThrottled('boost')) return;
     const now = this.audioContext.currentTime;
 
@@ -1021,7 +1039,10 @@ class AudioManager {
   }
 
   playBounceSound() {
-    if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (!this.isInitialized || !this.ensureContextRunning()) {
+      if (this._pendingSfx.length < 3) this._pendingSfx.push({ method: 'playBounceSound', args: [] });
+      return;
+    }
     if (this._sfxThrottled('bounce')) return;
     const now = this.audioContext.currentTime;
 
@@ -1058,7 +1079,10 @@ class AudioManager {
   }
 
   playCollisionSound() {
-    if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (!this.isInitialized || !this.ensureContextRunning()) {
+      if (this._pendingSfx.length < 3) this._pendingSfx.push({ method: 'playCollisionSound', args: [] });
+      return;
+    }
     if (this._sfxThrottled('collision')) return;
     const now = this.audioContext.currentTime;
 
@@ -1100,7 +1124,10 @@ class AudioManager {
   }
 
   playCoinPickupSound() {
-    if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (!this.isInitialized || !this.ensureContextRunning()) {
+      if (this._pendingSfx.length < 3) this._pendingSfx.push({ method: 'playCoinPickupSound', args: [] });
+      return;
+    }
     if (this._sfxThrottled('coinPickup')) return;
     const now = this.audioContext.currentTime;
 

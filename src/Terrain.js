@@ -45,6 +45,11 @@ class Terrain {
     this.runningLights = [];
     this.bounceImpacts = []; // active glow animations
 
+    // Path caching
+    this._pathsDirty = true;
+    this._cachedWallPath = null;
+    this._cachedEdgePath = null;
+
     this.generateTerrain();
     this.generateDetails();
   }
@@ -104,6 +109,7 @@ class Terrain {
 
   generateTerrain() {
     this.hillPoints = [];
+    this._pathsDirty = true;
 
     const segmentHeight = 80;
     const numSegments = Math.floor(this.height / segmentHeight) + 2;
@@ -390,54 +396,65 @@ class Terrain {
     }
   }
 
+  // Rebuild cached Path2D objects using world-space coordinates
+  _rebuildPaths() {
+    const isLeft = this.side === 'left';
+
+    const wallPath = new Path2D();
+    if (isLeft) {
+      wallPath.moveTo(0, this.hillPoints[0].y);
+    } else {
+      wallPath.moveTo(this.width, this.hillPoints[0].y);
+    }
+
+    for (let i = 0; i < this.hillPoints.length - 1; i++) {
+      const current = this.hillPoints[i];
+      const next = this.hillPoints[i + 1];
+      const midX = (current.x + next.x) / 2;
+      const midY = (current.y + next.y) / 2;
+      wallPath.quadraticCurveTo(current.x, current.y, midX, midY);
+    }
+
+    const lastPoint = this.hillPoints[this.hillPoints.length - 1];
+    wallPath.lineTo(lastPoint.x, lastPoint.y);
+
+    if (isLeft) {
+      wallPath.lineTo(0, lastPoint.y);
+    } else {
+      wallPath.lineTo(this.width, lastPoint.y);
+    }
+    wallPath.closePath();
+
+    const edgePath = new Path2D();
+    edgePath.moveTo(this.hillPoints[0].x, this.hillPoints[0].y);
+    for (let i = 0; i < this.hillPoints.length - 1; i++) {
+      const current = this.hillPoints[i];
+      const next = this.hillPoints[i + 1];
+      const midX = (current.x + next.x) / 2;
+      const midY = (current.y + next.y) / 2;
+      edgePath.quadraticCurveTo(current.x, current.y, midX, midY);
+    }
+
+    this._cachedWallPath = wallPath;
+    this._cachedEdgePath = edgePath;
+    this._pathsDirty = false;
+  }
+
   draw(ctx, cameraY) {
     const canvasH = ctx.canvas.logicalHeight || ctx.canvas.height;
     const isLeft = this.side === 'left';
 
     ctx.save();
 
-    // --- Build wall shape path once, reuse for fill + edge stroke ---
-    const wallPath = new Path2D();
-    if (isLeft) {
-      wallPath.moveTo(0, this.hillPoints[0].y - cameraY);
-    } else {
-      wallPath.moveTo(this.width, this.hillPoints[0].y - cameraY);
+    // --- Rebuild cached paths only when geometry has changed ---
+    if (this._pathsDirty) {
+      this._rebuildPaths();
     }
+    const wallPath = this._cachedWallPath;
+    const edgePath = this._cachedEdgePath;
 
-    for (let i = 0; i < this.hillPoints.length - 1; i++) {
-      const current = this.hillPoints[i];
-      const next = this.hillPoints[i + 1];
-      const midX = (current.x + next.x) / 2;
-      const midY = (current.y + next.y) / 2;
-      wallPath.quadraticCurveTo(
-        current.x, current.y - cameraY,
-        midX, midY - cameraY
-      );
-    }
-
-    const lastPoint = this.hillPoints[this.hillPoints.length - 1];
-    wallPath.lineTo(lastPoint.x, lastPoint.y - cameraY);
-
-    if (isLeft) {
-      wallPath.lineTo(0, lastPoint.y - cameraY);
-    } else {
-      wallPath.lineTo(this.width, lastPoint.y - cameraY);
-    }
-    wallPath.closePath();
-
-    // --- Build edge-only path (no closePath, for strokes) ---
-    const edgePath = new Path2D();
-    edgePath.moveTo(this.hillPoints[0].x, this.hillPoints[0].y - cameraY);
-    for (let i = 0; i < this.hillPoints.length - 1; i++) {
-      const current = this.hillPoints[i];
-      const next = this.hillPoints[i + 1];
-      const midX = (current.x + next.x) / 2;
-      const midY = (current.y + next.y) / 2;
-      edgePath.quadraticCurveTo(
-        current.x, current.y - cameraY,
-        midX, midY - cameraY
-      );
-    }
+    // --- Apply camera offset via translate (paths use world coordinates) ---
+    ctx.translate(0, -cameraY);
 
     // --- Base fill: themed gradient based on difficulty + height ---
     const sampleY = cameraY + canvasH * 0.5;
@@ -447,17 +464,19 @@ class Terrain {
       this._cachedBiome = this.getBiomeAt(sampleY);
       this._cachedBiomeKey = biomeKey;
       this._cachedAccentRgb = this._hexToRgb(this._cachedBiome.accent);
+      // Cache the gradient alongside the biome (Issue 1 fix)
+      const gradX = isLeft ? 0 : this.width;
+      const gradEnd = isLeft ? 180 : this.width - 180;
+      const gradient = ctx.createLinearGradient(gradX, 0, gradEnd, 0);
+      gradient.addColorStop(0, this._cachedBiome.dark);
+      gradient.addColorStop(0.6, this._cachedBiome.mid);
+      gradient.addColorStop(1, this._cachedBiome.edge);
+      this._cachedGradient = gradient;
     }
     const biome = this._cachedBiome;
     const accentRgb = this._cachedAccentRgb;
 
-    const gradX = isLeft ? 0 : this.width;
-    const gradEnd = isLeft ? 180 : this.width - 180;
-    const gradient = ctx.createLinearGradient(gradX, 0, gradEnd, 0);
-    gradient.addColorStop(0, biome.dark);
-    gradient.addColorStop(0.6, biome.mid);
-    gradient.addColorStop(1, biome.edge);
-    ctx.fillStyle = gradient;
+    ctx.fillStyle = this._cachedGradient;
     ctx.fill(wallPath);
 
     // --- Clip to wall shape for interior details ---
@@ -471,8 +490,8 @@ class Terrain {
     ctx.beginPath();
     for (const detail of this.panelDetails) {
       if (detail.type !== 'seam') continue;
-      const screenY = detail.y - cameraY;
-      if (screenY < -50 || screenY > canvasH + 50) continue;
+      const screenY = detail.y;
+      if (screenY - cameraY < -50 || screenY - cameraY > canvasH + 50) continue;
       const seamX = isLeft ? 0 : detail.x;
       const seamEndX = isLeft ? detail.x : this.width;
       ctx.moveTo(seamX, screenY);
@@ -485,8 +504,8 @@ class Terrain {
     ctx.beginPath();
     for (const detail of this.panelDetails) {
       if (detail.type !== 'seam') continue;
-      const screenY = detail.y - cameraY;
-      if (screenY < -50 || screenY > canvasH + 50) continue;
+      const screenY = detail.y;
+      if (screenY - cameraY < -50 || screenY - cameraY > canvasH + 50) continue;
       const seamX = isLeft ? 0 : detail.x;
       const seamEndX = isLeft ? detail.x : this.width;
       ctx.moveTo(seamX, screenY + 1);
@@ -498,8 +517,8 @@ class Terrain {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
     for (const detail of this.panelDetails) {
       if (detail.type !== 'vent') continue;
-      const screenY = detail.y - cameraY;
-      if (screenY < -50 || screenY > canvasH + 50) continue;
+      const screenY = detail.y;
+      if (screenY - cameraY < -50 || screenY - cameraY > canvasH + 50) continue;
       const ventX = isLeft ? detail.x - detail.width - 10 : detail.x + 10;
       ctx.fillRect(ventX, screenY - detail.height / 2, detail.width, detail.height);
     }
@@ -509,8 +528,8 @@ class Terrain {
     ctx.beginPath();
     for (const detail of this.panelDetails) {
       if (detail.type !== 'vent') continue;
-      const screenY = detail.y - cameraY;
-      if (screenY < -50 || screenY > canvasH + 50) continue;
+      const screenY = detail.y;
+      if (screenY - cameraY < -50 || screenY - cameraY > canvasH + 50) continue;
       const ventX = isLeft ? detail.x - detail.width - 10 : detail.x + 10;
       for (let s = 1; s < 3; s++) {
         const slatY = screenY - detail.height / 2 + (detail.height / 3) * s;
@@ -525,8 +544,8 @@ class Terrain {
     ctx.beginPath();
     for (const detail of this.panelDetails) {
       if (detail.type !== 'rivet') continue;
-      const screenY = detail.y - cameraY;
-      if (screenY < -50 || screenY > canvasH + 50) continue;
+      const screenY = detail.y;
+      if (screenY - cameraY < -50 || screenY - cameraY > canvasH + 50) continue;
       const rivetX = isLeft ? detail.x - 8 : detail.x + 8;
       ctx.moveTo(rivetX + 2, screenY);
       ctx.arc(rivetX, screenY, 2, 0, Math.PI * 2);
@@ -537,8 +556,8 @@ class Terrain {
     ctx.beginPath();
     for (const detail of this.panelDetails) {
       if (detail.type !== 'rivet') continue;
-      const screenY = detail.y - cameraY;
-      if (screenY < -50 || screenY > canvasH + 50) continue;
+      const screenY = detail.y;
+      if (screenY - cameraY < -50 || screenY - cameraY > canvasH + 50) continue;
       const rivetX = isLeft ? detail.x - 8 : detail.x + 8;
       ctx.moveTo(rivetX - 0.5 + 1, screenY - 0.5);
       ctx.arc(rivetX - 0.5, screenY - 0.5, 1, 0, Math.PI * 2);
@@ -547,8 +566,8 @@ class Terrain {
 
     // Bounce pads (fewer, drawn individually but still inside clip)
     for (const pad of this.bouncePads) {
-      const screenY = pad.y - cameraY;
-      if (screenY < -60 || screenY > canvasH + 60) continue;
+      const screenY = pad.y;
+      if (screenY - cameraY < -60 || screenY - cameraY > canvasH + 60) continue;
 
       const padX = isLeft ? pad.x - pad.width - 2 : pad.x + 2;
       const baseAlpha = 0.3 + pad.glowIntensity * 0.7;
@@ -598,8 +617,8 @@ class Terrain {
     ctx.fillStyle = `rgba(${accentRgb}, 0.5)`;
     ctx.beginPath();
     for (const light of this.runningLights) {
-      const screenY = light.y - cameraY;
-      if (screenY < -20 || screenY > canvasH + 20) continue;
+      const screenY = light.y;
+      if (screenY - cameraY < -20 || screenY - cameraY > canvasH + 20) continue;
       ctx.moveTo(light.x + 2, screenY);
       ctx.arc(light.x, screenY, 2, 0, Math.PI * 2);
     }
@@ -608,8 +627,8 @@ class Terrain {
     // --- Bounce impact ripples ---
     if (this.bounceImpacts.length > 0) {
       for (const impact of this.bounceImpacts) {
-        const screenY = impact.y - cameraY;
-        if (screenY < -50 || screenY > canvasH + 50) continue;
+        const screenY = impact.y;
+        if (screenY - cameraY < -50 || screenY - cameraY > canvasH + 50) continue;
 
         const progress = 1 - impact.life;
         const radius = impact.maxRadius * progress;
@@ -651,7 +670,15 @@ class Terrain {
   }
 
   checkCollision(player) {
-    for (let i = 0; i < this.hillPoints.length - 1; i++) {
+    // Use binary search to find the relevant segment instead of O(n) linear scan
+    const idx = this._findSegmentIndex(player.y);
+    if (idx === -1) return null;
+
+    // Check the found segment and its immediate neighbors (with bounds checking)
+    const startIdx = Math.max(0, idx - 1);
+    const endIdx = Math.min(this.hillPoints.length - 2, idx + 1);
+
+    for (let i = startIdx; i <= endIdx; i++) {
       const p1 = this.hillPoints[i];
       const p2 = this.hillPoints[i + 1];
 

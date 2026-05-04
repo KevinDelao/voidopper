@@ -50,19 +50,19 @@ class SpaceJellyfish {
   }
 
   update(deltaTime) {
-    this.pulsePhase += this.pulseSpeed;
+    this.pulsePhase += this.pulseSpeed * deltaTime * 60;
 
     // Float in place with gentle bob — no vertical movement
     this.x += this.vx * (this.speedScale || 1) * deltaTime;
 
     // Update tentacle sway
     this.tentacles.forEach(t => {
-      t.phase += t.speed;
+      t.phase += t.speed * deltaTime * 60;
     });
 
     // Update organ glow
     this.organs.forEach(o => {
-      o.phase += 0.04;
+      o.phase += 0.04 * deltaTime * 60;
     });
   }
 
@@ -186,7 +186,7 @@ class SpaceJellyfish {
     // Tapered tentacle hitbox - wider near body, narrower at tips (scaled)
     const ss = this.ss || 1;
     const tentacleLen = 50 * ss;
-    const tentacleWidth = 15 * ss * (1 - dy / tentacleLen);
+    const tentacleWidth = 10 * ss * (1 - dy / tentacleLen);
     if (dy > 0 && dy < tentacleLen && Math.abs(dx) < tentacleWidth) {
       return true;
     }

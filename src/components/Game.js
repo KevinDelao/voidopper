@@ -95,6 +95,9 @@ const Game = () => {
   const themeRef = useRef(new ThemeManager());
   const tutorialRef = useRef(new TutorialOverlay());
   const appStateListenerRef = useRef(null);
+  const isGameOverRef = useRef(false);
+  const gameStartedRef = useRef(false);
+  const highScoresRef = useRef({ easy: 0, medium: 0, hard: 0 });
 
   // Persistent data from localStorage
   const [totalCoins, setTotalCoins] = useState(() => {
@@ -252,19 +255,23 @@ const Game = () => {
   // Keep refs in sync with state for use inside closures
   unlockedSkinsRef.current = unlockedSkins;
   unlockedTrailsRef.current = unlockedTrails;
+  highScoresRef.current = highScores;
+
+  useEffect(() => { isGameOverRef.current = isGameOver; }, [isGameOver]);
+  useEffect(() => { gameStartedRef.current = gameStarted; }, [gameStarted]);
 
   // Hide banner during active gameplay, show it when paused or not in game
   useEffect(() => {
+    let timer;
     if (gameStarted && !isGameOver && !isPaused) {
       hideBanner().then(() => window.dispatchEvent(new Event('resize')));
     } else {
       showBanner().then(() => {
         window.dispatchEvent(new Event('resize'));
-        // Native banner may not be fully laid out yet; fire a second resize
-        // after a short delay to account for the ad rendering asynchronously.
-        setTimeout(() => window.dispatchEvent(new Event('resize')), 150);
+        timer = setTimeout(() => window.dispatchEvent(new Event('resize')), 150);
       });
     }
+    return () => { if (timer) clearTimeout(timer); };
   }, [gameStarted, isGameOver, isPaused]);
 
   useEffect(() => {
@@ -373,7 +380,8 @@ const Game = () => {
     };
     resizeCanvas();
     // The ad banner may still be loading on first mount; re-measure once it's ready.
-    setTimeout(resizeCanvas, 200);
+    const _timers = [];
+    _timers.push(setTimeout(resizeCanvas, 200));
     window.addEventListener('resize', resizeCanvas);
     // Mobile browsers fire visualViewport resize when URL bar hides/shows
     if (window.visualViewport) {
@@ -381,7 +389,7 @@ const Game = () => {
     }
 
     // Initialize game (only on first load, not on game over)
-    if (!isGameOver) {
+    if (!isGameOverRef.current) {
       generateBackgroundStars(canvas.logicalWidth);
       generateMenuScene(canvas.logicalWidth, canvas.logicalHeight);
     }
@@ -407,9 +415,9 @@ const Game = () => {
           } catch {}
         }
         loadingScreen.classList.add('fade-out');
-        setTimeout(() => loadingScreen.remove(), 600);
+        _timers.push(setTimeout(() => loadingScreen.remove(), 600));
       };
-      setTimeout(() => {
+      _timers.push(setTimeout(() => {
         if (bar) bar.style.display = 'none';
         if (tip) {
           tip.textContent = t('tapToStart');
@@ -418,12 +426,11 @@ const Game = () => {
         }
         loadingScreen.addEventListener('touchstart', dismissLoading, { once: true });
         loadingScreen.addEventListener('click', dismissLoading, { once: true });
-      }, 1200);
+      }, 1200));
     }
 
-    // Compute safe area insets for notched phones and gesture bars
-    const getSafeInsets = () => {
-      // Create a temporary element to measure env() safe area values
+    // Compute safe area insets for notched phones and gesture bars (cached)
+    if (!Game._cachedInsets) {
       const el = document.createElement('div');
       el.style.position = 'fixed';
       el.style.top = 'env(safe-area-inset-top, 0px)';
@@ -437,9 +444,9 @@ const Game = () => {
       const totalH = window.innerHeight;
       const bottom = totalH - el.offsetTop - el.offsetHeight;
       document.body.removeChild(el);
-      return { top: Math.max(0, top), bottom: Math.max(0, bottom) };
-    };
-    const insets = getSafeInsets();
+      Game._cachedInsets = { top: Math.max(0, top), bottom: Math.max(0, bottom) };
+    }
+    const insets = Game._cachedInsets;
     gameStateRef.current.safeTop = insets.top;
     gameStateRef.current.safeBottom = Math.max(insets.bottom, getBannerHeight());
 
@@ -477,7 +484,7 @@ const Game = () => {
           gameStateRef.current.deathSlowmo = false;
           handleGameOver();
         }
-      } else if (gameStateRef.current.isRunning && !isGameOver && gameStarted && !isPausedRef.current) {
+      } else if (gameStateRef.current.isRunning && !isGameOverRef.current && gameStartedRef.current && !isPausedRef.current) {
         // Hitstop: skip game update during freeze frames (still render)
         if (gameStateRef.current.hitstopTimer > 0) {
           gameStateRef.current.hitstopTimer -= deltaTime;
@@ -486,7 +493,7 @@ const Game = () => {
           const grazeSlowFactor = (gameStateRef.current.player && gameStateRef.current.player.grazeTimer > 0) ? 0.4 : 1.0;
           update(deltaTime * grazeSlowFactor, getW(), getH());
         }
-      } else if (isGameOver || gameStateRef.current.pendingRevive) {
+      } else if (isGameOverRef.current || gameStateRef.current.pendingRevive) {
         // Update particles even when game is over or revive pending
         const state = gameStateRef.current;
         state.explosionParticles = state.explosionParticles.filter(particle => {
@@ -564,7 +571,7 @@ const Game = () => {
       const touch = e.touches[0];
       if (!touch) return;
 
-      if (!gameStarted || isGameOver || gameOverTimeRef.current) {
+      if (!gameStartedRef.current || isGameOverRef.current || gameOverTimeRef.current) {
         const rect = canvas.getBoundingClientRect();
         const ty = touch.clientY - rect.top;
         // Shop/Settings scrolling
@@ -572,7 +579,7 @@ const Game = () => {
           settingsDragRef.current = { active: true, startY: ty, startScroll: settingsScrollRef.current, moved: false };
         } else if (showShopRef.current) {
           shopDragRef.current = { active: true, startY: ty, startScroll: shopScrollRef.current, moved: false };
-        } else if (!gameStarted && !isGameOver && !gameOverTimeRef.current) {
+        } else if (!gameStartedRef.current && !isGameOverRef.current && !gameOverTimeRef.current) {
           // Menu scrolling
           menuDragRef.current = { active: true, startY: ty, startScroll: menuScrollRef.current, moved: false };
         }
@@ -601,7 +608,7 @@ const Game = () => {
       // Pause button hit area (uses stored bounds from drawing + padding)
       const pbBounds = gameStateRef.current._pauseBtnBounds;
       if (pbBounds && tx >= pbBounds.x - 10 && tx <= pbBounds.x + pbBounds.w + 10 &&
-          ty >= pbBounds.y - 10 && ty <= pbBounds.y + pbBounds.h + 10 && gameStarted && !isGameOver) {
+          ty >= pbBounds.y - 10 && ty <= pbBounds.y + pbBounds.h + 10 && gameStartedRef.current && !isGameOverRef.current) {
         isPausedRef.current = !isPausedRef.current;
         setIsPaused(isPausedRef.current);
         selectionTap();
@@ -710,7 +717,7 @@ const Game = () => {
         menuDragRef.current.active = false;
       }
 
-      if (!gameStarted || isGameOver || gameOverTimeRef.current || isPausedRef.current) return;
+      if (!gameStartedRef.current || isGameOverRef.current || gameOverTimeRef.current || isPausedRef.current) return;
 
       const player = gameStateRef.current.player;
 
@@ -747,7 +754,7 @@ const Game = () => {
       // Check if pause button was clicked (uses stored bounds)
       const pbBounds = gameStateRef.current._pauseBtnBounds;
       if (pbBounds && clickX >= pbBounds.x && clickX <= pbBounds.x + pbBounds.w &&
-          clickY >= pbBounds.y && clickY <= pbBounds.y + pbBounds.h && gameStarted && !isGameOver) {
+          clickY >= pbBounds.y && clickY <= pbBounds.y + pbBounds.h && gameStartedRef.current && !isGameOverRef.current) {
         isPausedRef.current = !isPausedRef.current;
         setIsPaused(isPausedRef.current);
         selectionTap();
@@ -801,7 +808,7 @@ const Game = () => {
       }
 
       // Start game if not started
-      if (!gameStarted) {
+      if (!gameStartedRef.current) {
         // Capture drag state before any async work (touch moves during await can set moved=true)
         const wasShopDragging = shopDragRef.current.moved;
         const wasMenuDragging = menuDragRef.current.moved;
@@ -1210,7 +1217,7 @@ const Game = () => {
       }
 
       // Use ref to detect game over immediately (closure `isGameOver` can be stale)
-      if (isGameOver || gameOverTimeRef.current) {
+      if (isGameOverRef.current || gameOverTimeRef.current) {
         const timeSinceGameOver = Date.now() - gameOverTimeRef.current;
         // Check Share button on game over screen
         const shareBounds = gameStateRef.current._shareBtnBounds;
@@ -1304,7 +1311,7 @@ const Game = () => {
       // Initialize audio on first keyboard interaction
       if (audioManagerRef.current && !audioManagerRef.current.isInitialized) {
         await audioManagerRef.current.initialize();
-        if (gameStarted && !isGameOver) {
+        if (gameStartedRef.current && !isGameOverRef.current) {
           await audioManagerRef.current.startMusic(difficultyRef.current);
         } else {
           await audioManagerRef.current.startMenuMusic();
@@ -1313,7 +1320,7 @@ const Game = () => {
       }
 
       // P key toggles pause
-      if ((e.key === 'p' || e.key === 'P') && gameStarted && !isGameOver) {
+      if ((e.key === 'p' || e.key === 'P') && gameStartedRef.current && !isGameOverRef.current) {
         isPausedRef.current = !isPausedRef.current;
         setIsPaused(isPausedRef.current);
         return;
@@ -1322,7 +1329,7 @@ const Game = () => {
       // Block all other input while paused
       if (isPausedRef.current) return;
 
-      if (isGameOver || gameOverTimeRef.current) {
+      if (isGameOverRef.current || gameOverTimeRef.current) {
         if (e.key === 'r' || e.key === 'R' || e.key === ' ') {
           // Brief delay before allowing restart
           const timeSinceGameOver = Date.now() - gameOverTimeRef.current;
@@ -1350,7 +1357,7 @@ const Game = () => {
 
         // Space or any key - launch bird (only during gameplay)
         if (e.key === ' ' || e.key === 'a' || e.key === 'A' || e.key === 'd' || e.key === 'D') {
-          if (gameStarted) {
+          if (gameStartedRef.current) {
             player.launch();
           }
         }
@@ -1376,7 +1383,7 @@ const Game = () => {
       } else if (showShopRef.current) {
         e.preventDefault();
         shopScrollRef.current = Math.max(0, shopScrollRef.current + e.deltaY);
-      } else if (!gameStarted && !isGameOver) {
+      } else if (!gameStartedRef.current && !isGameOverRef.current) {
         e.preventDefault();
         menuScrollRef.current = Math.max(0, menuScrollRef.current + e.deltaY);
       }
@@ -1417,7 +1424,7 @@ const Game = () => {
       if (_audioSuspended) return;
       _audioSuspended = true;
       // Auto-pause the game if in an active level
-      if (gameStarted && !isGameOver) {
+      if (gameStartedRef.current && !isGameOverRef.current) {
         isPausedRef.current = true;
         setIsPaused(true);
       }
@@ -1505,8 +1512,10 @@ const Game = () => {
       window.removeEventListener('memorywarning', handleMemoryWarning);
       if (appStateListenerRef.current) { appStateListenerRef.current.remove(); appStateListenerRef.current = null; }
       cancelAnimationFrame(animationFrameId);
+      _timers.forEach(id => clearTimeout(id));
     };
-  }, [isGameOver, gameStarted]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Dispose audio only on true component unmount
   useEffect(() => {
@@ -3052,7 +3061,7 @@ const Game = () => {
       const nearMissMaxSq = 60 * 60;
       for (let i = 0; i < enemies.length; i++) {
         const enemy = enemies[i];
-        if (!enemy.active || state._nearMissedEnemies.has(enemy)) continue;
+        if (!enemy.active || !enemy.radius || state._nearMissedEnemies.has(enemy)) continue;
         const dx = px - enemy.x;
         const dy = py - enemy.y;
         const distSq = dx * dx + dy * dy;
@@ -3093,10 +3102,8 @@ const Game = () => {
         }
       }
       // Clean up references to dead/removed enemies to prevent memory leaks
-      if (state._nearMissedEnemies.size > 0) {
-        for (const e of state._nearMissedEnemies) {
-          if (!e.active) state._nearMissedEnemies.delete(e);
-        }
+      if (state._nearMissedEnemies.size > 20) {
+        state._nearMissedEnemies.clear();
       }
     }
 
@@ -3970,8 +3977,8 @@ const Game = () => {
       }
     });
 
-    // Shooting stars (spawn randomly)
-    if (Math.random() < 0.005) {
+    // Shooting stars (spawn randomly, cap at 10)
+    if (Math.random() < 0.005 && state.menuShootingStars.length < 10) {
       state.menuShootingStars.push({
         x: Math.random() * width,
         y: Math.random() * height * 0.5,
@@ -4035,7 +4042,7 @@ const Game = () => {
     if (!state.dustParticles) state.dustParticles = [];
 
     // When paused, skip expensive game world rendering — just draw static bg + overlay
-    if (isPausedRef.current && gameStarted && !isGameOver) {
+    if (isPausedRef.current && gameStartedRef.current && !isGameOverRef.current) {
       const bgBiome = state.leftTerrain ? state.leftTerrain.getBiomeAt(state.cameraY + height * 0.5) : null;
       ctx.fillStyle = bgBiome ? bgBiome.bg : '#120e29';
       ctx.fillRect(0, 0, width, height);
@@ -4094,7 +4101,7 @@ const Game = () => {
     }
 
     // Menu background — draw animated space scene instead of game world
-    if (!gameStarted && !isGameOver) {
+    if (!gameStartedRef.current && !isGameOverRef.current) {
       if (!state.menuStars || state.menuStars.length === 0) {
         generateMenuScene(width, height);
       }
@@ -4345,9 +4352,11 @@ const Game = () => {
       }
     }
 
-    // Draw wall-stick particles — batched by color, no per-particle save/restore
+    // Draw wall-stick particles — batched by color, reuse buffers across frames
     if (state.wallParticles && state.wallParticles.length > 0) {
-      const particlesByColor = {};
+      if (!state._particleBatchBuf) state._particleBatchBuf = {};
+      const particlesByColor = state._particleBatchBuf;
+      for (const k in particlesByColor) particlesByColor[k].length = 0;
       for (let i = 0; i < state.wallParticles.length; i++) {
         const p = state.wallParticles[i];
         const screenY = p.y - renderCam;
@@ -4358,9 +4367,10 @@ const Game = () => {
         particlesByColor[key].push({ x: p.x, y: screenY, r: p.radius * alpha });
       }
       for (const color in particlesByColor) {
+        const arr = particlesByColor[color];
+        if (arr.length === 0) continue;
         ctx.fillStyle = color;
         ctx.beginPath();
-        const arr = particlesByColor[color];
         for (let i = 0; i < arr.length; i++) {
           ctx.moveTo(arr[i].x + arr[i].r, arr[i].y);
           ctx.arc(arr[i].x, arr[i].y, arr[i].r, 0, Math.PI * 2);
@@ -4422,7 +4432,7 @@ const Game = () => {
     }
 
     // Milestone flash overlay
-    if (state.milestoneFlash > 0 && !isGameOver) {
+    if (state.milestoneFlash > 0 && !isGameOverRef.current) {
       ctx.save();
       ctx.globalAlpha = state.milestoneFlash * 0.3;
       ctx.fillStyle = '#ffffff';
@@ -4431,7 +4441,7 @@ const Game = () => {
     }
 
     // Milestone celebration text — dramatic entrance with gradient and glow
-    if (state.milestoneTextTimer > 0 && !isGameOver) {
+    if (state.milestoneTextTimer > 0 && !isGameOverRef.current) {
       ctx.save();
       const progress = 1 - (state.milestoneTextTimer / 3.0);
       const scale = progress < 0.1 ? progress / 0.1 : 1;
@@ -4479,7 +4489,7 @@ const Game = () => {
     }
 
     // Draw void storm warning overlay (on top, not affected by shake)
-    if (state.voidStorm && state.player && !isGameOver) {
+    if (state.voidStorm && state.player && !isGameOverRef.current) {
       const proximity = state.voidStorm.getProximity(state.player.y);
       state.voidStorm.drawWarning(ctx, width, height, proximity);
     }
@@ -4668,7 +4678,7 @@ const Game = () => {
     const safeTop = isMobile ? (state.safeTop || 0) : 0;
 
     // Only draw gameplay HUD when game is active (not on start menu)
-    if (gameStarted && !isGameOver) {
+    if (gameStartedRef.current && !isGameOverRef.current) {
       // Draw difficulty badge (top left)
       const diffKey = state.difficulty || 'medium';
       const diffLabelMap = { easy: t('diff.easy'), medium: t('diff.med'), hard: t('diff.hard') };
@@ -4747,7 +4757,7 @@ const Game = () => {
 
     // Draw mood meter bar
     const player = state.player;
-    if (player && gameStarted && !isGameOver) {
+    if (player && gameStartedRef.current && !isGameOverRef.current) {
       ctx.save();
       const meterW = 80 * ts;
       const meterH = 6 * ts;
@@ -4831,9 +4841,9 @@ const Game = () => {
     }
 
     // "Approaching Best!" indicator when within 100m of high score
-    if (gameStarted && !isGameOver) {
+    if (gameStartedRef.current && !isGameOverRef.current) {
       const diff = state.difficulty || 'medium';
-      const best = highScores[diff] || 0;
+      const best = highScoresRef.current[diff] || 0;
       if (best > 0 && state.currentScore >= best - 100 && state.currentScore < best) {
         ctx.save();
         const abPulse = 0.7 + Math.sin(Date.now() / 150) * 0.3;
@@ -4855,7 +4865,7 @@ const Game = () => {
     }
 
     // Draw combo indicator — bold outline with pulsing glow and timer bar
-    if (state.combo >= 2 && state.comboTimer > 0 && gameStarted && !isGameOver) {
+    if (state.combo >= 2 && state.comboTimer > 0 && gameStartedRef.current && !isGameOverRef.current) {
       ctx.save();
       const comboTier = getComboLabel(state.combo);
       const comboMult = getComboMultiplier(state.combo);
@@ -4913,7 +4923,7 @@ const Game = () => {
     }
 
     // Draw momentum streak indicator (right side)
-    if (player && player.momentumStreak >= 2 && gameStarted && !isGameOver) {
+    if (player && player.momentumStreak >= 2 && gameStartedRef.current && !isGameOverRef.current) {
       ctx.save();
       const streakTier = player.getMomentumTier();
       const streakColor = streakTier === 'blazing' ? '#ff3300' :
@@ -4945,7 +4955,7 @@ const Game = () => {
     }
 
     // Void surge warning text
-    if (state.voidSurgeWarning && !state.voidSurgeActive && gameStarted && !isGameOver) {
+    if (state.voidSurgeWarning && !state.voidSurgeActive && gameStartedRef.current && !isGameOverRef.current) {
       ctx.save();
       const warnPulse = 0.5 + Math.sin(Date.now() / 120) * 0.5;
       ctx.globalAlpha = warnPulse;
@@ -4959,7 +4969,7 @@ const Game = () => {
       ctx.restore();
     }
 
-    if (state.voidSurgeActive && gameStarted && !isGameOver) {
+    if (state.voidSurgeActive && gameStartedRef.current && !isGameOverRef.current) {
       ctx.save();
       const surgePulse = 0.6 + Math.sin(Date.now() / 60) * 0.4;
       ctx.globalAlpha = surgePulse;
@@ -4974,7 +4984,7 @@ const Game = () => {
     }
 
     // Draw active power-up indicators (left side)
-    if (player && gameStarted && !isGameOver) {
+    if (player && gameStartedRef.current && !isGameOverRef.current) {
       let puY = Math.round(30 * ts) + safeTop;
       const puBoxW = Math.round(90 * ts);
       const puBoxH = Math.round(22 * ts);
@@ -5038,7 +5048,7 @@ const Game = () => {
     }
 
     // Draw first-run hint overlay (hide when milestone text is showing to avoid overlap)
-    if (state.hints && state.hints.active && gameStarted && !isGameOver && !(state.milestoneTextTimer > 0)) {
+    if (state.hints && state.hints.active && gameStartedRef.current && !isGameOverRef.current && !(state.milestoneTextTimer > 0)) {
       const hint = state.hints.active;
       const hAlpha = Math.min(1, hint.timer, hint.maxTimer - hint.timer + 0.3) * 0.95;
       ctx.save();
@@ -5127,7 +5137,7 @@ const Game = () => {
     ctx.restore();
 
     // Draw pause button (next to mute button, flipped for left-hand mode)
-    if (gameStarted && !isGameOver) {
+    if (gameStartedRef.current && !isGameOverRef.current) {
       ctx.save();
       const pbX = leftHandRef.current ? btnX + btnSize + Math.round(10 * ts) : width - Math.round(130 * ts);
       const pbY = Math.round(20 * ts) + safeTop;
@@ -5372,7 +5382,7 @@ const Game = () => {
     }
 
     // Draw game over screen
-    if (isGameOver) {
+    if (isGameOverRef.current) {
       ctx.save();
 
       // Semi-transparent overlay
@@ -5397,7 +5407,7 @@ const Game = () => {
       const hasMissionReward = gameStateRef.current.missionRewardsThisRun > 0;
       const hasStreakBonus = gameStateRef.current.streakBonusThisRun > 0;
       const goDiff_est = gameStateRef.current.difficulty || 'medium';
-      const goBest_est = highScores[goDiff_est] || 0;
+      const goBest_est = highScoresRef.current[goDiff_est] || 0;
       const rs_est = gameStateRef.current.runStats;
       const hasStats = rs_est && (rs_est.wallBounces > 0 || rs_est.nearMisses > 0 || rs_est.guardiansDefeated > 0);
       const totalGoH = Math.round(52 * goScale)      // GAME OVER title
@@ -5523,7 +5533,7 @@ const Game = () => {
 
       // High score for current difficulty
       const goDiff = gameStateRef.current.difficulty || 'medium';
-      const goBest = highScores[goDiff] || 0;
+      const goBest = highScoresRef.current[goDiff] || 0;
       if (goBest > 0) {
         ctx.font = `${Math.round(20 * goScale)}px Orbitron, Arial`;
         ctx.fillStyle = '#4dccff';
@@ -5709,7 +5719,7 @@ const Game = () => {
     }
 
     // Draw start menu
-    if (!gameStarted && !isGameOver) {
+    if (!gameStartedRef.current && !isGameOverRef.current) {
       ctx.save();
 
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
@@ -6628,7 +6638,7 @@ const Game = () => {
           const bx = diffStartX + i * (diffBtnW + diffGap);
           const by = curY;
           const isSelected = difficultyRef.current === d.key;
-          const best = highScores[d.key] || 0;
+          const best = highScoresRef.current[d.key] || 0;
 
           ctx.fillStyle = isSelected ? d.color : 'rgba(30, 20, 50, 0.9)';
           ctx.fillRect(bx, by, diffBtnW, diffBtnH);

@@ -390,7 +390,7 @@ class Guardian {
   }
 
   update(deltaTime, playerX, playerY, cameraY, screenHeight, currentHeight) {
-    this.phase += 0.04;
+    this.phase += 0.04 * deltaTime * 60;
     this.moveTimer += deltaTime;
 
     // Zone progress (time-based, not height-based)
@@ -970,7 +970,8 @@ class Guardian {
     const dy = this.y - player.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < this.vortexRadius && dist > 0) {
-      const force = this.vortexStrength / (dist * 0.5);
+      const safeDist = Math.max(dist, 10);
+      const force = this.vortexStrength / (safeDist * 0.5);
       player.vx += (dx / dist) * force * deltaTime;
       player.vy += (dy / dist) * force * deltaTime;
     }
@@ -1242,6 +1243,8 @@ class Guardian {
   }
 
   _drawBody(ctx, pulse) {
+    // Quantize pulse to nearest 0.2 to reduce gradient cache thrashing
+    pulse = Math.round(pulse * 5) / 5;
     const r = this.radius;
 
     // Outer glow aura

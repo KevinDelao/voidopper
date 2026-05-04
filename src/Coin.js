@@ -58,7 +58,7 @@ class Coin {
 
     // Render to 2x oversampled offscreen canvas for sharpness
     const scale = 2;
-    const logSize = Math.ceil(this.radius * 1.8 * 2 * pulseScale) + 4;
+    const logSize = Math.ceil(this.radius * 1.8 * 2 * 1.15) + 4;
     const offW = logSize * scale;
     if (!this._offCanvas) {
       this._offCanvas = document.createElement('canvas');

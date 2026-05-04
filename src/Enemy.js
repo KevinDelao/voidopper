@@ -190,8 +190,8 @@ class Enemy {
   }
 
   update(deltaTime) {
-    this.rotation += this.rotationSpeed;
-    this.pulsePhase += this.pulseSpeed;
+    this.rotation += this.rotationSpeed * deltaTime * 60;
+    this.pulsePhase += this.pulseSpeed * deltaTime * 60;
 
     // Move downward (positive Y direction)
     this.y += this.vy * deltaTime;

@@ -44,7 +44,7 @@ class PowerUp {
 
     // Render to 2x oversampled offscreen canvas for sharp icons
     const scale = 2;
-    const logSize = Math.ceil(this.radius * 1.5 * pulse) * 2 + 8;
+    const logSize = Math.ceil(this.radius * 1.5 * 1.1) * 2 + 8;
     if (!this._offCanvas) this._offCanvas = document.createElement('canvas');
     const oc = this._offCanvas;
     const offW = logSize * scale;

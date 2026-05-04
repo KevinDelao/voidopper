@@ -57,6 +57,7 @@ class Boss {
     this.shieldActive = false;
     this.shieldTimer = 0;
     this.vortexActive = false;
+    this.vortexTimer = 0;
 
     // Visual
     this.phase = Math.random() * Math.PI * 2;
@@ -88,7 +89,7 @@ class Boss {
       return;
     }
 
-    this.phase += 0.04;
+    this.phase += 0.04 * deltaTime * 60;
     this.moveTimer += deltaTime;
     this.attackTimer += deltaTime;
     this.specialTimer += deltaTime;
@@ -398,7 +399,8 @@ class Boss {
     const dy = this.y - player.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < this.vortexRadius && dist > 0) {
-      const force = this.vortexStrength / (dist * 0.5);
+      const safeDist = Math.max(dist, 10);
+      const force = this.vortexStrength / (safeDist * 0.5);
       player.vx += (dx / dist) * force * deltaTime;
       player.vy += (dy / dist) * force * deltaTime;
     }
@@ -523,7 +525,7 @@ class Boss {
     ctx.fill();
 
     // Main body (cached gradient — recreate when pulse or flash changes significantly)
-    const bodyGradKey = `${flash ? 'f' : 'n'}_${pulse.toFixed(2)}`;
+    const bodyGradKey = `${flash ? 'f' : 'n'}_${((pulse * 5) | 0)}`;
     if (!this._cachedBodyGrad || this._cachedBodyGradKey !== bodyGradKey) {
       this._cachedBodyGrad = ctx.createRadialGradient(-this.radius * 0.2, -this.radius * 0.2, 0, 0, 0, this.radius * pulse);
       this._cachedBodyGrad.addColorStop(0, flash ? '#ffffff' : this.color.primary);

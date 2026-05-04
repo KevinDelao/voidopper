@@ -54,9 +54,9 @@ class Spike {
   }
 
   update(deltaTime) {
-    this.phase += 0.06;
-    this.pulsePhase += 0.04;
-    this.flickerPhase += 0.08;
+    this.phase += 0.06 * deltaTime * 60;
+    this.pulsePhase += 0.04 * deltaTime * 60;
+    this.flickerPhase += 0.08 * deltaTime * 60;
 
     // Animate particles flowing toward tip
     this.particles.forEach(p => {
@@ -76,6 +76,8 @@ class Spike {
     const edge = biome ? biome.edge : '#aa2222';
     const mid = biome ? biome.mid : '#662222';
     const dark = biome ? biome.dark : '#331111';
+
+    if (!this._gradCache) this._gradCache = {};
 
     ctx.save();
     ctx.translate(this.x, screenY);
@@ -131,12 +133,19 @@ class Spike {
       ctx.translate(6, shard.yOff);
       ctx.rotate(shard.angleOff);
 
-      // Shard body — gradient from dark base to bright tip
-      const shardGrad = ctx.createLinearGradient(0, 0, len, 0);
-      shardGrad.addColorStop(0, dark);
-      shardGrad.addColorStop(0.3, edge);
-      shardGrad.addColorStop(0.7, accent);
-      shardGrad.addColorStop(1, '#ffffff');
+      // Shard body — cached gradient from dark base to bright tip
+      const qLen = Math.round(len);
+      const shardKey = `s_${qLen}_${accent}`;
+      let shardGrad = this._gradCache[shardKey];
+      if (!shardGrad) {
+        if (Object.keys(this._gradCache).length > 20) this._gradCache = {};
+        shardGrad = ctx.createLinearGradient(0, 0, qLen, 0);
+        shardGrad.addColorStop(0, dark);
+        shardGrad.addColorStop(0.3, edge);
+        shardGrad.addColorStop(0.7, accent);
+        shardGrad.addColorStop(1, '#ffffff');
+        this._gradCache[shardKey] = shardGrad;
+      }
 
       ctx.fillStyle = shardGrad;
       ctx.beginPath();
@@ -178,12 +187,19 @@ class Spike {
     const mainLen = this.width * pulse;
     const mainThick = this.height / 2.5;
 
-    const mainGrad = ctx.createLinearGradient(4, 0, mainLen, 0);
-    mainGrad.addColorStop(0, dark);
-    mainGrad.addColorStop(0.2, edge);
-    mainGrad.addColorStop(0.5, accent);
-    mainGrad.addColorStop(0.85, accent);
-    mainGrad.addColorStop(1, '#ffffff');
+    const qMainLen = Math.round(mainLen);
+    const mainKey = `m_${qMainLen}_${accent}`;
+    let mainGrad = this._gradCache[mainKey];
+    if (!mainGrad) {
+      if (Object.keys(this._gradCache).length > 20) this._gradCache = {};
+      mainGrad = ctx.createLinearGradient(4, 0, qMainLen, 0);
+      mainGrad.addColorStop(0, dark);
+      mainGrad.addColorStop(0.2, edge);
+      mainGrad.addColorStop(0.5, accent);
+      mainGrad.addColorStop(0.85, accent);
+      mainGrad.addColorStop(1, '#ffffff');
+      this._gradCache[mainKey] = mainGrad;
+    }
 
     ctx.fillStyle = mainGrad;
     ctx.beginPath();
@@ -274,10 +290,10 @@ class Spike {
     let dx;
     if (this.side === 'left') {
       dx = player.x - this.x;
-      if (dx < -player.radius || dx > this.width * 0.9 + player.radius) return false;
+      if (dx < -player.radius || dx > this.width * 0.75 + player.radius) return false;
     } else {
       dx = this.x - player.x;
-      if (dx < -player.radius || dx > this.width * 0.9 + player.radius) return false;
+      if (dx < -player.radius || dx > this.width * 0.75 + player.radius) return false;
     }
 
     return true;

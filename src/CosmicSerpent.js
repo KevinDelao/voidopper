@@ -90,14 +90,16 @@ class CosmicSerpent {
     // Keep history long enough for the full body
     const maxHistory = this.numSegments * this.segmentSpacing + 40;
     if (this.pathHistory.length > maxHistory * 2) {
-      // Compact by copying tail instead of splice (avoids O(n) shift)
-      const keep = this.pathHistory.slice(-maxHistory);
-      this.pathHistory = keep;
+      // Compact in-place instead of .slice() to avoid allocation
+      const start = this.pathHistory.length - maxHistory;
+      for (let i = 0; i < maxHistory; i++) this.pathHistory[i] = this.pathHistory[start + i];
+      this.pathHistory.length = maxHistory;
     }
 
     // Place each segment along the recorded path at equal arc-length intervals.
     // pathHistory is newest-last, so walk backwards from the end (head).
-    this.segments[0] = { x: this.x, y: this.y };
+    this.segments[0].x = this.x;
+    this.segments[0].y = this.y;
     let pathIdx = this.pathHistory.length - 1;
     let accumDist = 0;
 
@@ -117,10 +119,8 @@ class CosmicSerpent {
           // Interpolate within this path segment — only sqrt here
           const segLen = Math.sqrt(segLenSq);
           const t = remaining / segLen;
-          this.segments[i] = {
-            x: this.pathHistory[pathIdx].x + dx * t,
-            y: this.pathHistory[pathIdx].y + dy * t,
-          };
+          this.segments[i].x = this.pathHistory[pathIdx].x + dx * t;
+          this.segments[i].y = this.pathHistory[pathIdx].y + dy * t;
           accumDist = targetDist;
           break;
         } else {
@@ -132,7 +132,8 @@ class CosmicSerpent {
       // Fallback if path isn't long enough yet
       if (accumDist < targetDist) {
         const first = this.pathHistory[0];
-        this.segments[i] = { x: first.x, y: first.y };
+        this.segments[i].x = first.x;
+        this.segments[i].y = first.y;
       }
     }
 
