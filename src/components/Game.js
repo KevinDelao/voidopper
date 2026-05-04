@@ -4483,15 +4483,17 @@ const Game = () => {
       }
     }
 
-    // Draw floating text popups (in world space)
+    // Draw floating text popups (in world space, clamped to screen edges)
     const ftTs = Math.min(2, Math.max(1, width / 390));
+    const ftPad = Math.round(60 * ftTs);
     state.floatingTexts.forEach(ft => {
       const screenY = ft.y - renderCam;
       const alpha = Math.min(1, ft.life / (ft.maxLife * 0.3)); // Fade out in last 30%
       const scale = Math.min(1, (ft.maxLife - ft.life) / 0.2); // Scale in quickly
+      const clampedX = Math.max(ftPad, Math.min(width - ftPad, ft.x));
 
       ctx.save();
-      ctx.translate(ft.x, screenY);
+      ctx.translate(clampedX, screenY);
       ctx.scale(scale, scale);
       ctx.globalAlpha = alpha;
 
@@ -4826,7 +4828,7 @@ const Game = () => {
         ctx.textAlign = 'right';
         const zoneBiome = state.leftTerrain ? state.leftTerrain.getBiomeAt(state.cameraY + height * 0.5) : null;
         ctx.fillStyle = zoneBiome ? (zoneBiome.accent || '#aaaaff') : '#aaaaff';
-        ctx.fillText(state.zoneAnnounceName, width - Math.round(75 * ts), diffPillY + Math.round(10 * ts));
+        ctx.fillText(state.zoneAnnounceName, width - Math.round(140 * ts), diffPillY + Math.round(10 * ts));
         ctx.restore();
       }
 
@@ -5047,7 +5049,7 @@ const Game = () => {
       ctx.restore();
     }
 
-    // Draw momentum streak indicator (right side)
+    // Draw momentum streak indicator (right side, below buttons)
     if (player && player.momentumStreak >= 2 && gameStartedRef.current && !isGameOverRef.current) {
       ctx.save();
       const streakTier = player.getMomentumTier();
@@ -5055,7 +5057,7 @@ const Game = () => {
         streakTier === 'hot' ? '#ff8800' : streakTier === 'warm' ? '#ffcc00' : '#66ccff';
       const streakSize = Math.round((14 + Math.min(player.momentumStreak, 12)) * ts);
       const streakX = width - Math.round(16 * ts);
-      const streakY = Math.round(30 * ts) + safeTop;
+      const streakY = Math.round(80 * ts) + safeTop;
       ctx.font = `900 ${streakSize}px Orbitron, Arial`;
       ctx.textAlign = 'right';
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
@@ -5110,7 +5112,7 @@ const Game = () => {
 
     // Draw active power-up indicators (left side)
     if (player && gameStartedRef.current && !isGameOverRef.current) {
-      let puY = Math.round(30 * ts) + safeTop;
+      let puY = Math.round(36 * ts) + safeTop;
       const puBoxW = Math.round(90 * ts);
       const puBoxH = Math.round(22 * ts);
       const puConfigs = [
