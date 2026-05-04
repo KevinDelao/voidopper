@@ -704,8 +704,16 @@ const Game = () => {
         const worldY = ty + gameStateRef.current.cameraY;
         player.startAiming(tx, worldY);
         isTouchAiming = true;
-      } else if (player && !player.isStuck) {
-        // Tap while flying — no action (bird is already launched)
+      } else if (player && !player.isStuck && !gameStateRef.current.rocketBurstActive) {
+        // Tap while flying — air nudge toward tap side for dodge control
+        const midX = (canvasRef.current.logicalWidth || 390) / 2;
+        const nudgeStrength = 250 * (player.screenScale || 1);
+        if (tx < midX) {
+          player.vx -= nudgeStrength;
+        } else {
+          player.vx += nudgeStrength;
+        }
+        lightTap();
       }
     };
 
@@ -1328,10 +1336,22 @@ const Game = () => {
         }
         return;
       } else {
-        if (gameStateRef.current.player) {
-          // Start aiming - convert to world coordinates
-          const worldY = clickY + gameStateRef.current.cameraY;
-          gameStateRef.current.player.startAiming(clickX, worldY);
+        const player = gameStateRef.current.player;
+        if (player) {
+          if (player.isStuck) {
+            // Start aiming - convert to world coordinates
+            const worldY = clickY + gameStateRef.current.cameraY;
+            player.startAiming(clickX, worldY);
+          } else if (!gameStateRef.current.rocketBurstActive) {
+            // Air nudge — click left/right to dodge
+            const midX = (canvasRef.current.logicalWidth || 390) / 2;
+            const nudgeStrength = 250 * (player.screenScale || 1);
+            if (clickX < midX) {
+              player.vx -= nudgeStrength;
+            } else {
+              player.vx += nudgeStrength;
+            }
+          }
         }
       }
     };
@@ -2107,6 +2127,13 @@ const Game = () => {
     // Apply gravity only when flying — prevents vy from accumulating while stuck
     if (!player.isStuck) {
       player.applyGravity(state.gravity * moodSpeed * 60 * (state.speedScale || 1), playerDeltaTime);
+    }
+
+    // Cap upward velocity — prevents infinite ascent on favorable terrain
+    // Rocket burst has its own height cap, so exclude it here
+    const maxUpwardVy = -1000 * (player.screenScale || 1);
+    if (!state.rocketBurstActive && player.vy < maxUpwardVy) {
+      player.vy = maxUpwardVy;
     }
 
     // Speed boost: amplify player's upward velocity
