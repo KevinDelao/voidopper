@@ -92,7 +92,7 @@ class Player {
     // === ROCKET BURST (fever burst from momentum) ===
     this.rocketBurst = false;
     this.rocketBurstTimer = 0;
-    this.rocketBurstDuration = 2.0;
+    this.rocketBurstDuration = 1.2;
     this.rocketBurstCooldown = 0;
 
     // === GRAZE SYSTEM (enhanced near-miss) ===

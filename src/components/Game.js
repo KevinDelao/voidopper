@@ -3421,27 +3421,28 @@ const Game = () => {
           setCoinScore(state.currentCoinScore);
         }
       }
-      if (state.rocketBurstTimer <= 0) {
+      if (state.rocketBurstTimer <= 0 || state.rocketBurstHeight > 600 * (player.screenScale || 1)) {
         state.rocketBurstActive = false;
         player.rocketBurst = false;
         player.momentumStreak = Math.floor(player.momentumStreak / 2);
       }
     }
 
-    // Speed lines — spawn when moving fast or during streak
+    // Star streaks — subtle space particles when moving fast
     const playerSpeed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
-    const speedThreshold = 500 * (player.screenScale || 1);
-    if ((playerSpeed > speedThreshold || player.momentumStreak >= 4) && !player.isStuck && state.speedLines.length < 40) {
-      const intensity = Math.min((playerSpeed - speedThreshold) / 600, 1);
-      const spawnCount = Math.ceil(intensity * 3 + (player.momentumStreak >= 8 ? 2 : 0));
+    const speedThreshold = 650 * (player.screenScale || 1);
+    if ((playerSpeed > speedThreshold || player.momentumStreak >= 6) && !player.isStuck && state.speedLines.length < 15) {
+      const intensity = Math.min((playerSpeed - speedThreshold) / 800, 1);
+      const spawnCount = Math.ceil(intensity * 1.5);
       for (let i = 0; i < spawnCount; i++) {
         state.speedLines.push({
           x: Math.random() * width,
           y: state.cameraY - 20,
-          length: 20 + Math.random() * 40 + intensity * 30,
-          speed: 600 + Math.random() * 400 + playerSpeed * 0.5,
-          alpha: 0.2 + intensity * 0.4,
-          life: 0.5 + Math.random() * 0.3,
+          length: 4 + Math.random() * 12 + intensity * 10,
+          speed: 400 + Math.random() * 300 + playerSpeed * 0.3,
+          alpha: 0.08 + intensity * 0.15,
+          life: 0.3 + Math.random() * 0.2,
+          hue: Math.random() < 0.3 ? '#06b6d4' : Math.random() < 0.5 ? '#7c3aed' : '#ffffff',
         });
       }
     }
@@ -4263,16 +4264,18 @@ const Game = () => {
     }
     ctx.fill();
 
-    // Draw speed lines (behind terrain for depth)
+    // Draw star streaks (subtle space particles behind terrain)
     if (state.speedLines && state.speedLines.length > 0) {
       ctx.save();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.5;
+      ctx.lineCap = 'round';
       for (let i = 0; i < state.speedLines.length; i++) {
         const sl = state.speedLines[i];
         const screenY = sl.y - renderCam;
         if (screenY < -50 || screenY > height + 50) continue;
-        ctx.globalAlpha = sl.alpha * Math.min(1, sl.life * 3);
+        const a = sl.alpha * Math.min(1, sl.life * 4);
+        ctx.globalAlpha = a;
+        ctx.strokeStyle = sl.hue || '#ffffff';
+        ctx.lineWidth = sl.length > 12 ? 1.2 : 0.8;
         ctx.beginPath();
         ctx.moveTo(sl.x, screenY);
         ctx.lineTo(sl.x, screenY + sl.length);
