@@ -1883,8 +1883,10 @@ const Game = () => {
     let prev = 0;
     for (const m of milestoneTimes) {
       // Add filler guardians between previous milestone and this one
+      // Stop placing fillers when they'd be within spacing of the milestone
+      // (fight duration ~20s means we need full spacing gap before milestone)
       let t = prev + spacing;
-      while (t < m - spacing * 0.4) {
+      while (t < m - spacing) {
         guardianSchedule.push({ time: t, isMilestone: false });
         t += spacing;
       }
@@ -3350,9 +3352,19 @@ const Game = () => {
         state.guardianActive = false;
         state.guardianIndex++;
         state.guardianScheduleIdx++;
-        // Advance to next scheduled guardian
+        // Advance to next scheduled guardian — skip any that already passed
+        // and enforce minimum 15s cooldown to prevent back-to-back bosses
+        const minCooldown = 15;
+        const earliestNext = state.guardianTimer + minCooldown;
+        while (state.guardianScheduleIdx < state.guardianSchedule.length &&
+               state.guardianSchedule[state.guardianScheduleIdx].time < earliestNext) {
+          state.guardianScheduleIdx++;
+        }
         if (state.guardianScheduleIdx < state.guardianSchedule.length) {
-          state.nextGuardianTime = state.guardianSchedule[state.guardianScheduleIdx].time;
+          state.nextGuardianTime = Math.max(
+            state.guardianSchedule[state.guardianScheduleIdx].time,
+            earliestNext
+          );
         } else {
           state.nextGuardianTime = 999999;
         }
