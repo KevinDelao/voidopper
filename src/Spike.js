@@ -233,15 +233,16 @@ class Spike {
     const tipX = mainLen + 2;
     const glowSize = 6 + Math.sin(this.phase * 2) * 2;
 
-    // Outer glow (cached per accent color)
-    if (!this._tipGlow || this._tipGlowAccent !== accent || this._tipGlowX !== tipX || this._tipGlowSize !== glowSize) {
-      this._tipGlow = ctx.createRadialGradient(tipX, 0, 0, tipX, 0, glowSize * 2);
+    // Outer glow (cached per accent color and quantized size to avoid per-frame recreation)
+    const quantizedGlow = Math.round(glowSize);
+    if (!this._tipGlow || this._tipGlowAccent !== accent || this._tipGlowX !== tipX || this._tipGlowSize !== quantizedGlow) {
+      this._tipGlow = ctx.createRadialGradient(tipX, 0, 0, tipX, 0, quantizedGlow * 2);
       this._tipGlow.addColorStop(0, accent);
       this._tipGlow.addColorStop(0.4, accent + '66');
       this._tipGlow.addColorStop(1, accent + '00');
       this._tipGlowAccent = accent;
       this._tipGlowX = tipX;
-      this._tipGlowSize = glowSize;
+      this._tipGlowSize = quantizedGlow;
     }
     ctx.fillStyle = this._tipGlow;
     ctx.globalAlpha = 0.6 * pulse;
@@ -290,13 +291,19 @@ class Spike {
     let dx;
     if (this.side === 'left') {
       dx = player.x - this.x;
-      if (dx < -player.radius || dx > this.width * 0.75 + player.radius) return false;
     } else {
       dx = this.x - player.x;
-      if (dx < -player.radius || dx > this.width * 0.75 + player.radius) return false;
     }
 
-    return true;
+    if (dx < -player.radius || dx > this.width * 0.75 + player.radius) return false;
+
+    // Triangular hitbox: spike tapers from full height at base to 0 at tip.
+    // At the player's horizontal distance, compute the spike's half-height there.
+    const spikeLen = this.width * 0.75;
+    const progress = Math.max(0, Math.min(1, dx / spikeLen));
+    const halfHeightAtDx = (effectiveHeight / 2) * (1 - progress);
+
+    return dy <= halfHeightAtDx + player.radius * 0.7;
   }
 }
 

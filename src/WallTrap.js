@@ -56,7 +56,7 @@ class WallTrap {
   }
 
   update(deltaTime) {
-    this.phase += 0.05;
+    this.phase += 0.05 * deltaTime * 60;
 
     if (this.trapType === 'sawblade') {
       this.rotationAngle += this.rotationSpeed * deltaTime;
@@ -359,7 +359,21 @@ class WallTrap {
 
     const dy = Math.abs(player.y - this.y);
 
-    // Vertical check
+    if (this.trapType === 'sawblade') {
+      // Circular hitbox at blade center (end of arm)
+      let bladeX;
+      if (this.side === 'left') {
+        bladeX = this.x + this.armLength;
+      } else {
+        bladeX = this.x - this.armLength;
+      }
+      const dx = player.x - bladeX;
+      const distSq = dx * dx + dy * dy;
+      const hitRadius = this.radius * 0.8 + player.radius * 0.7;
+      return distSq < hitRadius * hitRadius;
+    }
+
+    // Vertical check for non-sawblade types
     let effectiveHeight;
     if (this.trapType === 'lasergrid') {
       effectiveHeight = (this.beamCount - 1) * this.beamSpacing + 10;

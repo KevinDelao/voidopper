@@ -57,7 +57,7 @@ class VoidStorm {
     // If player is far ahead, the void accelerates to maintain tension
     const gap = this.y - playerY;
     if (gap > 800) {
-      this.currentSpeed += (gap - 800) * 0.05;
+      this.currentSpeed += Math.min((gap - 800) * 0.05, this.baseSpeed * 2);
     }
 
     // === SURGE SYSTEM ===

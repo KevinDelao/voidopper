@@ -19,7 +19,7 @@ class SpaceJellyfish {
     this.numTentacles = 5 + Math.floor(Math.random() * 3);
     this.tentacles = [];
     for (let i = 0; i < this.numTentacles; i++) {
-      const spread = (i / (this.numTentacles - 1)) - 0.5; // -0.5 to 0.5
+      const spread = this.numTentacles > 1 ? (i / (this.numTentacles - 1)) - 0.5 : 0;
       this.tentacles.push({
         baseX: spread * 20,
         segments: 6 + Math.floor(Math.random() * 3),
@@ -181,16 +181,26 @@ class SpaceJellyfish {
     const dx = player.x - this.x;
     const dy = player.y - this.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    // Slightly generous hitbox — tentacles add danger zone below
     const effectiveRadius = this.radius * 0.7;
-    // Tapered tentacle hitbox - wider near body, narrower at tips (scaled)
-    const ss = this.ss || 1;
-    const tentacleLen = 50 * ss;
-    const tentacleWidth = 10 * ss * (1 - dy / tentacleLen);
-    if (dy > 0 && dy < tentacleLen && Math.abs(dx) < tentacleWidth) {
+
+    // Body check first
+    if (distance < (effectiveRadius + player.radius * 0.7)) {
       return true;
     }
-    return distance < (effectiveRadius + player.radius * 0.7);
+
+    // Tapered tentacle hitbox - only below body, wider near body, narrower at tips
+    const ss = this.ss || 1;
+    const tentacleLen = 50 * ss;
+    const bodyBottom = effectiveRadius;
+    if (dy > bodyBottom && dy < bodyBottom + tentacleLen) {
+      const progress = (dy - bodyBottom) / tentacleLen;
+      const tentacleWidth = 10 * ss * (1 - progress) + player.radius * 0.5;
+      if (Math.abs(dx) < tentacleWidth) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }
 

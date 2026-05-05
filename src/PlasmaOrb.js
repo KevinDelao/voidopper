@@ -42,7 +42,7 @@ class PlasmaOrb {
   }
 
   update(deltaTime) {
-    this.phase += 0.1;
+    this.phase += 0.1 * deltaTime * 60;
 
     // Store trail
     this.trailPositions.push({ x: this.x, y: this.y });

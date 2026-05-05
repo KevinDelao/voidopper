@@ -72,8 +72,8 @@ class CosmicSerpent {
   }
 
   update(deltaTime) {
-    this.phase += 0.03;
-    this.glowPhase += 0.035;
+    this.phase += 0.03 * deltaTime * 60;
+    this.glowPhase += 0.035 * deltaTime * 60;
 
     // Move head downward
     const moveAmount = this.vy * deltaTime;
