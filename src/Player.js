@@ -177,7 +177,7 @@ class Player {
 
   // Mood -> Visual: trail length multiplier
   getTrailMult() {
-    if (this.mood >= 76) return 2.5;
+    if (this.mood >= 76) return 2.0;
     if (this.mood >= 51) return 1.5;
     return 1.0;
   }
@@ -472,9 +472,9 @@ class Player {
       this.trailParticles.push(particle);
     }
 
-    // Cap particle count (keep newest 60, avoid splice allocation)
-    if (this.trailParticles.length > 60) {
-      const keep = 60;
+    // Cap particle count (keep newest 35, avoid splice allocation)
+    if (this.trailParticles.length > 35) {
+      const keep = 35;
       const start = this.trailParticles.length - keep;
       for (let i = 0; i < keep; i++) this.trailParticles[i] = this.trailParticles[start + i];
       this.trailParticles.length = keep;
@@ -485,7 +485,8 @@ class Player {
     if (this.trailParticles.length === 0) return;
     const t = this.activeTrail;
     if (!t) return;
-    const allowShadow = gfxLevel !== 'low';
+    // Only allow shadowBlur on 'high' — it's extremely expensive on iOS
+    const allowShadow = gfxLevel === 'high';
 
     ctx.save();
 
@@ -506,7 +507,7 @@ class Player {
           ctx.beginPath();
           ctx.arc(p.x, screenY, p.size * alpha, 0, Math.PI * 2);
           ctx.fill();
-          ctx.shadowBlur = 0;
+          if (allowShadow) ctx.shadowBlur = 0;
           break;
         }
         case 'bubbles': {
@@ -517,7 +518,6 @@ class Player {
           ctx.beginPath();
           ctx.arc(p.x, screenY, bSize, 0, Math.PI * 2);
           ctx.stroke();
-          // Highlight
           ctx.globalAlpha = alpha * 0.3;
           ctx.fillStyle = '#ffffff';
           ctx.beginPath();
@@ -533,7 +533,7 @@ class Player {
             ctx.shadowColor = p.color;
           }
           this._drawStar(ctx, p.x, screenY, 4, p.size * alpha, p.size * alpha * 0.4, p.rotation);
-          ctx.shadowBlur = 0;
+          if (allowShadow) ctx.shadowBlur = 0;
           break;
         }
         case 'lightning': {
@@ -554,7 +554,7 @@ class Player {
             );
           }
           ctx.stroke();
-          ctx.shadowBlur = 0;
+          if (allowShadow) ctx.shadowBlur = 0;
           break;
         }
         case 'afterimage': {
@@ -571,7 +571,6 @@ class Player {
           ctx.save();
           ctx.translate(p.x, screenY);
           ctx.rotate(p.rotation);
-          // Petal shape
           const ps = p.size * alpha;
           ctx.beginPath();
           ctx.ellipse(0, 0, ps, ps * 0.5, 0, 0, Math.PI * 2);
@@ -612,7 +611,7 @@ class Player {
             ctx.beginPath();
             ctx.arc(p.x, screenY, p.size * alpha, 0, Math.PI * 2);
             ctx.fill();
-            ctx.shadowBlur = 0;
+            if (allowShadow) ctx.shadowBlur = 0;
           }
           break;
         }

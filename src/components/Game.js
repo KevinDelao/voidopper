@@ -3294,7 +3294,7 @@ const Game = () => {
       state.guardian.corridorRight = gRightB - 30;
       state.guardian.corridorCenter = (state.guardian.corridorLeft + state.guardian.corridorRight) / 2;
 
-      state.guardian.update(deltaTime, player.x, player.y, state.cameraY, height, currentHeight);
+      state.guardian.update(rawDeltaTime, player.x, player.y, state.cameraY, height, currentHeight);
 
       // Collision check (any hit = damage, like regular enemies)
       if (!shieldAbsorbedThisFrame && !playerInvincible && !state.guardian.exiting && state.guardian.entered) {
@@ -4261,17 +4261,20 @@ const Game = () => {
       ctx.translate(state.shakeX, state.shakeY);
     }
 
-    // Draw parallax nebulae (deepest layer)
+    // Draw parallax nebulae (deepest layer) — cached gradient per nebula
     if (state.bgNebulae) {
       for (const neb of state.bgNebulae) {
         const ny = (neb.y - renderCam * neb.parallax) % (height + 800) - 400;
         if (ny > -neb.radius * 2 && ny < height + neb.radius * 2) {
+          if (!neb._grad) {
+            neb._grad = ctx.createRadialGradient(0, 0, 0, 0, 0, neb.radius);
+            neb._grad.addColorStop(0, neb.color);
+            neb._grad.addColorStop(1, 'rgba(0,0,0,0)');
+          }
           ctx.save();
-          const grad = ctx.createRadialGradient(neb.x, ny, 0, neb.x, ny, neb.radius);
-          grad.addColorStop(0, neb.color);
-          grad.addColorStop(1, 'rgba(0,0,0,0)');
-          ctx.fillStyle = grad;
-          ctx.fillRect(neb.x - neb.radius, ny - neb.radius, neb.radius * 2, neb.radius * 2);
+          ctx.translate(neb.x, ny);
+          ctx.fillStyle = neb._grad;
+          ctx.fillRect(-neb.radius, -neb.radius, neb.radius * 2, neb.radius * 2);
           ctx.restore();
         }
       }
