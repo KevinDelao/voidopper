@@ -550,23 +550,25 @@ const Game = () => {
       } else if (isGameOverRef.current || gameStateRef.current.pendingRevive) {
         // Update particles even when game is over or revive pending
         const state = gameStateRef.current;
-        state.explosionParticles = state.explosionParticles.filter(particle => {
+        let epw = 0;
+        for (let i = 0; i < state.explosionParticles.length; i++) {
+          const particle = state.explosionParticles[i];
           if (particle.isFeather) {
-            // Feathers flutter and wobble as they fall
             particle.wobblePhase += particle.wobbleSpeed * deltaTime;
             particle.featherRotation += particle.featherRotationSpeed * deltaTime;
             const wobble = Math.sin(particle.wobblePhase) * 15;
             particle.x += (particle.vx + wobble) * deltaTime * 0.12;
             particle.y += particle.vy * deltaTime * 0.12;
-            particle.vy += 5 * deltaTime; // Gentle downward drift
+            particle.vy += 5 * deltaTime;
           } else {
             particle.x += particle.vx * deltaTime * 0.15;
             particle.y += particle.vy * deltaTime * 0.15;
             particle.vy += 3 * deltaTime;
           }
           particle.life -= deltaTime * 0.03;
-          return particle.life > 0;
-        });
+          if (particle.life > 0) state.explosionParticles[epw++] = particle;
+        }
+        state.explosionParticles.length = epw;
 
         // Update bird death dance
         if (state.player && state.player.isDying) {
@@ -3143,6 +3145,8 @@ const Game = () => {
       if (!state._nearMissedEnemies) state._nearMissedEnemies = new Set();
       // Use squared distance for quick rejection (35+maxRadius)^2 ~ 2500
       const nearMissMaxSq = 60 * 60;
+      const skinNM = getSkinAbility(selectedSkinRef.current);
+      const nearMissBonus = skinNM && (skinNM.type === 'nearMissRange' || skinNM.type === 'allBonus') ? (skinNM.type === 'nearMissRange' ? skinNM.value : 5) : 0;
       for (let i = 0; i < enemies.length; i++) {
         const enemy = enemies[i];
         if (!enemy.active || !enemy.radius || state._nearMissedEnemies.has(enemy)) continue;
@@ -3151,8 +3155,6 @@ const Game = () => {
         const distSq = dx * dx + dy * dy;
         if (distSq > nearMissMaxSq) continue;
         const dist = Math.sqrt(distSq) - enemy.radius - pr;
-        const skinNM = getSkinAbility(selectedSkinRef.current);
-        const nearMissBonus = skinNM && (skinNM.type === 'nearMissRange' || skinNM.type === 'allBonus') ? (skinNM.type === 'nearMissRange' ? skinNM.value : 5) : 0;
         // Only count near-miss when player is moving away (survived the pass)
         const dotAway = dx * player.vx + dy * player.vy;
         if (dist > 5 && dist < 35 + nearMissBonus && dotAway > 0) {
@@ -4503,12 +4505,17 @@ const Game = () => {
 
     // Draw floating text popups (in world space, clamped to screen edges)
     const ftTs = Math.min(2, Math.max(1, width / 390));
-    const ftPad = Math.round(60 * ftTs);
+    const ftEdgePad = Math.round(10 * ftTs);
     state.floatingTexts.forEach(ft => {
       const screenY = ft.y - renderCam;
       const alpha = Math.min(1, ft.life / (ft.maxLife * 0.3)); // Fade out in last 30%
       const scale = Math.min(1, (ft.maxLife - ft.life) / 0.2); // Scale in quickly
-      const clampedX = Math.max(ftPad, Math.min(width - ftPad, ft.x));
+
+      // Measure label to clamp center so full text stays on-screen
+      ctx.font = `900 ${Math.round(16 * ftTs)}px Orbitron, Arial`;
+      const halfW = ctx.measureText(ft.label).width / 2;
+      const minX = halfW + ftEdgePad;
+      const clampedX = Math.max(minX, Math.min(width - minX, ft.x));
 
       ctx.save();
       ctx.translate(clampedX, screenY);
@@ -4516,7 +4523,6 @@ const Game = () => {
       ctx.globalAlpha = alpha;
 
       // Label (e.g. "SHIELD") — outlined (no shadowBlur for performance)
-      ctx.font = `900 ${Math.round(16 * ftTs)}px Orbitron, Arial`;
       ctx.textAlign = 'center';
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
       ctx.lineWidth = 3;
