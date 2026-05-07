@@ -224,13 +224,13 @@ class Player {
     if (this.isStuck) {
       this.chargeTime = Math.min(this.chargeTime + deltaTime, this.maxChargeTime);
       this.chargeLevel = this.chargeTime / this.maxChargeTime;
-      this.squash = 1.0 - this.chargeLevel * 0.3;
+      this.squash = 1.0 - this.chargeLevel * 0.12;
     } else {
       this.chargeTime = 0;
       this.chargeLevel = 0;
       this.squash = 1.0;
       const targetStretch = 1.0;
-      this.stretch += (targetStretch - this.stretch) * deltaTime * 5;
+      this.stretch += (targetStretch - this.stretch) * deltaTime * 10;
     }
   }
 
@@ -301,7 +301,7 @@ class Player {
 
     // Stretch decays back to 1.0 during flight
     if (!this.isStuck && this.stretch > 1.0) {
-      this.stretch = Math.max(1.0, this.stretch - deltaTime * 3);
+      this.stretch = Math.max(1.0, this.stretch - deltaTime * 8);
     }
 
     // Velocity cap — prevent clipping through walls at extreme speed
@@ -843,7 +843,7 @@ class Player {
       this.launchSide = this.currentSide;
       this.launchY = this.y;
       // Set stretch based on charge (visual spring release)
-      this.stretch = 1.0 + this.chargeLevel * 0.5;
+      this.stretch = 1.0 + this.chargeLevel * 0.2;
       // Open perfect bounce window — tighter window rewards quick crossings
       this.perfectBounceWindow = 0.35 + this.chargeLevel * 0.15;
     }
