@@ -7171,25 +7171,6 @@ const Game = () => {
         gameStateRef.current._playBtnBounds = { x: playBtnX, y: playBtnY, w: playBtnW, h: playBtnH };
         curY += playBtnH + menuPad;
 
-        // --- Scroll indicator chevron (bounces to hint more content below) ---
-        const chevronBob = Math.sin(Date.now() / 400) * 4;
-        const chevronY = curY - menuPad * 0.4 + chevronBob;
-        ctx.save();
-        ctx.strokeStyle = 'rgba(200, 200, 255, 0.4)';
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(width / 2 - 12, chevronY);
-        ctx.lineTo(width / 2, chevronY + 7);
-        ctx.lineTo(width / 2 + 12, chevronY);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(width / 2 - 12, chevronY + 8);
-        ctx.lineTo(width / 2, chevronY + 15);
-        ctx.lineTo(width / 2 + 12, chevronY + 8);
-        ctx.stroke();
-        ctx.restore();
-
         // --- SHOP + SETTINGS row (side by side) — glass panels ---
         const rowW = Math.min(width - 30, menuMaxW);
         const rowStartX = width / 2 - rowW / 2;
