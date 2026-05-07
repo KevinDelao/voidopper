@@ -2611,7 +2611,8 @@ const Game = () => {
     }
 
     // Update coins
-    state.coins.forEach(coin => {
+    for (let ci = 0; ci < state.coins.length; ci++) {
+      const coin = state.coins[ci];
       coin.update(deltaTime);
 
       // Check collision with player
@@ -2622,7 +2623,6 @@ const Game = () => {
       const coinDist = Math.sqrt(cdx * cdx + cdy * cdy);
       if (!coin.collected && coinDist < magnetDist) {
         coin.collected = true;
-        // Coin pickup builds combo and mood
         addCombo(state, 1, 'COIN');
         state.runStats.coins++;
         if (state.runStats.coins === 1) {
@@ -2640,10 +2640,8 @@ const Game = () => {
         state.currentCoinScore += totalValue;
         setCoinScore(state.currentCoinScore);
 
-        // Sparkle animation flying to HUD
         spawnCoinCollectAnim(state, coin.x, coin.y, state.cameraY, width);
 
-        // Show multiplier text when bonuses active
         if (totalMult > 1) {
           const moodTier = player.getMoodTier();
           let label = '';
@@ -2664,7 +2662,6 @@ const Game = () => {
           });
         }
 
-        // Play coin collect sound
         if (audioManagerRef.current) {
           if (audioManagerRef.current.playCoinPickupSound) {
             audioManagerRef.current.playCoinPickupSound();
@@ -2673,7 +2670,7 @@ const Game = () => {
           }
         }
       }
-    });
+    }
 
     // Remove collected or off-screen coins — in-place
     let coinWrite = 0;
@@ -2736,10 +2733,10 @@ const Game = () => {
     // Update spikes
     let shieldAbsorbedThisFrame = false;
     const playerInvincible = player.invincibleTimer > 0;
-    state.spikes.forEach(spike => {
+    for (let si = 0; si < state.spikes.length; si++) {
+      const spike = state.spikes[si];
       spike.update(deltaTime);
 
-      // Check collision with player when stuck to wall
       if (!shieldAbsorbedThisFrame && !playerInvincible && spike.checkCollision(player)) {
         if (player.hasShield) {
           player.hasShield = false;
@@ -2757,7 +2754,6 @@ const Game = () => {
           handleGameOver();
         }
       } else if (player.isStuck && spike.side === player.currentSide && !spike._nearMissed) {
-        // Near-miss spike: stuck to same wall, close but didn't die (once per spike)
         const dy = Math.abs(spike.y - player.y);
         if (dy < 60 && dy > 10) {
           spike._nearMissed = true;
@@ -2771,7 +2767,7 @@ const Game = () => {
           });
         }
       }
-    });
+    }
 
     // Remove off-screen spikes — in-place
     let spikeWrite = 0;
@@ -2815,7 +2811,8 @@ const Game = () => {
     }
 
     // Update wall traps
-    state.wallTraps.forEach(trap => {
+    for (let ti = 0; ti < state.wallTraps.length; ti++) {
+      const trap = state.wallTraps[ti];
       trap.update(deltaTime);
 
       if (!shieldAbsorbedThisFrame && !playerInvincible && trap.checkCollision(player)) {
@@ -2833,7 +2830,7 @@ const Game = () => {
           handleGameOver();
         }
       }
-    });
+    }
 
     // Remove off-screen wall traps — in-place
     let trapWrite = 0;
@@ -2866,7 +2863,8 @@ const Game = () => {
     }
 
     // Update power-ups
-    state.powerUps.forEach(pu => {
+    for (let pi = 0; pi < state.powerUps.length; pi++) {
+      const pu = state.powerUps[pi];
       pu.update(deltaTime);
 
       if (pu.checkCollision(player)) {
@@ -2889,7 +2887,6 @@ const Game = () => {
           player.speedBoostTimer = duration;
         }
 
-        // Floating text descriptions
         const descriptions = {
           shield: t('powerup.shieldDesc'),
           magnet: t('powerup.magnetDesc'),
@@ -2897,7 +2894,6 @@ const Game = () => {
           speedboost: t('powerup.speedDesc'),
         };
 
-        // Add floating text popup
         state.floatingTexts.push({
           x: pu.x,
           y: pu.y,
@@ -2915,7 +2911,7 @@ const Game = () => {
           audioManagerRef.current.playScoreMilestoneSound();
         }
       }
-    });
+    }
 
     // Remove collected or off-screen powerups — in-place
     let puWrite = 0;
@@ -2959,19 +2955,19 @@ const Game = () => {
 
     // Magnet effect — pull nearby coins
     if (player.hasMagnet) {
-      state.coins.forEach(coin => {
-        if (coin.collected) return;
+      const magnetRange = 350 * (state.speedScale || 1);
+      for (let mi = 0; mi < state.coins.length; mi++) {
+        const coin = state.coins[mi];
+        if (coin.collected) continue;
         const dx = player.x - coin.x;
         const dy = player.y - coin.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const magnetRange = 350 * (state.speedScale || 1);
         if (dist < magnetRange && dist > 0) {
-          // Speed increases as coins get closer for a satisfying snap
           const pullSpeed = (600 + (1 - dist / magnetRange) * 400) * (state.speedScale || 1);
           coin.x += (dx / dist) * pullSpeed * deltaTime;
           coin.y += (dy / dist) * pullSpeed * deltaTime;
         }
-      });
+      }
     }
 
     // Update screen shake (skip if reduced motion)
@@ -3020,19 +3016,17 @@ const Game = () => {
     try {
 
     // Update enemies
-    enemies.forEach(enemy => {
+    for (let ei = 0; ei < enemies.length; ei++) {
+      const enemy = enemies[ei];
       enemy.update(deltaTime);
 
-      // Black holes apply gravitational pull to the player (even when bird is flying)
       if (enemy.isBlackHole && !player.isStuck) {
         enemy.applyGravity(player, deltaTime);
       }
 
-      // Keep enemies within corridor boundaries - bounce off walls
       const enemyLeftBoundary = state.leftTerrain.getMaxXAtY(enemy.y);
       const enemyRightBoundary = state.rightTerrain.getMinXAtY(enemy.y);
 
-      // Check if enemy hit left wall
       if (enemy.x - enemy.radius < enemyLeftBoundary) {
         enemy.x = enemyLeftBoundary + enemy.radius;
         if (enemy.isPlasmaOrb) {
@@ -3042,7 +3036,6 @@ const Game = () => {
         }
       }
 
-      // Check if enemy hit right wall
       if (enemy.x + enemy.radius > enemyRightBoundary) {
         enemy.x = enemyRightBoundary - enemy.radius;
         if (enemy.isPlasmaOrb) {
@@ -3052,10 +3045,8 @@ const Game = () => {
         }
       }
 
-      // Check collision with player
       if (!shieldAbsorbedThisFrame && !playerInvincible && enemy.active && enemy.checkCollision(player)) {
         if (player.hasShield) {
-          // Shield absorbs the hit — breaks combo
           player.hasShield = false;
           player.shieldTimer = 0;
           player.invincibleTimer = 0.3;
@@ -3074,7 +3065,7 @@ const Game = () => {
           handleGameOver();
         }
       }
-    });
+    }
 
     // Proximity-based danger — use squared distance to avoid sqrt per enemy
     // Only compute exact distance if we find something within 80px (squared = 6400)
@@ -3187,10 +3178,10 @@ const Game = () => {
           }
         }
       }
-      // Clean up references to dead/removed enemies to prevent memory leaks
-      if (state._nearMissedEnemies.size > 10) {
+      // Clean up references to removed enemies to prevent memory leaks
+      if (state._nearMissedEnemies.size > enemies.length) {
         for (const e of state._nearMissedEnemies) {
-          if (!e.active) state._nearMissedEnemies.delete(e);
+          if (!e.active || !enemies.includes(e)) state._nearMissedEnemies.delete(e);
         }
       }
     }
