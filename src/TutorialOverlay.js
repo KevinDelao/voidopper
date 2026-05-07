@@ -91,6 +91,25 @@ class TutorialOverlay {
       ctx.lineTo(handX, handY);
       ctx.stroke();
       ctx.setLineDash([]);
+      // Large animated arrow pointing at the bird position
+      const arrowBob = Math.sin(this.timer * 4) * 8;
+      const birdY = height * 0.65;
+      ctx.strokeStyle = '#44ccff';
+      ctx.lineWidth = 3 * ts;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(cx, birdY - 50 * ts + arrowBob);
+      ctx.lineTo(cx, birdY - 20 * ts + arrowBob);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - 10 * ts, birdY - 30 * ts + arrowBob);
+      ctx.lineTo(cx, birdY - 15 * ts + arrowBob);
+      ctx.lineTo(cx + 10 * ts, birdY - 30 * ts + arrowBob);
+      ctx.fillStyle = '#44ccff';
+      ctx.fill();
+      ctx.font = `bold ${Math.round(11 * ts)}px Orbitron, Arial`;
+      ctx.textAlign = 'center';
+      ctx.fillText('YOUR BIRD', cx, birdY - 55 * ts + arrowBob);
     } else if (s.handAction === 'release') {
       const pulse = Math.sin(this.timer * 4) * 0.3 + 0.7;
       const handX = cx;

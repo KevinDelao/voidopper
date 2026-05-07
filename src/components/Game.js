@@ -237,6 +237,8 @@ const Game = () => {
     guardianTimer: 0,
     guardianActive: false,
     guardianClearedHeight: 0,
+    // Purchase confirmation
+    pendingPurchase: null, // { type: 'skin'|'trail'|'upgrade', key, cost, name }
     // Menu scene
     menuStars: [],
     menuPlanets: [],
@@ -797,14 +799,16 @@ const Game = () => {
         }
         isTouchAiming = false;
       } else if (player && player.isStuck && !isTouchAiming) {
-        // Quick tap without drag — still launch (auto-aim)
+        // Quick tap without drag — auto-aim at 35 degrees and launch
         const elapsed = Date.now() - touchStartTime;
-        if (elapsed < 200) {
-          player.launch();
+        if (elapsed < 300) {
+          player.tapLaunch();
           lightTap();
           if (audioManagerRef.current) {
             audioManagerRef.current.playBoostSound();
           }
+        } else {
+          showHint(gameStateRef.current, 'dragReminder', 'Drag to aim', 'Touch and drag away from the bird to aim your launch');
         }
       }
       isTouchAiming = false;
@@ -1008,6 +1012,26 @@ const Game = () => {
             return;
           }
 
+          // Purchase confirmation dialog click handling
+          const pending = gameStateRef.current.pendingPurchase;
+          if (pending) {
+            const confirmB = gameStateRef.current._confirmYesBounds;
+            const cancelB = gameStateRef.current._confirmNoBounds;
+            if (confirmB && clickX >= confirmB.x && clickX <= confirmB.x + confirmB.w &&
+                clickY >= confirmB.y && clickY <= confirmB.y + confirmB.h) {
+              selectionTap();
+              if (pending.type === 'skin') completeSkinPurchase(pending.key, pending.cost);
+              else if (pending.type === 'trail') completeTrailPurchase(pending.key, pending.cost);
+              else if (pending.type === 'upgrade') completeUpgradePurchase(pending.key);
+              gameStateRef.current.pendingPurchase = null;
+            } else if (cancelB && clickX >= cancelB.x && clickX <= cancelB.x + cancelB.w &&
+                       clickY >= cancelB.y && clickY <= cancelB.y + cancelB.h) {
+              selectionTap();
+              gameStateRef.current.pendingPurchase = null;
+            }
+            return;
+          }
+
           // Shop click handling — skins or trails depending on active tab
           if (shopTabRef.current === 'skins') {
             const skinKeys = Object.keys(BirdSkins);
@@ -1031,16 +1055,11 @@ const Game = () => {
                 setSelectedSkin(clickedSkin);
                 setItem('voidHopper_selectedSkin', clickedSkin);
               } else if (totalCoinsRef.current >= skin.cost) {
-                const newTotal = totalCoinsRef.current - skin.cost;
-                totalCoinsRef.current = newTotal;
-                setTotalCoins(newTotal);
-                setItem('voidHopper_totalCoins', String(newTotal));
-                const newUnlocked = [...currentUnlockedSkins, clickedSkin];
-                setUnlockedSkins(newUnlocked);
-                setJSON('voidHopper_unlockedSkins', newUnlocked);
-                selectedSkinRef.current = clickedSkin;
-                setSelectedSkin(clickedSkin);
-                setItem('voidHopper_selectedSkin', clickedSkin);
+                if (skin.cost > 50) {
+                  gameStateRef.current.pendingPurchase = { type: 'skin', key: clickedSkin, cost: skin.cost, name: skin.name || clickedSkin };
+                } else {
+                  completeSkinPurchase(clickedSkin, skin.cost);
+                }
               }
               return;
             }
@@ -1066,16 +1085,11 @@ const Game = () => {
                 setSelectedTrail(clickedTrail);
                 setItem('voidHopper_selectedTrail', clickedTrail);
               } else if (totalCoinsRef.current >= trail.cost) {
-                const newTotal = totalCoinsRef.current - trail.cost;
-                totalCoinsRef.current = newTotal;
-                setTotalCoins(newTotal);
-                setItem('voidHopper_totalCoins', String(newTotal));
-                const newUnlocked = [...currentUnlockedTrails, clickedTrail];
-                setUnlockedTrails(newUnlocked);
-                setJSON('voidHopper_unlockedTrails', newUnlocked);
-                selectedTrailRef.current = clickedTrail;
-                setSelectedTrail(clickedTrail);
-                setItem('voidHopper_selectedTrail', clickedTrail);
+                if (trail.cost > 50) {
+                  gameStateRef.current.pendingPurchase = { type: 'trail', key: clickedTrail, cost: trail.cost, name: trail.name || clickedTrail };
+                } else {
+                  completeTrailPurchase(clickedTrail, trail.cost);
+                }
               }
               return;
             }
@@ -1086,14 +1100,12 @@ const Game = () => {
               const b = gameStateRef.current['_upg_' + key];
               if (b && clickX >= b.x && clickX <= b.x + b.w && clickY >= b.y && clickY <= b.y + b.h) {
                 if (!um.isMaxed(key) && totalCoinsRef.current >= um.getCost(key)) {
-                  const cost = um.purchase(key, totalCoinsRef.current);
-                  if (cost != null) {
-                    selectionTap();
-                    const newTotal = totalCoinsRef.current - cost;
-                    totalCoinsRef.current = newTotal;
-                    setTotalCoins(newTotal);
-                    setItem('voidHopper_totalCoins', String(newTotal));
-                    if (audioManagerRef.current) audioManagerRef.current.playScoreMilestoneSound();
+                  const upgCost = um.getCost(key);
+                  if (upgCost > 50) {
+                    const def = um.getAllDefs()[key];
+                    gameStateRef.current.pendingPurchase = { type: 'upgrade', key, cost: upgCost, name: def.label || key };
+                  } else {
+                    completeUpgradePurchase(key);
                   }
                 }
                 return;
@@ -1106,6 +1118,31 @@ const Game = () => {
 
         // No scroll offset — menu fits on one screen
         const menuClickY = clickY;
+
+        // Daily reward modal intercepts all clicks when visible
+        if (!gameStateRef.current._dailyRewardClaimed && !gameStateRef.current._dailyModalDismissed &&
+            progressionRef.current && progressionRef.current.pendingDailyReward > 0 &&
+            gameStateRef.current._dailyModalBounds) {
+          const mb = gameStateRef.current._dailyModalBounds;
+          if (clickX >= mb.x && clickX <= mb.x + mb.w && menuClickY >= mb.y && menuClickY <= mb.y + mb.h) {
+            const reward = progressionRef.current.claimDailyReward();
+            if (reward > 0) {
+              const newTotal = totalCoinsRef.current + reward;
+              totalCoinsRef.current = newTotal;
+              setTotalCoins(newTotal);
+              setItem('voidHopper_totalCoins', String(newTotal));
+              gameStateRef.current._dailyRewardClaimed = true;
+              gameStateRef.current._dailyRewardBounds = null;
+              gameStateRef.current._dailyModalBounds = null;
+              notifyTap('SUCCESS');
+              if (audioManagerRef.current) audioManagerRef.current.playScoreMilestoneSound();
+            }
+          } else {
+            gameStateRef.current._dailyModalDismissed = true;
+            gameStateRef.current._dailyModalBounds = null;
+          }
+          return;
+        }
 
         // Check if daily reward was clicked
         const drBounds = gameStateRef.current._dailyRewardBounds;
@@ -1317,7 +1354,7 @@ const Game = () => {
         }
         // Check Restart button
         const restartBounds = gameStateRef.current._restartBtnBounds;
-        if (restartBounds && timeSinceGameOver >= 500 &&
+        if (restartBounds && timeSinceGameOver >= 200 &&
             clickX >= restartBounds.x && clickX <= restartBounds.x + restartBounds.w &&
             clickY >= restartBounds.y && clickY <= restartBounds.y + restartBounds.h) {
           mediumTap();
@@ -1409,7 +1446,7 @@ const Game = () => {
         if (e.key === 'r' || e.key === 'R' || e.key === ' ') {
           // Brief delay before allowing restart
           const timeSinceGameOver = Date.now() - gameOverTimeRef.current;
-          if (timeSinceGameOver >= 500) {
+          if (timeSinceGameOver >= 200) {
             restartGame(getW(), getH());
             gameOverTimeRef.current = null; // Reset
             // Restart game music
@@ -1856,7 +1893,7 @@ const Game = () => {
     state.voidSurgeWarning = false;
     state.voidSurgeActive = false;
     state.activePowerUpDisplay = [];
-    state.difficulty = difficultyRef.current;
+    state.difficulty = state._isFirstRun ? 'easy' : difficultyRef.current;
     const voidStorm = new VoidStorm(startY, width);
     // Adjust void storm speed by difficulty
     if (state.difficulty === 'easy') {
@@ -1974,6 +2011,46 @@ const Game = () => {
     setScore(0);
     setCoinScore(0);
     setIsGameOver(false);
+  };
+
+  const completeSkinPurchase = (skinKey, cost) => {
+    const newTotal = totalCoinsRef.current - cost;
+    totalCoinsRef.current = newTotal;
+    setTotalCoins(newTotal);
+    setItem('voidHopper_totalCoins', String(newTotal));
+    const newUnlocked = [...unlockedSkinsRef.current, skinKey];
+    setUnlockedSkins(newUnlocked);
+    setJSON('voidHopper_unlockedSkins', newUnlocked);
+    selectedSkinRef.current = skinKey;
+    setSelectedSkin(skinKey);
+    setItem('voidHopper_selectedSkin', skinKey);
+    if (audioManagerRef.current) audioManagerRef.current.playScoreMilestoneSound();
+  };
+
+  const completeTrailPurchase = (trailKey, cost) => {
+    const newTotal = totalCoinsRef.current - cost;
+    totalCoinsRef.current = newTotal;
+    setTotalCoins(newTotal);
+    setItem('voidHopper_totalCoins', String(newTotal));
+    const newUnlocked = [...unlockedTrailsRef.current, trailKey];
+    setUnlockedTrails(newUnlocked);
+    setJSON('voidHopper_unlockedTrails', newUnlocked);
+    selectedTrailRef.current = trailKey;
+    setSelectedTrail(trailKey);
+    setItem('voidHopper_selectedTrail', trailKey);
+    if (audioManagerRef.current) audioManagerRef.current.playScoreMilestoneSound();
+  };
+
+  const completeUpgradePurchase = (key) => {
+    const um = upgradeRef.current;
+    const cost = um.purchase(key, totalCoinsRef.current);
+    if (cost != null) {
+      const newTotal = totalCoinsRef.current - cost;
+      totalCoinsRef.current = newTotal;
+      setTotalCoins(newTotal);
+      setItem('voidHopper_totalCoins', String(newTotal));
+      if (audioManagerRef.current) audioManagerRef.current.playScoreMilestoneSound();
+    }
   };
 
   const restartGame = (width, height) => {
@@ -2266,6 +2343,9 @@ const Game = () => {
         if (state.runStats.wallBounces === 1) {
           showHint(state, 'wallBounce', t('hint.comboText'), t('hint.comboSub'));
         }
+        if (player.momentumStreak === 3) {
+          showHint(state, 'streak', 'STREAK: Bounce quickly!', 'Fast consecutive bounces build your streak multiplier');
+        }
         bounceTap(player.getMoodTier());
         if (audioManagerRef.current) {
           audioManagerRef.current.playBounceSound();
@@ -2311,6 +2391,9 @@ const Game = () => {
 
         if (state.runStats.wallBounces === 1) {
           showHint(state, 'wallBounce', t('hint.comboText'), t('hint.comboSub'));
+        }
+        if (player.momentumStreak === 3) {
+          showHint(state, 'streak', 'STREAK: Bounce quickly!', 'Fast consecutive bounces build your streak multiplier');
         }
         bounceTap(player.getMoodTier());
         if (audioManagerRef.current) {
@@ -2737,15 +2820,14 @@ const Game = () => {
       const spike = state.spikes[si];
       spike.update(deltaTime);
 
-      if (!shieldAbsorbedThisFrame && !playerInvincible && spike.checkCollision(player)) {
+      if (!shieldAbsorbedThisFrame && !playerInvincible && !state.rocketBurstActive && spike.checkCollision(player)) {
+        spike._collidedThisFrame = true;
         if (player.hasShield) {
           player.hasShield = false;
           player.shieldTimer = 0;
           player.invincibleTimer = 0.3;
           state.shakeIntensity = 6;
-          state.combo = 0;
-          state.comboTimer = 0;
-          player.breakStreak();
+          state.combo = Math.floor(state.combo / 2); state.comboTimer = state.comboTimerMax * 0.5; player.breakStreak(); player.drainMood(15);
           shieldAbsorbedThisFrame = true;
           if (audioManagerRef.current) audioManagerRef.current.playBounceSound();
         } else {
@@ -2753,7 +2835,7 @@ const Game = () => {
           state.shakeIntensity = 9;
           handleGameOver();
         }
-      } else if (player.isStuck && spike.side === player.currentSide && !spike._nearMissed) {
+      } else if (!spike._collidedThisFrame && player.isStuck && spike.side === player.currentSide && !spike._nearMissed) {
         const dy = Math.abs(spike.y - player.y);
         if (dy < 60 && dy > 10) {
           spike._nearMissed = true;
@@ -2821,7 +2903,7 @@ const Game = () => {
           player.shieldTimer = 0;
           player.invincibleTimer = 0.3;
           state.shakeIntensity = 6;
-          state.combo = 0; state.comboTimer = 0; player.breakStreak(); player.drainMood(25);
+          state.combo = Math.floor(state.combo / 2); state.comboTimer = state.comboTimerMax * 0.5; player.breakStreak(); player.drainMood(15);
           shieldAbsorbedThisFrame = true;
           if (audioManagerRef.current) audioManagerRef.current.playBounceSound();
         } else {
@@ -3052,7 +3134,7 @@ const Game = () => {
           player.invincibleTimer = 0.3;
           enemy.active = false;
           state.shakeIntensity = 6;
-          state.combo = 0; state.comboTimer = 0; player.breakStreak(); player.drainMood(25);
+          state.combo = Math.floor(state.combo / 2); state.comboTimer = state.comboTimerMax * 0.5; player.breakStreak(); player.drainMood(15);
           shieldAbsorbedThisFrame = true;
           if (audioManagerRef.current) {
             audioManagerRef.current.playBounceSound();
@@ -3291,8 +3373,8 @@ const Game = () => {
 
       state.guardian.update(rawDeltaTime, player.x, player.y, state.cameraY, height, currentHeight);
 
-      // Collision check (any hit = damage, like regular enemies)
-      if (!shieldAbsorbedThisFrame && !playerInvincible && !state.guardian.exiting && state.guardian.entered) {
+      // Collision check (any hit = damage, like regular enemies) — skip during rocket burst
+      if (!shieldAbsorbedThisFrame && !playerInvincible && !state.rocketBurstActive && !state.guardian.exiting && state.guardian.entered) {
         const guardianHit = state.guardian.checkCollision(player);
         if (guardianHit) {
           if (player.hasShield) {
@@ -3300,7 +3382,7 @@ const Game = () => {
             player.shieldTimer = 0;
             player.invincibleTimer = 0.3;
             state.shakeIntensity = 6;
-            state.combo = 0; state.comboTimer = 0; player.breakStreak(); player.drainMood(25);
+            state.combo = Math.floor(state.combo / 2); state.comboTimer = state.comboTimerMax * 0.5; player.breakStreak(); player.drainMood(15);
             shieldAbsorbedThisFrame = true;
             if (audioManagerRef.current) audioManagerRef.current.playBounceSound();
           } else {
@@ -4421,8 +4503,9 @@ const Game = () => {
       // Charge indicator: pulsing ring around bird while stuck
       if (state.player.isStuck && state.player.chargeLevel > 0.1) {
         const pScreenY = state.player.y - renderCam;
-        const chargeR = state.player.radius + 8 + state.player.chargeLevel * 12;
-        const chargePulse = 0.4 + Math.sin(Date.now() / 100) * 0.2;
+        const ss = state.player.screenScale || 1;
+        const chargeR = state.player.radius + 8 * ss + state.player.chargeLevel * 12 * ss;
+        const chargePulse = reducedMotionRef.current ? 0.6 : 0.4 + Math.sin(Date.now() / 100) * 0.2;
         ctx.save();
         ctx.beginPath();
         ctx.arc(state.player.x, pScreenY, chargeR, 0, Math.PI * 2 * state.player.chargeLevel);
@@ -4890,16 +4973,16 @@ const Game = () => {
       }
       ctx.restore();
 
-      // Zone name announcement
+      // Zone name announcement (left side, below difficulty badge)
       if (state.zoneAnnounceTimer > 0 && state.zoneAnnounceName) {
         ctx.save();
         const zoneAlpha = state.zoneAnnounceTimer > 2.0 ? Math.min(1, (3.0 - state.zoneAnnounceTimer) / 0.5) : Math.min(1, state.zoneAnnounceTimer / 1.0);
         ctx.globalAlpha = zoneAlpha * 0.8;
         ctx.font = `bold ${Math.round(11 * ts)}px Orbitron, Arial`;
-        ctx.textAlign = 'right';
+        ctx.textAlign = 'left';
         const zoneBiome = state.leftTerrain ? state.leftTerrain.getBiomeAt(state.cameraY + height * 0.5) : null;
         ctx.fillStyle = zoneBiome ? (zoneBiome.accent || '#aaaaff') : '#aaaaff';
-        ctx.fillText(state.zoneAnnounceName, width - Math.round(140 * ts), diffPillY + Math.round(10 * ts));
+        ctx.fillText(state.zoneAnnounceName, Math.round(12 * ts), diffPillY + diffPillH + Math.round(14 * ts));
         ctx.restore();
       }
 
@@ -4965,7 +5048,7 @@ const Game = () => {
       // Mood fill — color shifts with mood, clipped to capsule
       let moodColor;
       if (tier === 'onfire') {
-        const pulse = Math.sin(Date.now() / 80) * 0.15 + 0.85;
+        const pulse = reducedMotionRef.current ? 1 : Math.sin(Date.now() / 80) * 0.15 + 0.85;
         moodColor = `rgba(255, ${Math.floor(60 + pulse * 40)}, 0, 1)`;
       } else if (tier === 'firedup') {
         moodColor = '#ffaa44';
@@ -5018,8 +5101,8 @@ const Game = () => {
           firedup: t('mood.firedUpEffect'),
           onfire: t('mood.onFireEffect'),
         };
-        ctx.font = `${Math.round(8 * ts)}px Orbitron, Arial`;
-        ctx.fillStyle = 'rgba(200, 200, 240, 0.6)';
+        ctx.font = `${Math.round(11 * ts)}px Orbitron, Arial`;
+        ctx.fillStyle = 'rgba(200, 200, 240, 0.7)';
         ctx.fillText(effects[tier], width / 2, meterY + meterH + Math.round(22 * ts));
         hudFlowY = meterY + meterH + Math.round(44 * ts); // below effect hint plus font ascent + padding
       } else {
@@ -5068,7 +5151,7 @@ const Game = () => {
       const comboTier = getComboLabel(state.combo);
       const comboMult = getComboMultiplier(state.combo);
       const comboSize = Math.min(20 + state.combo * 2, 40) * ts;
-      const comboScale = 1 + Math.sin(Date.now() / 80) * 0.08;
+      const comboScale = reducedMotionRef.current ? 1 : 1 + Math.sin(Date.now() / 80) * 0.08;
       const comboAlpha = Math.min(1, state.comboTimer);
       const comboColor = state.combo >= 15 ? '#ff2244' : state.combo >= 10 ? '#ff6600' : state.combo >= 5 ? '#ffaa00' : '#44ddff';
       // Position combo below previous elements with guaranteed spacing
@@ -5129,7 +5212,7 @@ const Game = () => {
         streakTier === 'hot' ? '#ff8800' : streakTier === 'warm' ? '#ffcc00' : '#66ccff';
       const streakSize = Math.round((14 + Math.min(player.momentumStreak, 12)) * ts);
       const streakX = width - Math.round(16 * ts);
-      const streakY = Math.round(90 * ts) + safeTop;
+      const streakY = Math.round(100 * ts) + safeTop;
       ctx.font = `900 ${streakSize}px Orbitron, Arial`;
       ctx.textAlign = 'right';
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
@@ -5143,7 +5226,7 @@ const Game = () => {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
       ctx.fillText('STREAK', streakX, streakY + Math.round(14 * ts));
       // Pulsing outline when close to rocket burst (6+)
-      if (player.momentumStreak >= 6) {
+      if (player.momentumStreak >= 6 && !reducedMotionRef.current) {
         const rocketPulse = 0.4 + Math.sin(Date.now() / 100) * 0.3;
         ctx.font = `900 ${streakSize}px Orbitron, Arial`;
         ctx.strokeStyle = `rgba(${streakTier === 'blazing' ? '255, 50, 0' : '255, 136, 0'}, ${rocketPulse})`;
@@ -6567,6 +6650,43 @@ const Game = () => {
         ctx.restore();
         gameStateRef.current._shopBackBtnBounds = { x: backBtnX, y: backBtnY, w: backBtnW, h: backBtnH };
 
+        // Purchase confirmation overlay
+        if (gameStateRef.current.pendingPurchase) {
+          const pp = gameStateRef.current.pendingPurchase;
+          ctx.save();
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          ctx.fillRect(0, 0, width, height);
+          const dlgW = Math.round(260 * shopTs);
+          const dlgH = Math.round(140 * shopTs);
+          const dlgX = width / 2 - dlgW / 2;
+          const dlgY = height / 2 - dlgH / 2;
+          drawGlassPanel(ctx, dlgX, dlgY, dlgW, dlgH, { radius: 16, bg: 'rgba(20, 10, 40, 0.95)', border: 'rgba(255, 255, 255, 0.15)' });
+          ctx.font = `bold ${Math.round(14 * shopTs)}px Orbitron, Arial`;
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#f0f0ff';
+          ctx.fillText(`Buy ${pp.name}?`, width / 2, dlgY + Math.round(35 * shopTs));
+          ctx.font = `${Math.round(12 * shopTs)}px Orbitron, Arial`;
+          ctx.fillStyle = '#ffd700';
+          ctx.fillText(`Cost: ${pp.cost} coins`, width / 2, dlgY + Math.round(60 * shopTs));
+          const btnW = Math.round(90 * shopTs);
+          const btnH = Math.round(36 * shopTs);
+          const btnY = dlgY + dlgH - Math.round(52 * shopTs);
+          const yesX = width / 2 - btnW - Math.round(8 * shopTs);
+          const noX = width / 2 + Math.round(8 * shopTs);
+          drawGlassPanel(ctx, yesX, btnY, btnW, btnH, { radius: 8, bg: 'rgba(50, 180, 80, 0.8)', border: 'rgba(100, 255, 120, 0.4)' });
+          drawGlassPanel(ctx, noX, btnY, btnW, btnH, { radius: 8, bg: 'rgba(180, 50, 50, 0.8)', border: 'rgba(255, 100, 100, 0.4)' });
+          ctx.font = `bold ${Math.round(13 * shopTs)}px Orbitron, Arial`;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText('Confirm', yesX + btnW / 2, btnY + btnH / 2 + Math.round(4 * shopTs));
+          ctx.fillText('Cancel', noX + btnW / 2, btnY + btnH / 2 + Math.round(4 * shopTs));
+          gameStateRef.current._confirmYesBounds = { x: yesX, y: btnY, w: btnW, h: btnH };
+          gameStateRef.current._confirmNoBounds = { x: noX, y: btnY, w: btnW, h: btnH };
+          ctx.restore();
+        } else {
+          gameStateRef.current._confirmYesBounds = null;
+          gameStateRef.current._confirmNoBounds = null;
+        }
+
       } else if (showSettingsRef.current) {
         // === SETTINGS PANEL ===
         const sTs = Math.min(1.8, Math.max(1, width / 390));
@@ -6971,16 +7091,28 @@ const Game = () => {
           if (isSelected) {
             ctx.fillStyle = d.color;
             ctx.fill();
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = 12;
             ctx.shadowColor = d.color;
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.lineWidth = 2;
             ctx.stroke();
             ctx.shadowBlur = 0;
           } else {
-            ctx.fillStyle = 'rgba(15, 10, 30, 0.7)';
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowOffsetY = 3;
+            ctx.fillStyle = 'rgba(25, 18, 50, 0.85)';
             ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetY = 0;
             ctx.strokeStyle = d.color;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            // Top highlight for 3D depth
+            ctx.beginPath();
+            ctx.moveTo(bx + diffBtnR, by + 1);
+            ctx.lineTo(bx + diffBtnW - diffBtnR, by + 1);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
             ctx.lineWidth = 1;
             ctx.stroke();
           }
@@ -7038,6 +7170,25 @@ const Game = () => {
         ctx.restore();
         gameStateRef.current._playBtnBounds = { x: playBtnX, y: playBtnY, w: playBtnW, h: playBtnH };
         curY += playBtnH + menuPad;
+
+        // --- Scroll indicator chevron (bounces to hint more content below) ---
+        const chevronBob = Math.sin(Date.now() / 400) * 4;
+        const chevronY = curY - menuPad * 0.4 + chevronBob;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(200, 200, 255, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(width / 2 - 12, chevronY);
+        ctx.lineTo(width / 2, chevronY + 7);
+        ctx.lineTo(width / 2 + 12, chevronY);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(width / 2 - 12, chevronY + 8);
+        ctx.lineTo(width / 2, chevronY + 15);
+        ctx.lineTo(width / 2 + 12, chevronY + 8);
+        ctx.stroke();
+        ctx.restore();
 
         // --- SHOP + SETTINGS row (side by side) — glass panels ---
         const rowW = Math.min(width - 30, menuMaxW);
@@ -7248,6 +7399,41 @@ const Game = () => {
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
       ctx.fillText(t('menu.credits'), width / 2, height - creditSafeBot - 8);
+
+      // --- Daily reward modal overlay (draws on top of menu) ---
+      if (!state._dailyRewardClaimed && !state._dailyModalDismissed &&
+          progressionRef.current && progressionRef.current.pendingDailyReward > 0 &&
+          state.screen === 'menu' && !state._showSettings) {
+        const drInfo = progressionRef.current.getDailyRewardInfo();
+        const mTs = Math.min(1.8, Math.max(1, width / 390));
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(0, 0, width, height);
+        const mW = Math.min(width - 60, Math.round(260 * mTs));
+        const mH = Math.round(140 * mTs);
+        const mX = width / 2 - mW / 2;
+        const mY = height / 2 - mH / 2;
+        drawGlassPanel(ctx, mX, mY, mW, mH, { radius: 18, bg: 'rgba(30, 20, 50, 0.95)', border: 'rgba(255, 215, 0, 0.5)' });
+        ctx.font = `bold ${Math.round(16 * mTs)}px Orbitron, Arial`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffd700';
+        ctx.fillText('DAILY REWARD', width / 2, mY + Math.round(30 * mTs));
+        ctx.font = `bold ${Math.round(28 * mTs)}px Orbitron, Arial`;
+        ctx.fillText(`+${drInfo.pending}`, width / 2, mY + Math.round(65 * mTs));
+        ctx.font = `${Math.round(11 * mTs)}px Orbitron, Arial`;
+        ctx.fillStyle = 'rgba(255, 230, 150, 0.8)';
+        ctx.fillText(`Day ${drInfo.day} bonus — tap to claim!`, width / 2, mY + Math.round(88 * mTs));
+        const claimBtnW = Math.round(120 * mTs);
+        const claimBtnH = Math.round(34 * mTs);
+        const claimBtnX = width / 2 - claimBtnW / 2;
+        const claimBtnY = mY + mH - Math.round(48 * mTs);
+        drawRoundRect(ctx, claimBtnX, claimBtnY, claimBtnW, claimBtnH, claimBtnH / 2);
+        ctx.fillStyle = '#ffd700';
+        ctx.fill();
+        ctx.font = `bold ${Math.round(13 * mTs)}px Orbitron, Arial`;
+        ctx.fillStyle = '#000000';
+        ctx.fillText('CLAIM', width / 2, claimBtnY + claimBtnH / 2 + Math.round(5 * mTs));
+        state._dailyModalBounds = { x: mX, y: mY, w: mW, h: mH };
+      }
 
       ctx.restore();
     }

@@ -792,43 +792,42 @@ class Player {
       let angle = Math.atan2(dy, dx);
 
       // Restrict angles based on which wall bird is stuck to
-      // Must aim upward — range: 10 deg to 55 deg above horizontal
+      // Must aim upward — range: 5 deg to 70 deg above horizontal
       if (this.currentSide === 'left') {
-        // On left wall - must aim rightward and upward
-        const maxUpAngle = -Math.PI * 55 / 180; // 75 deg up from horizontal (steepest)
-        const minUpAngle = -Math.PI * 10 / 180; // 10 deg up from horizontal (shallowest)
+        const maxUpAngle = -Math.PI * 70 / 180;
+        const minUpAngle = -Math.PI * 5 / 180;
 
-        // If aiming left (angle > pi/2 or angle < -pi/2), clamp to steepest
         if (angle > Math.PI / 2 || angle < -Math.PI / 2) {
           angle = maxUpAngle;
         } else if (angle > minUpAngle) {
-          // If aiming too horizontal or downward, clamp to shallowest
           angle = minUpAngle;
         } else {
-          // Clamp within valid range
           angle = Math.max(maxUpAngle, Math.min(minUpAngle, angle));
         }
       } else {
-        // On right wall - must aim leftward and upward
-        const maxUpAngle = -Math.PI + Math.PI * 55 / 180; // 55 deg up from horizontal left
-        const minUpAngle = -Math.PI + Math.PI * 10 / 180; // 10 deg up from horizontal left
+        const maxUpAngle = -Math.PI + Math.PI * 70 / 180;
+        const minUpAngle = -Math.PI + Math.PI * 5 / 180;
 
-        // If aiming right (between -pi/2 and pi/2), force to steepest
         if (angle > -Math.PI / 2 && angle < Math.PI / 2) {
           angle = maxUpAngle;
-        }
-        // If aiming downward-left (between pi/2 and pi), clamp to shallowest
-        else if (angle > 0 && angle < Math.PI) {
+        } else if (angle > 0 && angle < Math.PI) {
           angle = minUpAngle;
-        }
-        // Otherwise clamp within valid range
-        else {
+        } else {
           angle = Math.max(minUpAngle, Math.min(maxUpAngle, angle));
         }
       }
 
       this.aimAngle = angle;
     }
+  }
+
+  tapLaunch() {
+    if (!this.isStuck) return false;
+    const defaultAngle = this.currentSide === 'left' ? -Math.PI * 35 / 180 : (-Math.PI + Math.PI * 35 / 180);
+    this.aimAngle = defaultAngle;
+    this.isAiming = true;
+    this.launch();
+    return true;
   }
 
   launch() {
