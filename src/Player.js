@@ -1020,9 +1020,9 @@ class Player {
       ctx.globalAlpha = auraAlpha * auraPulse;
       if (allowShadow) {
         ctx.shadowBlur = tier === 'onfire' ? 20 : 10;
-        ctx.shadowColor = tier === 'onfire' ? '#ff4400' : '#ffaa44';
+        ctx.shadowColor = tier === 'onfire' ? '#00ccff' : '#44ddff';
       }
-      ctx.fillStyle = tier === 'onfire' ? '#ff6600' : '#ffcc44';
+      ctx.fillStyle = tier === 'onfire' ? '#00aaff' : '#66ddff';
       ctx.beginPath();
       ctx.arc(0, 0, auraSize * auraPulse, 0, Math.PI * 2);
       ctx.fill();
@@ -1775,20 +1775,20 @@ class Player {
       ctx.beginPath();
       ctx.arc(0, hy + 2, 3, 0.1, Math.PI - 0.1);
       ctx.stroke();
-      // Fire glow around head
+      // Energy glow around head
       ctx.save();
       const fireAlpha = 0.15 + Math.sin(Date.now() / 100) * 0.08;
       ctx.globalAlpha = fireAlpha;
       ctx.shadowBlur = 15;
-      ctx.shadowColor = '#ff6600';
-      ctx.strokeStyle = '#ff4400';
+      ctx.shadowColor = '#00bbff';
+      ctx.strokeStyle = '#00aaff';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(0, hy, 12, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
-      // Rosy fire cheeks
-      ctx.fillStyle = 'rgba(255, 120, 50, 0.3)';
+      // Rosy cheeks
+      ctx.fillStyle = 'rgba(50, 180, 255, 0.3)';
       ctx.beginPath();
       ctx.ellipse(-5, hy + 1.5, 2.5, 1.5, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -1944,12 +1944,12 @@ class Player {
       ctx.arc(4, hy, 3, Math.PI + 0.3, -0.3);
       ctx.stroke();
       if (tier === 'onfire') {
-        // Fire glow
+        // Energy glow
         ctx.save();
         ctx.globalAlpha = 0.15;
         ctx.shadowBlur = 12;
-        ctx.shadowColor = '#ff6600';
-        ctx.strokeStyle = '#ff4400';
+        ctx.shadowColor = '#00bbff';
+        ctx.strokeStyle = '#00aaff';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(0, hy, 12, 0, Math.PI * 2);

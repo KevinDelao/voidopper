@@ -2751,7 +2751,7 @@ const Game = () => {
             x: coin.x, y: coin.y,
             label: label,
             desc: `+${totalValue}`,
-            color: totalMult >= 5 ? '#ff6600' : totalMult >= 3 ? '#ffaa00' : '#ffd700',
+            color: totalMult >= 5 ? '#00ccff' : totalMult >= 3 ? '#44ddff' : '#ffd700',
             life: 1.5, maxLife: 1.5, vy: -50,
           });
         }
@@ -3541,7 +3541,7 @@ const Game = () => {
         x: player.x, y: player.y,
         label: 'FEVER!',
         desc: 'Invincible!',
-        color: '#ff4400',
+        color: '#00ccff',
         life: 2.0, maxLife: 2.0, vy: -60,
       });
     }
@@ -4733,7 +4733,7 @@ const Game = () => {
     if (state.feverActive && state.feverTimer > 0) {
       ctx.save();
       const feverPulse = 0.3 + Math.sin(Date.now() / 80) * 0.15;
-      ctx.strokeStyle = `rgba(255, 160, 0, ${feverPulse})`;
+      ctx.strokeStyle = `rgba(0, 200, 255, ${feverPulse})`;
       ctx.lineWidth = 6;
       ctx.strokeRect(0, 0, width, height);
       ctx.restore();
@@ -4790,12 +4790,12 @@ const Game = () => {
       ctx.restore();
     }
 
-    // Momentum streak visual: screen edge glow intensifies with streak
+    // Momentum streak visual: screen edge glow intensifies with streak (cyan palette)
     if (state.player && state.player.momentumStreak >= 4) {
       ctx.save();
       const streakIntensity = Math.min((state.player.momentumStreak - 4) / 12, 1);
-      const streakColor = state.player.momentumStreak >= 12 ? '255, 50, 0' :
-        state.player.momentumStreak >= 8 ? '255, 150, 0' : '100, 200, 255';
+      const streakColor = state.player.momentumStreak >= 12 ? '0, 220, 255' :
+        state.player.momentumStreak >= 8 ? '0, 180, 255' : '100, 200, 255';
       const edgeGrad = ctx.createRadialGradient(width / 2, height / 2, width * 0.3, width / 2, height / 2, width * 0.75);
       edgeGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
       edgeGrad.addColorStop(1, `rgba(${streakColor}, ${0.08 + streakIntensity * 0.15})`);
@@ -5082,9 +5082,9 @@ const Game = () => {
       let moodColor;
       if (tier === 'onfire') {
         const pulse = reducedMotionRef.current ? 1 : Math.sin(Date.now() / 80) * 0.15 + 0.85;
-        moodColor = `rgba(255, ${Math.floor(60 + pulse * 40)}, 0, 1)`;
+        moodColor = `rgba(0, ${Math.floor(180 + pulse * 40)}, 255, 1)`;
       } else if (tier === 'firedup') {
-        moodColor = '#ffaa44';
+        moodColor = '#44ddff';
       } else if (tier === 'chill') {
         moodColor = '#6688cc';
       } else {
@@ -5120,7 +5120,7 @@ const Game = () => {
       // Tier label (only when not neutral)
       if (tier !== 'neutral') {
         const tierLabels = { chill: t('mood.chill'), firedup: t('mood.firedUp'), onfire: t('mood.onFire') };
-        const tierColors = { chill: '#6688cc', firedup: '#ffaa44', onfire: '#ff4400' };
+        const tierColors = { chill: '#6688cc', firedup: '#44ddff', onfire: '#00aaff' };
         ctx.font = `bold ${Math.round(10 * ts)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = tierColors[tier];
@@ -5146,7 +5146,7 @@ const Game = () => {
       if (player.moodFlashTimer > 0) {
         const flashAlpha = player.moodFlashTimer * 0.5;
         ctx.globalAlpha = flashAlpha;
-        ctx.fillStyle = player.moodFlashDir > 0 ? '#ffaa00' : '#4466aa';
+        ctx.fillStyle = player.moodFlashDir > 0 ? '#00ccff' : '#4466aa';
         drawRoundRect(ctx, meterX - 2, meterY - 2, meterW + 4, meterH + 4, meterR + 2);
         ctx.fill();
       }
