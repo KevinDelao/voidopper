@@ -89,10 +89,10 @@ class Player {
     this.squash = 1.0;              // Squash factor for visuals (< 1 = compressed)
     this.stretch = 1.0;             // Stretch factor for flight (> 1 = elongated)
 
-    // === ROCKET BURST (fever burst from momentum) ===
+    // === ROCKET BURST (from rocket fuel pickup) ===
     this.rocketBurst = false;
     this.rocketBurstTimer = 0;
-    this.rocketBurstDuration = 1.2;
+    this.rocketBurstDuration = 2.0;
     this.rocketBurstCooldown = 0;
 
     // === GRAZE SYSTEM (enhanced near-miss) ===

@@ -332,10 +332,11 @@ class Guardian {
     this.y = 0;
     this.homeX = this.corridorCenter;
 
-    // Zone tracking (time-based: duration in seconds)
+    // Zone tracking (time-based: duration in seconds, scaled by difficulty)
     this.startHeight = startHeight;
     const baseZonePixels = type.zoneLength || (2000 + guardianIndex * 200);
-    this.zoneDuration = baseZonePixels / 100; // convert pixels to seconds (~20s base, scales up)
+    const diffScale = difficulty === 'easy' ? 0.6 : difficulty === 'hard' ? 1.3 : 1.0;
+    this.zoneDuration = (baseZonePixels / 100) * diffScale;
     this.zoneTimer = 0;
     this.progress = 0;
     this.active = true;
@@ -1171,10 +1172,12 @@ class Guardian {
       ctx.translate(this.x + hx, screenY + hy);
 
       // Head body
-      const hGrad = ctx.createRadialGradient(-3, -3, 0, 0, 0, 14);
-      hGrad.addColorStop(0, this.color.secondary);
-      hGrad.addColorStop(1, this.color.primary);
-      ctx.fillStyle = hGrad;
+      if (!this._cachedHeadGrad) {
+        this._cachedHeadGrad = ctx.createRadialGradient(-3, -3, 0, 0, 0, 14);
+        this._cachedHeadGrad.addColorStop(0, this.color.secondary);
+        this._cachedHeadGrad.addColorStop(1, this.color.primary);
+      }
+      ctx.fillStyle = this._cachedHeadGrad;
       ctx.beginPath();
       ctx.arc(0, 0, 14, 0, Math.PI * 2);
       ctx.fill();
@@ -1228,10 +1231,14 @@ class Guardian {
       ctx.fillRect(barX, barScreenY, barW, barH);
 
       // Progress fill
-      const fillGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
-      fillGrad.addColorStop(0, this.color.primary);
-      fillGrad.addColorStop(1, this.color.glow);
-      ctx.fillStyle = fillGrad;
+      if (!this._cachedProgressGrad || this._cachedProgressGradBarW !== barW || this._cachedProgressGradBarX !== barX) {
+        this._cachedProgressGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+        this._cachedProgressGrad.addColorStop(0, this.color.primary);
+        this._cachedProgressGrad.addColorStop(1, this.color.glow);
+        this._cachedProgressGradBarW = barW;
+        this._cachedProgressGradBarX = barX;
+      }
+      ctx.fillStyle = this._cachedProgressGrad;
       ctx.fillRect(barX, barScreenY, barW * this.progress, barH);
 
       // Border
@@ -1279,11 +1286,14 @@ class Guardian {
       }
       case 'drake': {
         // Dragon-like shape with wings
-        const bodyGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.2, 0, 0, 0, r * pulse);
-        bodyGrad.addColorStop(0, this.color.glow);
-        bodyGrad.addColorStop(0.5, this.color.primary);
-        bodyGrad.addColorStop(1, this.color.primary + '88');
-        ctx.fillStyle = bodyGrad;
+        if (!this._cachedDrakeGrad || this._cachedDrakeGradPulse !== pulse) {
+          this._cachedDrakeGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.2, 0, 0, 0, r * pulse);
+          this._cachedDrakeGrad.addColorStop(0, this.color.glow);
+          this._cachedDrakeGrad.addColorStop(0.5, this.color.primary);
+          this._cachedDrakeGrad.addColorStop(1, this.color.primary + '88');
+          this._cachedDrakeGradPulse = pulse;
+        }
+        ctx.fillStyle = this._cachedDrakeGrad;
         ctx.beginPath();
         ctx.arc(0, 0, r * pulse, 0, Math.PI * 2);
         ctx.fill();
@@ -1340,11 +1350,14 @@ class Guardian {
       }
       case 'emperor': {
         // Dark void body with crown-like spikes
-        const bodyGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, r * pulse);
-        bodyGrad.addColorStop(0, '#000000');
-        bodyGrad.addColorStop(0.5, this.color.primary);
-        bodyGrad.addColorStop(1, this.color.secondary + '66');
-        ctx.fillStyle = bodyGrad;
+        if (!this._cachedEmperorGrad || this._cachedEmperorGradPulse !== pulse) {
+          this._cachedEmperorGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, r * pulse);
+          this._cachedEmperorGrad.addColorStop(0, '#000000');
+          this._cachedEmperorGrad.addColorStop(0.5, this.color.primary);
+          this._cachedEmperorGrad.addColorStop(1, this.color.secondary + '66');
+          this._cachedEmperorGradPulse = pulse;
+        }
+        ctx.fillStyle = this._cachedEmperorGrad;
         ctx.beginPath();
         ctx.arc(0, 0, r * pulse, 0, Math.PI * 2);
         ctx.fill();
@@ -1366,11 +1379,14 @@ class Guardian {
       }
       case 'hydra': {
         // Multi-bodied form
-        const bodyGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.2, 0, 0, 0, r * pulse);
-        bodyGrad.addColorStop(0, this.color.secondary);
-        bodyGrad.addColorStop(0.6, this.color.primary);
-        bodyGrad.addColorStop(1, this.color.primary + '44');
-        ctx.fillStyle = bodyGrad;
+        if (!this._cachedHydraGrad || this._cachedHydraGradPulse !== pulse) {
+          this._cachedHydraGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.2, 0, 0, 0, r * pulse);
+          this._cachedHydraGrad.addColorStop(0, this.color.secondary);
+          this._cachedHydraGrad.addColorStop(0.6, this.color.primary);
+          this._cachedHydraGrad.addColorStop(1, this.color.primary + '44');
+          this._cachedHydraGradPulse = pulse;
+        }
+        ctx.fillStyle = this._cachedHydraGrad;
         ctx.beginPath();
         ctx.arc(0, 0, r * pulse, 0, Math.PI * 2);
         ctx.fill();
@@ -1399,12 +1415,15 @@ class Guardian {
           ctx.stroke();
         }
         // Body
-        const bodyGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, r * pulse);
-        bodyGrad.addColorStop(0, '#ffffff');
-        bodyGrad.addColorStop(0.3, this.color.primary);
-        bodyGrad.addColorStop(0.7, this.color.secondary);
-        bodyGrad.addColorStop(1, this.color.primary + '44');
-        ctx.fillStyle = bodyGrad;
+        if (!this._cachedLeviathanGrad || this._cachedLeviathanGradPulse !== pulse) {
+          this._cachedLeviathanGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, r * pulse);
+          this._cachedLeviathanGrad.addColorStop(0, '#ffffff');
+          this._cachedLeviathanGrad.addColorStop(0.3, this.color.primary);
+          this._cachedLeviathanGrad.addColorStop(0.7, this.color.secondary);
+          this._cachedLeviathanGrad.addColorStop(1, this.color.primary + '44');
+          this._cachedLeviathanGradPulse = pulse;
+        }
+        ctx.fillStyle = this._cachedLeviathanGrad;
         ctx.beginPath();
         ctx.arc(0, 0, r * pulse, 0, Math.PI * 2);
         ctx.fill();
@@ -1458,11 +1477,14 @@ class Guardian {
       case 'wisp': {
         // Glowing orb with flickering particles
         const glowSize = r * pulse * 1.3;
-        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, glowSize);
-        grad.addColorStop(0, this.color.glow);
-        grad.addColorStop(0.4, this.color.primary);
-        grad.addColorStop(1, 'transparent');
-        ctx.fillStyle = grad;
+        if (!this._cachedWispGrad || this._cachedWispGradPulse !== pulse) {
+          this._cachedWispGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, glowSize);
+          this._cachedWispGrad.addColorStop(0, this.color.glow);
+          this._cachedWispGrad.addColorStop(0.4, this.color.primary);
+          this._cachedWispGrad.addColorStop(1, 'transparent');
+          this._cachedWispGradPulse = pulse;
+        }
+        ctx.fillStyle = this._cachedWispGrad;
         ctx.beginPath();
         ctx.arc(0, 0, glowSize, 0, Math.PI * 2);
         ctx.fill();
@@ -1528,10 +1550,13 @@ class Guardian {
           ctx.stroke();
         }
         // Body
-        const bodyGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, r * pulse);
-        bodyGrad.addColorStop(0, this.color.secondary);
-        bodyGrad.addColorStop(1, this.color.primary);
-        ctx.fillStyle = bodyGrad;
+        if (!this._cachedOracleGrad || this._cachedOracleGradPulse !== pulse) {
+          this._cachedOracleGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, r * pulse);
+          this._cachedOracleGrad.addColorStop(0, this.color.secondary);
+          this._cachedOracleGrad.addColorStop(1, this.color.primary);
+          this._cachedOracleGradPulse = pulse;
+        }
+        ctx.fillStyle = this._cachedOracleGrad;
         ctx.beginPath();
         ctx.arc(0, 0, r * pulse, 0, Math.PI * 2);
         ctx.fill();
@@ -1662,11 +1687,14 @@ class Guardian {
       }
       default: {
         // Default sentinel style (original)
-        const bodyGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.2, 0, 0, 0, r * pulse);
-        bodyGrad.addColorStop(0, this.color.primary);
-        bodyGrad.addColorStop(0.6, this.color.secondary);
-        bodyGrad.addColorStop(1, this.color.secondary + '88');
-        ctx.fillStyle = bodyGrad;
+        if (!this._cachedSentinelGrad || this._cachedSentinelGradPulse !== pulse) {
+          this._cachedSentinelGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.2, 0, 0, 0, r * pulse);
+          this._cachedSentinelGrad.addColorStop(0, this.color.primary);
+          this._cachedSentinelGrad.addColorStop(0.6, this.color.secondary);
+          this._cachedSentinelGrad.addColorStop(1, this.color.secondary + '88');
+          this._cachedSentinelGradPulse = pulse;
+        }
+        ctx.fillStyle = this._cachedSentinelGrad;
         ctx.beginPath();
         ctx.arc(0, 0, r * pulse, 0, Math.PI * 2);
         ctx.fill();

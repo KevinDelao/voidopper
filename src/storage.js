@@ -24,8 +24,10 @@ export function getItem(key) {
 export function setItem(key, value) {
   try {
     localStorage.setItem(key, value);
+    return true;
   } catch {
-    // Storage full or unavailable — silently fail
+    // Storage full or unavailable
+    return false;
   }
 }
 
@@ -41,7 +43,9 @@ export function getJSON(key, fallback) {
 export function setJSON(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    return true;
   } catch {
     // Storage full or unavailable
+    return false;
   }
 }

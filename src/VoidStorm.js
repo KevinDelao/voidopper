@@ -93,7 +93,7 @@ class VoidStorm {
     }
 
     // Cap combined speed (surge + catchup) to prevent absurd spikes
-    this.currentSpeed = Math.min(this.currentSpeed, this.baseSpeed * 5);
+    this.currentSpeed = Math.min(this.currentSpeed, this.baseSpeed * 8);
 
     // Void never slows below base speed — always rising
     this.y -= this.currentSpeed * deltaTime;

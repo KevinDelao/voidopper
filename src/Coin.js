@@ -41,9 +41,9 @@ class Coin {
   }
 
   update(deltaTime) {
-    this.rotation += this.rotationSpeed;
-    this.pulsePhase += this.pulseSpeed;
-    this.bobPhase += this.bobSpeed;
+    this.rotation += this.rotationSpeed * deltaTime * 60;
+    this.pulsePhase += this.pulseSpeed * deltaTime * 60;
+    this.bobPhase += this.bobSpeed * deltaTime * 60;
 
     // Float down slowly
     this.y += this.vy * deltaTime;

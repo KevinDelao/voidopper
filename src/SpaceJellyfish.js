@@ -53,7 +53,7 @@ class SpaceJellyfish {
     this.pulsePhase += this.pulseSpeed * deltaTime * 60;
 
     // Float in place with gentle bob — no vertical movement
-    this.x += this.vx * (this.speedScale || 1) * deltaTime;
+    this.x += this.vx * deltaTime;
 
     // Update tentacle sway
     this.tentacles.forEach(t => {

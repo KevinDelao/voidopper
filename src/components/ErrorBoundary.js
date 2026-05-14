@@ -27,23 +27,24 @@ class ErrorBoundary extends React.Component {
           background: '#120e29', display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
           fontFamily: 'Orbitron, Arial, sans-serif', color: '#fff',
-          textAlign: 'center', padding: 40,
+          textAlign: 'center', padding: 'clamp(20px, 5vw, 40px)',
         }}>
-          <div style={{ fontSize: 48, marginBottom: 20 }}>!</div>
-          <h2 style={{ fontSize: 20, color: '#cc66ff', marginBottom: 12 }}>
+          <div style={{ fontSize: 'clamp(32px, 8vw, 48px)', marginBottom: 20 }}>!</div>
+          <h2 style={{ fontSize: 'clamp(16px, 4vw, 20px)', color: '#cc66ff', marginBottom: 12 }}>
             {t('error.title')}
           </h2>
-          <p style={{ fontSize: 13, color: '#aaaacc', lineHeight: 1.6, marginBottom: 30 }}>
+          <p style={{ fontSize: 'clamp(11px, 3vw, 13px)', color: '#aaaacc', lineHeight: 1.6, marginBottom: 30 }}>
             {t('error.desc')}
           </p>
           <button
             onClick={this.handleRestart}
             style={{
-              padding: '14px 40px', fontSize: 16,
+              padding: '14px clamp(24px, 8vw, 40px)', fontSize: 'clamp(14px, 3.5vw, 16px)',
               fontFamily: 'Orbitron, Arial, sans-serif',
               background: 'linear-gradient(135deg, #9944ff, #6622cc)',
               color: '#fff', border: 'none', borderRadius: 12,
               cursor: 'pointer', boxShadow: '0 0 20px rgba(153,68,255,0.4)',
+              minHeight: 44, minWidth: 120,
             }}
           >
             {t('error.restart')}

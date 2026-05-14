@@ -4,7 +4,7 @@ class PowerUp {
     this.ss = ss;
     this.x = x;
     this.y = y;
-    this.type = type; // 'shield', 'magnet', 'slowmo', 'speedboost'
+    this.type = type; // 'shield', 'magnet', 'slowmo', 'speedboost', 'rocketfuel'
     this.radius = Math.round(16 * ss);
     this.collected = false;
     this.phase = Math.random() * Math.PI * 2;
@@ -17,6 +17,7 @@ class PowerUp {
       magnet: 10,
       slowmo: 5,
       speedboost: 6,
+      rocketfuel: 2.0,
     };
 
     // Visual config per type
@@ -25,12 +26,13 @@ class PowerUp {
       magnet: { icon: '\u{1F9F2}', color: '#ff44aa', glow: '#ff0088', label: 'MAGNET' },
       slowmo: { icon: '\u{23F3}', color: '#aa44ff', glow: '#8800ff', label: 'SLOW-MO' },
       speedboost: { icon: '\u{26A1}', color: '#ffaa00', glow: '#ff8800', label: 'BOOST' },
+      rocketfuel: { icon: '\u{1F680}', color: '#00ddff', glow: '#0099ff', label: 'ROCKET FUEL' },
     };
   }
 
   update(deltaTime) {
-    this.phase += 0.08;
-    this.bobPhase += 0.06;
+    this.phase += 0.08 * deltaTime * 60;
+    this.bobPhase += 0.06 * deltaTime * 60;
     this.y += this.vy * deltaTime;
   }
 
@@ -165,6 +167,28 @@ class PowerUp {
       c.strokeStyle = '#ffffff';
       c.lineWidth = 1;
       c.stroke();
+    } else if (this.type === 'rocketfuel') {
+      // Rocket icon — upward arrow with flame
+      c.beginPath();
+      c.moveTo(0, -10);
+      c.lineTo(5, -2);
+      c.lineTo(3, -2);
+      c.lineTo(3, 5);
+      c.lineTo(-3, 5);
+      c.lineTo(-3, -2);
+      c.lineTo(-5, -2);
+      c.closePath();
+      c.fillStyle = '#00ddff';
+      c.fill();
+      c.strokeStyle = '#ffffff';
+      c.lineWidth = 1;
+      c.stroke();
+      // Flame
+      c.beginPath();
+      c.moveTo(-2, 5);
+      c.quadraticCurveTo(0, 11, 2, 5);
+      c.fillStyle = '#ffaa00';
+      c.fill();
     }
 
     // Sparkle particles orbiting

@@ -44,6 +44,7 @@ class AudioManager {
     this._pendingSfx = [];
     this._resuming = false;
     this._initializing = false;
+    this._reinitializing = false;
   }
 
   async initialize() {
@@ -138,41 +139,47 @@ class AudioManager {
   // Nuclear option for iOS: tear down everything and rebuild from scratch.
   // Called inside a user gesture (touchstart) so the new AudioContext is allowed to play.
   async forceReinitialize() {
-    // Kill all running oscillators and intervals
-    this._stopWatchdog();
-    if (this.musicIntervalId) { clearInterval(this.musicIntervalId); this.musicIntervalId = null; }
-    if (this.menuMusicIntervalId) { clearInterval(this.menuMusicIntervalId); this.menuMusicIntervalId = null; }
-    this.musicTimeouts.forEach(t => clearTimeout(t));
-    this.musicTimeouts = [];
-    [...this.musicOscillators, ...this.menuMusicOscillators].forEach(({ osc, gain, filters }) => {
-      try { osc.stop(); } catch (e) {}
-      try { osc.disconnect(); } catch (e) {}
-      try { gain.disconnect(); } catch (e) {}
-      if (filters) filters.forEach(f => { try { f.disconnect(); } catch (e) {} });
-    });
-    this.musicOscillators = [];
-    this.menuMusicOscillators = [];
-    this.isMusicPlaying = false;
-    this.isMenuMusicPlaying = false;
-    // Clean up void storm oscillator
-    if (this.voidStormOsc) {
-      try { this.voidStormOsc.stop(); } catch (e) {}
-      try { this.voidStormOsc.disconnect(); } catch (e) {}
+    if (this._reinitializing) return;
+    this._reinitializing = true;
+    try {
+      // Kill all running oscillators and intervals
+      this._stopWatchdog();
+      if (this.musicIntervalId) { clearInterval(this.musicIntervalId); this.musicIntervalId = null; }
+      if (this.menuMusicIntervalId) { clearInterval(this.menuMusicIntervalId); this.menuMusicIntervalId = null; }
+      this.musicTimeouts.forEach(t => clearTimeout(t));
+      this.musicTimeouts = [];
+      [...this.musicOscillators, ...this.menuMusicOscillators].forEach(({ osc, gain, filters }) => {
+        try { osc.stop(); } catch (e) {}
+        try { osc.disconnect(); } catch (e) {}
+        try { gain.disconnect(); } catch (e) {}
+        if (filters) filters.forEach(f => { try { f.disconnect(); } catch (e) {} });
+      });
+      this.musicOscillators = [];
+      this.menuMusicOscillators = [];
+      this.isMusicPlaying = false;
+      this.isMenuMusicPlaying = false;
+      // Clean up void storm oscillator
+      if (this.voidStormOsc) {
+        try { this.voidStormOsc.stop(); } catch (e) {}
+        try { this.voidStormOsc.disconnect(); } catch (e) {}
+      }
+      if (this.voidStormGain) {
+        try { this.voidStormGain.disconnect(); } catch (e) {}
+      }
+      this.voidStormOsc = null;
+      this.voidStormGain = null;
+      // Close the old context entirely
+      if (this.audioContext && this.audioContext.state !== 'closed') {
+        try { this.audioContext.close(); } catch (e) {}
+      }
+      this.audioContext = null;
+      this.isInitialized = false;
+      this._noiseBuffers = {};
+      // Create a brand new context (inside user gesture = iOS allows it)
+      await this.initialize();
+    } finally {
+      this._reinitializing = false;
     }
-    if (this.voidStormGain) {
-      try { this.voidStormGain.disconnect(); } catch (e) {}
-    }
-    this.voidStormOsc = null;
-    this.voidStormGain = null;
-    // Close the old context entirely
-    if (this.audioContext && this.audioContext.state !== 'closed') {
-      try { this.audioContext.close(); } catch (e) {}
-    }
-    this.audioContext = null;
-    this.isInitialized = false;
-    this._noiseBuffers = {};
-    // Create a brand new context (inside user gesture = iOS allows it)
-    await this.initialize();
   }
 
   // ── GAMEPLAY MUSIC — difficulty-specific ──────────────
@@ -256,6 +263,7 @@ class AudioManager {
       if (this.audioContext.state !== 'running') return; // skip when suspended
       this._cleanupExpiredOscillators();
 
+      try {
       const chord = chords[idx];
       const melody = melodies[idx];
       const now = this.audioContext.currentTime;
@@ -327,6 +335,12 @@ class AudioManager {
       });
 
       idx = (idx + 1) % chords.length;
+      } catch (err) {
+        console.error('[AudioManager] _playEasyMusic oscillator error:', err);
+        this.isMusicPlaying = false;
+        clearInterval(this.musicIntervalId);
+        this.musicIntervalId = null;
+      }
     };
 
     play();
@@ -364,6 +378,7 @@ class AudioManager {
       if (this.audioContext.state !== 'running') return; // skip when suspended
       this._cleanupExpiredOscillators();
 
+      try {
       const chord = chords[idx];
       const melody = melodies[idx];
       const now = this.audioContext.currentTime;
@@ -445,6 +460,12 @@ class AudioManager {
       });
 
       idx = (idx + 1) % chords.length;
+      } catch (err) {
+        console.error('[AudioManager] _playMediumMusic oscillator error:', err);
+        this.isMusicPlaying = false;
+        clearInterval(this.musicIntervalId);
+        this.musicIntervalId = null;
+      }
     };
 
     play();
@@ -482,6 +503,7 @@ class AudioManager {
       if (this.audioContext.state !== 'running') return; // skip when suspended
       this._cleanupExpiredOscillators();
 
+      try {
       const chord = chords[idx];
       const melody = melodies[idx];
       const now = this.audioContext.currentTime;
@@ -592,6 +614,12 @@ class AudioManager {
       });
 
       idx = (idx + 1) % chords.length;
+      } catch (err) {
+        console.error('[AudioManager] _playHardMusic oscillator error:', err);
+        this.isMusicPlaying = false;
+        clearInterval(this.musicIntervalId);
+        this.musicIntervalId = null;
+      }
     };
 
     play();
@@ -670,12 +698,13 @@ class AudioManager {
     if (!this.audioContext) return;
     const now = this.audioContext.currentTime;
     const oscs = this.musicOscillators.splice(0);
-    oscs.forEach(({ osc, gain }) => {
+    oscs.forEach(({ osc, gain, filters }) => {
       try {
         gain.gain.cancelScheduledValues(now);
         gain.gain.setValueAtTime(gain.gain.value, now);
         gain.gain.linearRampToValueAtTime(0, now + fadeDuration);
         osc.stop(now + fadeDuration + 0.1);
+        if (filters) filters.forEach(f => { try { f.disconnect(); } catch(e){} });
       } catch (e) {}
     });
     // Hard-kill after fade duration as safety net (iOS gain ramps can fail)
@@ -705,6 +734,7 @@ class AudioManager {
       this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, now);
     }
     this._stopGameOscillators(1.5);
+    this._stopWatchdog();
   }
 
   toggleMute() {
@@ -780,6 +810,7 @@ class AudioManager {
       if (this.audioContext.state !== 'running') return; // skip when suspended
       this._cleanupExpiredMenuOscillators();
 
+      try {
       const chord = chords[chordIndex];
       const melody = melodySequences[chordIndex];
       const now = this.audioContext.currentTime;
@@ -862,6 +893,12 @@ class AudioManager {
       }
 
       chordIndex = (chordIndex + 1) % chords.length;
+      } catch (err) {
+        console.error('[AudioManager] menu music oscillator error:', err);
+        this.isMenuMusicPlaying = false;
+        clearInterval(this.menuMusicIntervalId);
+        this.menuMusicIntervalId = null;
+      }
     };
 
     playMenuChord();
@@ -878,12 +915,13 @@ class AudioManager {
     if (!this.audioContext) return;
     const now = this.audioContext.currentTime;
     const oscs = this.menuMusicOscillators.splice(0);
-    oscs.forEach(({ osc, gain }) => {
+    oscs.forEach(({ osc, gain, filters }) => {
       try {
         gain.gain.cancelScheduledValues(now);
         gain.gain.setValueAtTime(gain.gain.value, now);
         gain.gain.linearRampToValueAtTime(0, now + fadeDuration);
         osc.stop(now + fadeDuration + 0.1);
+        if (filters) filters.forEach(f => { try { f.disconnect(); } catch(e){} });
       } catch (e) {}
     });
     // Hard-kill after fade duration as safety net (iOS gain ramps can fail)
@@ -912,6 +950,7 @@ class AudioManager {
     }
     // Slow fade for smooth transition to gameplay music
     this.stopAllMenuOscillators(2.5);
+    this._stopWatchdog();
   }
 
   ensureContextRunning() {
@@ -935,6 +974,7 @@ class AudioManager {
 
   // Recover music after an AudioContext interruption (Control Center, Siri, phone call, etc.)
   _recoverAfterInterruption() {
+    if (document.hidden) return;
     if (!this.audioContext || this.audioContext.state !== 'running') return;
     // Kill all existing oscillators — their scheduled params are broken
     // after an interruption and will cause stuck/droning sounds
@@ -953,27 +993,6 @@ class AudioManager {
       this.startMusic(this.currentDifficulty);
     } else if (this.isMenuMusicPlaying) {
       this.isMenuMusicPlaying = false;
-      this.startMenuMusic();
-    }
-  }
-
-  _restartActiveMusic() {
-    if (this.isMusicPlaying) {
-      if (this.musicIntervalId) clearInterval(this.musicIntervalId);
-      this.musicIntervalId = null;
-      this.isMusicPlaying = false;
-      this.startMusic(this.currentDifficulty);
-    } else if (this._wasGameMusicPlaying) {
-      this._wasGameMusicPlaying = false;
-      this.startMusic(this._savedDifficulty || this.currentDifficulty);
-    }
-    if (this.isMenuMusicPlaying) {
-      if (this.menuMusicIntervalId) clearInterval(this.menuMusicIntervalId);
-      this.menuMusicIntervalId = null;
-      this.isMenuMusicPlaying = false;
-      this.startMenuMusic();
-    } else if (this._wasMenuMusicPlaying) {
-      this._wasMenuMusicPlaying = false;
       this.startMenuMusic();
     }
   }
@@ -1103,7 +1122,10 @@ class AudioManager {
   }
 
   playScoreMilestoneSound() {
-    if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (!this.isInitialized || !this.ensureContextRunning()) {
+      if (this._pendingSfx.length < 3) this._pendingSfx.push({ method: 'playScoreMilestoneSound', args: [] });
+      return;
+    }
     if (this._sfxThrottled('scoreMilestone')) return;
     const now = this.audioContext.currentTime;
 
@@ -1162,7 +1184,10 @@ class AudioManager {
   }
 
   playNearMissSound() {
-    if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (!this.isInitialized || !this.ensureContextRunning()) {
+      if (this._pendingSfx.length < 3) this._pendingSfx.push({ method: 'playNearMissSound', args: [] });
+      return;
+    }
     if (this._sfxThrottled('nearMiss')) return;
     const now = this.audioContext.currentTime;
 
@@ -1208,7 +1233,10 @@ class AudioManager {
   }
 
   playComboTierUpSound(tier) {
-    if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (!this.isInitialized || !this.ensureContextRunning()) {
+      if (this._pendingSfx.length < 3) this._pendingSfx.push({ method: 'playComboTierUpSound', args: [tier] });
+      return;
+    }
     if (this._sfxThrottled('comboTierUp')) return;
     const now = this.audioContext.currentTime;
 
@@ -1256,7 +1284,10 @@ class AudioManager {
   }
 
   playMoodIgnitionSound() {
-    if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (!this.isInitialized || !this.ensureContextRunning()) {
+      if (this._pendingSfx.length < 3) this._pendingSfx.push({ method: 'playMoodIgnitionSound', args: [] });
+      return;
+    }
     if (this._sfxThrottled('moodIgnition')) return;
     const now = this.audioContext.currentTime;
 
@@ -1301,7 +1332,10 @@ class AudioManager {
   }
 
   playMoodChillSound() {
-    if (!this.isInitialized || !this.ensureContextRunning()) return;
+    if (!this.isInitialized || !this.ensureContextRunning()) {
+      if (this._pendingSfx.length < 3) this._pendingSfx.push({ method: 'playMoodChillSound', args: [] });
+      return;
+    }
     if (this._sfxThrottled('moodChill')) return;
     const now = this.audioContext.currentTime;
 
@@ -1409,7 +1443,7 @@ class AudioManager {
     this.stopMenuMusic();
     this.stopVoidStormAmbience();
     if (this.audioContext && this.audioContext.state !== 'closed') {
-      this.audioContext.close();
+      try { this.audioContext.close(); } catch (e) {}
     }
   }
 }

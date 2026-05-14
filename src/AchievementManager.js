@@ -36,6 +36,7 @@ class AchievementManager {
       revivesUsed: 0,
     });
     this.pendingToasts = [];
+    this._lastSessionId = null;
   }
 
   _save() {
@@ -43,7 +44,9 @@ class AchievementManager {
     setJSON('voidHopper_achieveStats', this.stats);
   }
 
-  updateStats(partial) {
+  updateStats(partial, sessionId) {
+    if (sessionId != null && sessionId === this._lastSessionId) return;
+    if (sessionId != null) this._lastSessionId = sessionId;
     for (const key of Object.keys(partial)) {
       if (key === 'bestDistance' || key === 'bestCombo') {
         this.stats[key] = Math.max(this.stats[key] || 0, partial[key]);

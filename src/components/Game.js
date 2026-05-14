@@ -299,16 +299,18 @@ const Game = () => {
   useEffect(() => { isGameOverRef.current = isGameOver; }, [isGameOver]);
   useEffect(() => { gameStartedRef.current = gameStarted; }, [gameStarted]);
 
-  // Hide banner during active gameplay, show it when paused or not in game
+  // Hide banner during active gameplay, show on menu/game over/pause
   useEffect(() => {
     let timer;
     if (gameStarted && !isGameOver && !isPaused) {
       hideBanner().then(() => window.dispatchEvent(new Event('resize')));
     } else {
-      showBanner().then(() => {
-        window.dispatchEvent(new Event('resize'));
-        timer = setTimeout(() => window.dispatchEvent(new Event('resize')), 150);
-      });
+      timer = setTimeout(() => {
+        showBanner().then(() => {
+          window.dispatchEvent(new Event('resize'));
+          setTimeout(() => window.dispatchEvent(new Event('resize')), 150);
+        });
+      }, 300);
     }
     return () => { if (timer) clearTimeout(timer); };
   }, [gameStarted, isGameOver, isPaused]);
@@ -829,7 +831,7 @@ const Game = () => {
         return;
       }
 
-      // If paused, check for Resume and Main Menu button clicks
+      // If paused, check for Resume, Main Menu, and Mute button clicks
       if (isPausedRef.current) {
         // Resume button
         const rBounds = gameStateRef.current._resumeBtnBounds;
@@ -854,6 +856,20 @@ const Game = () => {
           if (audioManagerRef.current) {
             audioManagerRef.current.stopMusic();
             audioManagerRef.current.startMenuMusic();
+          }
+          return;
+        }
+        // Mute button during pause
+        const pauseMbBounds = gameStateRef.current._muteBtnBounds;
+        if (pauseMbBounds && clickX >= pauseMbBounds.x && clickX <= pauseMbBounds.x + pauseMbBounds.w &&
+            clickY >= pauseMbBounds.y && clickY <= pauseMbBounds.y + pauseMbBounds.h) {
+          selectionTap();
+          if (audioManagerRef.current) {
+            if (!audioManagerRef.current.isInitialized) {
+              await audioManagerRef.current.initialize();
+            }
+            const muted = audioManagerRef.current.toggleMute();
+            isMutedRef.current = muted; setIsMuted(muted);
           }
           return;
         }
@@ -1565,13 +1581,14 @@ const Game = () => {
       _audioSuspended = false;
       const am = audioManagerRef.current;
       if (!am) return;
-      // Try immediate reinit — works for short backgrounds on some iOS versions.
-      // If iOS blocks it (no user gesture), _needsResume stays true for touch handler.
+      // Try to resume existing context first (avoids destroying it outside user gesture)
       try {
-        await am.forceReinitialize();
+        if (am.audioContext && am.audioContext.state === 'suspended') {
+          await am.audioContext.resume();
+        }
         if (am.audioContext && am.audioContext.state === 'running') {
           am._needsResume = false;
-          // Only clear flags AFTER successfully starting music
+          if (am.masterGain) am.masterGain.gain.value = 1;
           if (am._wasGameMusicPlaying) {
             await am.startMusic(am._savedDifficulty || difficultyRef.current);
             am._wasGameMusicPlaying = false;
@@ -1579,10 +1596,12 @@ const Game = () => {
             await am.startMenuMusic();
             am._wasMenuMusicPlaying = false;
           }
+        } else {
+          am._needsResume = true;
         }
-        // If context isn't running, leave _needsResume true and flags intact
-        // so the touch handler can recover with user gesture
-      } catch (e) { /* touch handler will recover */ }
+      } catch (e) {
+        am._needsResume = true;
+      }
     };
     const handleVisibility = () => {
       if (document.hidden) suspendAudio(); else resumeAudio();
@@ -2087,19 +2106,19 @@ const Game = () => {
     }
   };
 
-  // Trigger rocket burst — bird blasts upward through hazards
+  // Trigger rocket burst — bird blasts upward through hazards (from pickup)
   const triggerRocketBurst = (state, player) => {
     player.triggerRocketBurst();
     state.rocketBurstActive = true;
     state.rocketBurstTimer = player.rocketBurstDuration;
     state.rocketBurstHeight = 0;
-    state.shakeIntensity = 10;
+    state.shakeIntensity = 8;
     heavyTap();
     state.floatingTexts.push({
       x: player.x, y: player.y,
-      label: 'ROCKET BURST!',
-      desc: 'Invincible!',
-      color: '#ff8800',
+      label: 'ROCKET FUEL!',
+      desc: 'Fly up!',
+      color: '#00ddff',
       life: 1.5, maxLife: 1.5, vy: -100,
     });
     if (audioManagerRef.current && audioManagerRef.current.playComboTierUpSound) {
@@ -2335,10 +2354,6 @@ const Game = () => {
           });
         }
 
-        // Check for rocket burst trigger (8+ streak)
-        if (player.momentumStreak >= 8 && !player.rocketBurst && !state.rocketBurstActive && player.rocketBurstCooldown <= 0) {
-          triggerRocketBurst(state, player);
-        }
 
         if (state.runStats.wallBounces === 1) {
           showHint(state, 'wallBounce', t('hint.comboText'), t('hint.comboSub'));
@@ -2937,8 +2952,15 @@ const Game = () => {
 
       if (puMaxX - puMinX > 60) {
         const puX = puMinX + Math.random() * (puMaxX - puMinX);
-        const types = ['shield', 'magnet', 'slowmo', 'speedboost'];
-        const puType = types[Math.floor(Math.random() * types.length)];
+        // Rocket fuel is rare (15% chance), other types split remaining 85%
+        let puType;
+        const roll = Math.random();
+        if (roll < 0.15 && !state.rocketBurstActive) {
+          puType = 'rocketfuel';
+        } else {
+          const types = ['shield', 'magnet', 'slowmo', 'speedboost'];
+          puType = types[Math.floor(Math.random() * types.length)];
+        }
         state.powerUps.push(new PowerUp(puX, puY, puType, width));
       }
       state.lastPowerUpSpawnY = 0;
@@ -2967,6 +2989,8 @@ const Game = () => {
         } else if (pu.type === 'speedboost') {
           player.hasSpeedBoost = true;
           player.speedBoostTimer = duration;
+        } else if (pu.type === 'rocketfuel') {
+          triggerRocketBurst(state, player);
         }
 
         const descriptions = {
@@ -3261,9 +3285,10 @@ const Game = () => {
         }
       }
       // Clean up references to removed enemies to prevent memory leaks
-      if (state._nearMissedEnemies.size > enemies.length) {
+      if (state._nearMissedEnemies.size > 0) {
+        const activeSet = new Set(enemies);
         for (const e of state._nearMissedEnemies) {
-          if (!e.active || !enemies.includes(e)) state._nearMissedEnemies.delete(e);
+          if (!activeSet.has(e)) state._nearMissedEnemies.delete(e);
         }
       }
     }
@@ -3534,10 +3559,14 @@ const Game = () => {
 
     // === EXCITEMENT SYSTEMS UPDATE ===
 
-    // Rocket burst: force bird upward, smash through enemies
+    // Rocket burst: bird flies upward with deceleration, must reach a wall after
     if (state.rocketBurstActive) {
       state.rocketBurstTimer -= deltaTime;
-      const burstSpeed = -800 * (player.screenScale || 1);
+      const totalDuration = player.rocketBurstDuration || 2.0;
+      const progress = 1 - Math.max(0, state.rocketBurstTimer / totalDuration);
+      // Decelerate: full speed at start, eases out toward end
+      const easeFactor = 1 - progress * progress;
+      const burstSpeed = -700 * easeFactor * (player.screenScale || 1);
       player.vy = Math.min(player.vy, burstSpeed);
       player.isStuck = false;
       state.rocketBurstHeight += Math.abs(burstSpeed * deltaTime);
@@ -3555,10 +3584,9 @@ const Game = () => {
           setCoinScore(state.currentCoinScore);
         }
       }
-      if (state.rocketBurstTimer <= 0 || state.rocketBurstHeight > 600 * (player.screenScale || 1)) {
+      if (state.rocketBurstTimer <= 0) {
         state.rocketBurstActive = false;
         player.rocketBurst = false;
-        player.momentumStreak = Math.floor(player.momentumStreak / 2);
       }
     }
 
@@ -4553,7 +4581,10 @@ const Game = () => {
     // Draw wall-stick particles — batched by color, reuse buffers across frames
     if (state.wallParticles && state.wallParticles.length > 0) {
       if (!state._particleBatchBuf) state._particleBatchBuf = {};
+      if (!state._particleBatchPool) state._particleBatchPool = [];
       const particlesByColor = state._particleBatchBuf;
+      const pool = state._particleBatchPool;
+      let poolIdx = 0;
       for (const k in particlesByColor) particlesByColor[k].length = 0;
       for (let i = 0; i < state.wallParticles.length; i++) {
         const p = state.wallParticles[i];
@@ -4562,7 +4593,11 @@ const Game = () => {
         const alpha = p.life / p.maxLife;
         const key = p.color;
         if (!particlesByColor[key]) particlesByColor[key] = [];
-        particlesByColor[key].push({ x: p.x, y: screenY, r: p.radius * alpha });
+        let obj = pool[poolIdx];
+        if (!obj) { obj = { x: 0, y: 0, r: 0 }; pool[poolIdx] = obj; }
+        obj.x = p.x; obj.y = screenY; obj.r = p.radius * alpha;
+        particlesByColor[key].push(obj);
+        poolIdx++;
       }
       for (const color in particlesByColor) {
         const arr = particlesByColor[color];
@@ -4708,17 +4743,19 @@ const Game = () => {
       ctx.restore();
     }
 
-    // Rocket burst: intense orange/red border + radial speed overlay
+    // Rocket burst: cyan/blue border + radial speed overlay
     if (state.rocketBurstActive && state.rocketBurstTimer > 0) {
       ctx.save();
-      const burstPulse = 0.5 + Math.sin(Date.now() / 50) * 0.3;
-      ctx.strokeStyle = `rgba(255, 100, 0, ${burstPulse})`;
-      ctx.lineWidth = 8;
+      const totalDuration = state.player.rocketBurstDuration || 2.0;
+      const burstProgress = 1 - Math.max(0, state.rocketBurstTimer / totalDuration);
+      const burstPulse = (0.5 + Math.sin(Date.now() / 50) * 0.3) * (1 - burstProgress * 0.6);
+      ctx.strokeStyle = `rgba(0, 200, 255, ${burstPulse})`;
+      ctx.lineWidth = 6 * (1 - burstProgress * 0.5);
       ctx.strokeRect(0, 0, width, height);
-      // Radial motion blur effect
+      // Radial motion blur effect — fades as burst decelerates
       const grad = ctx.createRadialGradient(width / 2, height / 2, height * 0.3, width / 2, height / 2, height * 0.7);
       grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-      grad.addColorStop(1, `rgba(255, 80, 0, ${0.15 * burstPulse})`);
+      grad.addColorStop(1, `rgba(0, 180, 255, ${0.12 * burstPulse})`);
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, width, height);
       ctx.restore();
@@ -5150,26 +5187,36 @@ const Game = () => {
       ctx.save();
       const comboTier = getComboLabel(state.combo);
       const comboMult = getComboMultiplier(state.combo);
-      const comboSize = Math.min(20 + state.combo * 2, 40) * ts;
-      const comboScale = reducedMotionRef.current ? 1 : 1 + Math.sin(Date.now() / 80) * 0.08;
+      // Cap size to prevent edge clipping and guardian overlap
+      const guardianActive = state.guardian && state.guardian.entered && !state.guardian.exiting;
+      const maxY = guardianActive ? Math.round(130 * ts) + safeTop : Math.round(height * 0.25);
+      const maxComboSize = Math.min(28, height * 0.035);
+      const comboSize = Math.min(20 + state.combo * 2, maxComboSize) * ts;
+      const comboScale = reducedMotionRef.current ? 1 : 1 + Math.sin(Date.now() / 80) * 0.06;
       const comboAlpha = Math.min(1, state.comboTimer);
       const comboColor = state.combo >= 15 ? '#ff2244' : state.combo >= 10 ? '#ff6600' : state.combo >= 5 ? '#ffaa00' : '#44ddff';
       // Position combo below previous elements with guaranteed spacing
       hudFlowY += Math.round(8 * ts);
-      const comboY = hudFlowY + Math.ceil(comboSize * 0.65);
+      const comboY = Math.min(hudFlowY + Math.ceil(comboSize * 0.65), maxY);
       ctx.globalAlpha = comboAlpha;
 
-      // Combo count and tier
+      // Combo count and tier — measure to prevent edge clipping
       ctx.save();
       ctx.translate(width / 2, comboY);
       ctx.scale(comboScale, comboScale);
       ctx.font = `900 ${comboSize}px Orbitron, Arial`;
       ctx.textAlign = 'center';
-      ctx.shadowBlur = getGfx().shadowBlurMed > 0 ? Math.min(16, 12 + state.combo) : 0;
+      const comboText = `${state.combo}x ${comboTier}`;
+      // Shrink if text overflows screen width
+      let finalComboSize = comboSize;
+      while (ctx.measureText(comboText).width > width - 20 && finalComboSize > 14) {
+        finalComboSize -= 2;
+        ctx.font = `900 ${finalComboSize}px Orbitron, Arial`;
+      }
+      ctx.shadowBlur = getGfx().shadowBlurMed > 0 ? Math.min(12, 8 + state.combo) : 0;
       ctx.shadowColor = comboColor;
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
-      ctx.lineWidth = 4;
-      const comboText = `${state.combo}x ${comboTier}`;
+      ctx.lineWidth = 3;
       ctx.strokeText(comboText, 0, 0);
       ctx.fillStyle = comboColor;
       ctx.fillText(comboText, 0, 0);
@@ -5181,20 +5228,20 @@ const Game = () => {
 
       // Coin multiplier label
       if (comboMult > 1) {
-        ctx.font = `bold ${Math.round(12 * ts)}px Orbitron, Arial`;
+        ctx.font = `bold ${Math.round(11 * ts)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffd700';
         ctx.shadowBlur = 4;
         ctx.shadowColor = '#ffaa00';
-        ctx.fillText(t('hud.coinsMultiplier', { mult: comboMult }), width / 2, comboY + 16 * ts);
+        ctx.fillText(t('hud.coinsMultiplier', { mult: comboMult }), width / 2, comboY + 14 * ts);
         ctx.shadowBlur = 0;
       }
 
       // Timer bar
-      const barW = Math.round(80 * ts);
+      const barW = Math.round(70 * ts);
       const barH = Math.max(2, Math.round(3 * ts));
       const barX = width / 2 - barW / 2;
-      const barY = comboY + Math.round(22 * ts);
+      const barY = comboY + Math.round(18 * ts);
       const timerPct = state.comboTimer / state.comboTimerMax;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
       ctx.fillRect(barX, barY, barW, barH);
@@ -5204,7 +5251,7 @@ const Game = () => {
       ctx.restore();
     }
 
-    // Draw momentum streak indicator (right side, below buttons)
+    // Draw momentum streak indicator (right side, below buttons with guaranteed clearance)
     if (player && player.momentumStreak >= 2 && gameStartedRef.current && !isGameOverRef.current) {
       ctx.save();
       const streakTier = player.getMomentumTier();
@@ -5212,7 +5259,7 @@ const Game = () => {
         streakTier === 'hot' ? '#ff8800' : streakTier === 'warm' ? '#ffcc00' : '#66ccff';
       const streakSize = Math.round((14 + Math.min(player.momentumStreak, 12)) * ts);
       const streakX = width - Math.round(16 * ts);
-      const streakY = Math.round(100 * ts) + safeTop;
+      const streakY = Math.round(80 * ts) + safeTop + Math.round(50 * ts);
       ctx.font = `900 ${streakSize}px Orbitron, Arial`;
       ctx.textAlign = 'right';
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
@@ -5247,8 +5294,9 @@ const Game = () => {
       ctx.fillStyle = '#ff3333';
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
       ctx.lineWidth = 3;
-      ctx.strokeText('VOID SURGE INCOMING', width / 2, height - Math.round(40 * ts) - surgeBot);
-      ctx.fillText('VOID SURGE INCOMING', width / 2, height - Math.round(40 * ts) - surgeBot);
+      const surgeWarnY = Math.max(height * 0.7, height - Math.round(40 * ts) - surgeBot);
+      ctx.strokeText('VOID SURGE INCOMING', width / 2, surgeWarnY);
+      ctx.fillText('VOID SURGE INCOMING', width / 2, surgeWarnY);
       ctx.restore();
     }
 
@@ -5266,9 +5314,9 @@ const Game = () => {
       ctx.restore();
     }
 
-    // Draw active power-up indicators (left side)
+    // Draw active power-up indicators (left side, below difficulty badge)
     if (player && gameStartedRef.current && !isGameOverRef.current) {
-      let puY = Math.round(36 * ts) + safeTop;
+      let puY = Math.round(46 * ts) + safeTop;
       const puBoxW = Math.round(90 * ts);
       const puBoxH = Math.round(22 * ts);
       const puConfigs = [
@@ -5450,80 +5498,6 @@ const Game = () => {
       ctx.restore();
     }
 
-    // Draw pause overlay — glass-morphism style
-    if (isPausedRef.current) {
-      ctx.save();
-      const pauseDimGrad2 = ctx.createLinearGradient(0, 0, 0, height);
-      pauseDimGrad2.addColorStop(0, 'rgba(10, 5, 25, 0.6)');
-      pauseDimGrad2.addColorStop(1, 'rgba(5, 2, 15, 0.75)');
-      ctx.fillStyle = pauseDimGrad2;
-      ctx.fillRect(0, 0, width, height);
-
-      const pauseTs2 = Math.max(1, width / 390);
-      const pauseSmall2 = width < 420;
-      const pauseFontSize2 = pauseSmall2 ? Math.max(36, Math.floor(width * 0.1)) : Math.round(52 * pauseTs2);
-
-      // Glass panel behind PAUSED text and buttons
-      const pp2W = Math.min(Math.round(260 * pauseTs2), width - 40);
-      const pp2H = Math.round(220 * pauseTs2);
-      const pp2X = width / 2 - pp2W / 2;
-      const pp2Y = height / 2 - Math.round(60 * pauseTs2);
-      drawGlassPanel(ctx, pp2X, pp2Y, pp2W, pp2H, {
-        radius: 20, bg: 'rgba(15, 10, 30, 0.82)', border: 'rgba(124, 58, 237, 0.2)'
-      });
-
-      ctx.save();
-      ctx.font = `900 ${pauseFontSize2}px Orbitron, Arial`;
-      ctx.textAlign = 'center';
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = 'rgba(124, 58, 237, 0.4)';
-      ctx.lineWidth = 4;
-      ctx.strokeText(t('pause.title'), width / 2, height / 2 - Math.round(10 * pauseTs2));
-      const pauseGrad2 = ctx.createLinearGradient(width / 2 - 100, height / 2 - 35, width / 2 + 100, height / 2);
-      pauseGrad2.addColorStop(0, '#7c3aed');
-      pauseGrad2.addColorStop(0.5, '#f0f0ff');
-      pauseGrad2.addColorStop(1, '#06b6d4');
-      ctx.fillStyle = pauseGrad2;
-      ctx.fillText(t('pause.title'), width / 2, height / 2 - Math.round(10 * pauseTs2));
-      ctx.restore();
-
-      // Resume button — pill shape with glow
-      const pBtnW2 = Math.min(Math.round(200 * pauseTs2), width - 60);
-      const pBtnH2 = Math.max(44, Math.round(50 * pauseTs2 * (height < 600 ? height / 700 : 1)));
-      const pBtnR2 = pBtnH2 / 2;
-      const resumeBtnX2 = width / 2 - pBtnW2 / 2;
-      const resumeBtnY2 = height / 2 + Math.round(30 * pauseTs2);
-      drawRoundRect(ctx, resumeBtnX2, resumeBtnY2, pBtnW2, pBtnH2, pBtnR2);
-      const resumeGrad2 = ctx.createLinearGradient(resumeBtnX2, resumeBtnY2, resumeBtnX2, resumeBtnY2 + pBtnH2);
-      resumeGrad2.addColorStop(0, 'rgba(124, 58, 237, 0.9)');
-      resumeGrad2.addColorStop(1, 'rgba(88, 28, 200, 0.9)');
-      ctx.fillStyle = resumeGrad2;
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(167, 139, 250, 0.6)';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.fillStyle = '#f0f0ff';
-      ctx.font = `bold ${Math.round(20 * pauseTs2)}px Orbitron, Arial, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(t('pause.resume'), width / 2, resumeBtnY2 + pBtnH2 / 2 + 7);
-      gameStateRef.current._resumeBtnBounds = { x: resumeBtnX2, y: resumeBtnY2, w: pBtnW2, h: pBtnH2 };
-
-      // Main Menu button — pill shape, subtler
-      const menuBtnX2 = width / 2 - pBtnW2 / 2;
-      const menuBtnY2 = resumeBtnY2 + pBtnH2 + Math.round(14 * pauseTs2);
-      drawRoundRect(ctx, menuBtnX2, menuBtnY2, pBtnW2, pBtnH2, pBtnR2);
-      ctx.fillStyle = 'rgba(15, 10, 30, 0.8)';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(200, 200, 240, 0.15)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.fillStyle = 'rgba(200, 200, 240, 0.8)';
-      ctx.font = `bold ${Math.round(18 * pauseTs2)}px Orbitron, Arial, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(t('pause.mainMenu'), width / 2, menuBtnY2 + pBtnH2 / 2 + 6);
-      gameStateRef.current._pauseMenuBtnBounds = { x: menuBtnX2, y: menuBtnY2, w: pBtnW2, h: pBtnH2 };
-      ctx.restore();
-    }
 
     // Draw revive prompt
     if (state.pendingRevive) {
@@ -5697,10 +5671,10 @@ const Game = () => {
 
       // Responsive layout — scale spacing for short screens
       const goSmall = width < 420;
-      const goShort = height < 600;
+      const goShort = height < 650;
       const safeBot = gameStateRef.current.safeBottom || 0;
-      const goScale = goShort ? height / 700 : Math.min(2, Math.max(1, width / 390));
-      const goGap = Math.round(40 * goScale);
+      const goScale = goShort ? Math.min(height / 700, 0.85) : Math.min(2, Math.max(1, width / 390));
+      const goGap = Math.round((goShort ? 24 : 40) * goScale);
       const goLineGap = Math.round(10 * goScale);    // extra breathing room between stat lines
       const cx = width / 2;
 
@@ -5993,7 +5967,7 @@ const Game = () => {
 
       ctx.restore();
 
-      // Draw feather particles ON TOP of game over overlay (2x offscreen for sharpness)
+      // Draw feather particles ON TOP of game over overlay (2x offscreen, cached)
       const state = gameStateRef.current;
       state.explosionParticles.forEach(particle => {
         if (!particle.isFeather) return;
@@ -6003,41 +5977,36 @@ const Game = () => {
         const fScale = 2;
         const fLogSize = Math.ceil(s * 2) + 4;
         const fOffW = fLogSize * fScale;
-        if (!particle._fCanvas) particle._fCanvas = document.createElement('canvas');
-        const fc = particle._fCanvas;
-        if (fc.width !== fOffW || fc.height !== fOffW) { fc.width = fOffW; fc.height = fOffW; }
-        const f = fc.getContext('2d');
-        f.clearRect(0, 0, fOffW, fOffW);
-        f.save();
-        f.translate(fOffW / 2, fOffW / 2);
-        f.scale(fScale, fScale);
-        // Feather shaft
-        f.strokeStyle = particle.featherColor;
-        f.lineWidth = 1.5;
-        f.beginPath();
-        f.moveTo(0, -s); f.lineTo(0, s); f.stroke();
-        // Left vane
-        f.fillStyle = particle.featherColor;
-        f.beginPath();
-        f.moveTo(0, -s);
-        f.quadraticCurveTo(-s * 0.7, -s * 0.3, -s * 0.4, s * 0.2);
-        f.quadraticCurveTo(-s * 0.2, s * 0.6, 0, s);
-        f.fill();
-        // Right vane
-        f.globalAlpha = 0.8;
-        f.fillStyle = particle.featherColor;
-        f.beginPath();
-        f.moveTo(0, -s);
-        f.quadraticCurveTo(s * 0.5, -s * 0.2, s * 0.3, s * 0.3);
-        f.quadraticCurveTo(s * 0.15, s * 0.65, 0, s);
-        f.fill();
-        f.restore();
+        if (!particle._fCanvas) {
+          particle._fCanvas = document.createElement('canvas');
+          particle._fCanvas.width = fOffW;
+          particle._fCanvas.height = fOffW;
+          const f = particle._fCanvas.getContext('2d');
+          f.translate(fOffW / 2, fOffW / 2);
+          f.scale(fScale, fScale);
+          f.strokeStyle = particle.featherColor;
+          f.lineWidth = 1.5;
+          f.beginPath();
+          f.moveTo(0, -s); f.lineTo(0, s); f.stroke();
+          f.fillStyle = particle.featherColor;
+          f.beginPath();
+          f.moveTo(0, -s);
+          f.quadraticCurveTo(-s * 0.7, -s * 0.3, -s * 0.4, s * 0.2);
+          f.quadraticCurveTo(-s * 0.2, s * 0.6, 0, s);
+          f.fill();
+          f.globalAlpha = 0.8;
+          f.beginPath();
+          f.moveTo(0, -s);
+          f.quadraticCurveTo(s * 0.5, -s * 0.2, s * 0.3, s * 0.3);
+          f.quadraticCurveTo(s * 0.15, s * 0.65, 0, s);
+          f.fill();
+        }
         const fHalf = fLogSize / 2;
         ctx.save();
         ctx.translate(particle.x, screenY);
         ctx.rotate(particle.featherRotation);
         ctx.globalAlpha = alpha;
-        ctx.drawImage(fc, -fHalf, -fHalf, fLogSize, fLogSize);
+        ctx.drawImage(particle._fCanvas, -fHalf, -fHalf, fLogSize, fLogSize);
         ctx.restore();
       });
 
@@ -6583,14 +6552,14 @@ const Game = () => {
 
         // Tab buttons — rounded pills with active glow
         const tabW = Math.round(85 * shopTs);
-        const tabH = Math.round(34 * shopTs);
+        const tabH = Math.max(44, Math.round(34 * shopTs));
         const tabR = tabH / 2;
         const tabY = headerH - tabH - Math.round(12 * shopTs);
         const tabGap = Math.round(8 * shopTs);
         const tabs = [
           { tab: 'skins', label: t('shop.birds') },
           { tab: 'trails', label: t('shop.trails') },
-          { tab: 'upgrades', label: 'UPGRADES' },
+          { tab: 'upgrades', label: t('shop.upgrades') || 'UPGRADES' },
         ];
         const totalTabW = tabs.length * tabW + (tabs.length - 1) * tabGap;
         const tabStartX = width / 2 - totalTabW / 2;
@@ -6950,11 +6919,22 @@ const Game = () => {
         const availableH = height - safeTop - safeBot - adPad;
         const menuOffset = Math.max(0, (availableH - totalMenuH) / 2);
 
+        // Apply menu scroll offset and clamp to valid range
+        const maxMenuScroll = Math.max(0, totalMenuH - availableH + 20);
+        if (menuScrollRef.current > maxMenuScroll) menuScrollRef.current = maxMenuScroll;
+        const menuScroll = menuScrollRef.current || 0;
+
+        // Clip menu drawing to safe area
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, safeTop, width, availableH);
+        ctx.clip();
+
         // --- Title ---
         ctx.save();
         ctx.font = `900 ${titleFontSize}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        const titleY = safeTop + menuOffset + Math.round((isSmallScreen ? 34 : 46) * menuTs);
+        const titleY = safeTop + menuOffset + Math.round((isSmallScreen ? 34 : 46) * menuTs) - menuScroll;
         // Clip to prevent shadow glow from bleeding below title area
         ctx.beginPath();
         ctx.rect(0, 0, width, titleY + titleFontSize * 0.4);
@@ -7058,9 +7038,10 @@ const Game = () => {
             const dcStatus = dc.completed ? t('misc.done') : `${dc.progress}/${dc.target}`;
             const dcText = t('menu.dailyChallenge', { desc: dc.desc, status: dcStatus, reward: dc.reward });
             const dcMaxW = width - 30;
-            if (ctx.measureText(dcText).width > dcMaxW) {
-              const dcFontSmall = Math.round((isSmallScreen ? 7 : 8) * menuTs);
-              ctx.font = `bold ${dcFontSmall}px Orbitron, Arial`;
+            let dcFontCur = Math.round((isSmallScreen ? 9 : 10) * menuTs);
+            while (ctx.measureText(dcText).width > dcMaxW && dcFontCur > 6) {
+              dcFontCur -= 1;
+              ctx.font = `bold ${dcFontCur}px Orbitron, Arial`;
             }
             ctx.fillText(dcText, width / 2, curY + 4);
             ctx.restore();
@@ -7332,7 +7313,7 @@ const Game = () => {
         const isNativePlatform = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
         if (!isNativePlatform) {
           const slBtnW = Math.round(80 * menuTs);
-          const slBtnH = Math.round(30 * menuTs);
+          const slBtnH = Math.max(44, Math.round(30 * menuTs));
           const slGap = Math.round(8 * menuTs);
           const slTotalW = slBtnW * 2 + slGap;
           const slX = width / 2 - slTotalW / 2;
@@ -7360,6 +7341,9 @@ const Game = () => {
           gameStateRef.current._loadBtnBounds = { x: loadX, y: slY, w: slBtnW, h: slBtnH };
         }
       }
+
+      // Restore menu scroll clip
+      ctx.restore();
 
       // Daily theme name (bottom corner)
       const creditSafeBot = gameStateRef.current.safeBottom || 0;

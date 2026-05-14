@@ -772,6 +772,12 @@ class Terrain {
         lo = mid + 1;
       }
     }
+    // Linear fallback for boundary edge cases
+    for (let i = 0; i < pts.length - 1; i++) {
+      const minY = Math.min(pts[i].y, pts[i + 1].y);
+      const maxY = Math.max(pts[i].y, pts[i + 1].y);
+      if (y >= minY - 50 && y <= maxY + 50) return i;
+    }
     return -1;
   }
 

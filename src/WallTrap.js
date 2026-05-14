@@ -396,6 +396,19 @@ class WallTrap {
       if (dx < -player.radius || dx > effectiveWidth + player.radius) return false;
     }
 
+    // For lasergrid, check per-beam proximity instead of full bounding box
+    if (this.trapType === 'lasergrid') {
+      const relativeY = player.y - this.y;
+      const beamThickness = 4; // visual beam core width
+      for (let i = 0; i < this.beamCount; i++) {
+        const beamY = (i - (this.beamCount - 1) / 2) * this.beamSpacing;
+        if (Math.abs(relativeY - beamY) < beamThickness / 2 + player.radius) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     return true;
   }
 }
