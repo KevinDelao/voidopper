@@ -2948,10 +2948,10 @@ const Game = () => {
 
       if (puMaxX - puMinX > 60) {
         const puX = puMinX + Math.random() * (puMaxX - puMinX);
-        // Rocket fuel is rare (15% chance), other types split remaining 85%
+        // Rocket fuel has 22% chance, other types split remaining 78%
         let puType;
         const roll = Math.random();
-        if (roll < 0.15 && !state.rocketBurstActive) {
+        if (roll < 0.22 && !state.rocketBurstActive) {
           puType = 'rocketfuel';
         } else {
           const types = ['shield', 'magnet', 'slowmo', 'speedboost'];
@@ -5185,9 +5185,9 @@ const Game = () => {
       const comboMult = getComboMultiplier(state.combo);
       // Cap size to prevent edge clipping and guardian overlap
       const guardianActive = state.guardian && state.guardian.entered && !state.guardian.exiting;
-      const maxY = guardianActive ? Math.round(130 * ts) + safeTop : Math.round(height * 0.25);
-      const maxComboSize = Math.min(28, height * 0.035);
-      const comboSize = Math.min(20 + state.combo * 2, maxComboSize) * ts;
+      const maxY = guardianActive ? Math.round(105 * ts) + safeTop : Math.round(height * 0.22);
+      const maxComboSize = guardianActive ? Math.min(22, height * 0.028) : Math.min(28, height * 0.035);
+      const comboSize = Math.min(20 + state.combo * 1.5, maxComboSize) * ts;
       const comboScale = reducedMotionRef.current ? 1 : 1 + Math.sin(Date.now() / 80) * 0.06;
       const comboAlpha = Math.min(1, state.comboTimer);
       const comboColor = state.combo >= 15 ? '#ff2244' : state.combo >= 10 ? '#ff6600' : state.combo >= 5 ? '#ffaa00' : '#44ddff';

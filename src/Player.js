@@ -103,8 +103,8 @@ class Player {
 
   // Mood tier: 'chill', 'neutral', 'firedup', 'onfire'
   getMoodTier() {
-    if (this.mood >= 76) return 'onfire';
-    if (this.mood >= 51) return 'firedup';
+    if (this.mood >= 88) return 'onfire';
+    if (this.mood >= 55) return 'firedup';
     if (this.mood <= 20) return 'chill';
     return 'neutral';
   }
@@ -184,7 +184,7 @@ class Player {
 
   // Register a near-miss (enemy passed within close range without hitting)
   registerNearMiss() {
-    this.addMood(8);
+    this.addMood(5);
   }
 
   // === MOMENTUM STREAK ===
@@ -193,11 +193,11 @@ class Player {
     if (quality === 'perfect') {
       this.momentumStreak += 2;
       this.streakFlash = 0.4;
-      this.addMood(6);
+      this.addMood(4);
     } else if (quality === 'good') {
       this.momentumStreak += 1;
       this.streakFlash = 0.2;
-      this.addMood(3);
+      this.addMood(2);
     } else {
       this.momentumStreak = Math.max(0, this.momentumStreak - 1);
     }
@@ -244,7 +244,7 @@ class Player {
     this.rocketBurstTimer = this.rocketBurstDuration;
     this.rocketBurstCooldown = 12.0;
     this.invincibleTimer = this.rocketBurstDuration;
-    this.addMood(20);
+    this.addMood(12);
   }
 
   updateRocketBurst(deltaTime) {
@@ -263,7 +263,7 @@ class Player {
     this.grazeTimer = 0.15;
     this.grazeFlash = 0.3;
     this.totalGrazes++;
-    this.addMood(5);
+    this.addMood(3);
   }
 
   updateGraze(deltaTime) {
