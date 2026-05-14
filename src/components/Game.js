@@ -701,9 +701,6 @@ const Game = () => {
         return;
       }
 
-      // Block input during launch grace period (prevents PLAY tap from launching bird)
-      if (gameStateRef.current._launchGraceTimer > 0) return;
-
       touchStartTime = Date.now();
       touchStartPos = { x: touch.clientX, y: touch.clientY };
 
@@ -1196,6 +1193,7 @@ const Game = () => {
                 difficultyRef.current = d.key;
                 initGame(getW(), getH());
                 setGameStarted(true);
+                touchStartTime = 0; // prevent tap from bleeding as bird launch
                 if (audioManagerRef.current) {
                   if (!audioManagerRef.current.isInitialized) {
                     audioManagerRef.current.initialize().then(() => {
@@ -1240,6 +1238,7 @@ const Game = () => {
           mediumTap();
           initGame(getW(), getH());
           setGameStarted(true);
+          touchStartTime = 0; // prevent PLAY tap from bleeding through as bird launch
           if (tutorialRef.current.shouldShow()) {
             tutorialRef.current.start();
           }
@@ -1379,6 +1378,7 @@ const Game = () => {
           mediumTap();
           restartGame(getW(), getH());
           setGameStarted(true);
+          touchStartTime = 0; // prevent restart tap from launching bird
           gameOverTimeRef.current = null;
           // Restart game music (may have stopped during game over screen)
           if (audioManagerRef.current) {
@@ -1982,7 +1982,6 @@ const Game = () => {
     state.feverActive = false;
     state.feverTimer = 0;
     state.feverCooldown = 0;
-    state._launchGraceTimer = 0.5;
     // Cache upgrade multipliers for this run
     const um = upgradeRef.current;
     state.upgrades = {
@@ -2203,11 +2202,6 @@ const Game = () => {
     if (!state.backgroundStars) state.backgroundStars = [];
 
 
-    // Launch grace period — prevent accidental launch from PLAY button tap bleed
-    if (state._launchGraceTimer > 0) {
-      state._launchGraceTimer -= rawDeltaTime;
-    }
-
     // First-run hint: launch tutorial
     if (player.isStuck && state.runStats.wallBounces === 0 && state.runStats.distance === 0) {
       showHint(state, 'launch', t('hint.dragText'), t('hint.dragSub'));
@@ -2234,13 +2228,18 @@ const Game = () => {
     const boostMult = player.hasSpeedBoost ? 1.5 : 1.0;
 
     // Apply gravity only when flying — prevents vy from accumulating while stuck
+    // Mood does NOT amplify gravity (only launch power) to prevent "fly up" without pickup
     if (!player.isStuck) {
-      player.applyGravity(state.gravity * moodSpeed * 60 * (state.speedScale || 1), playerDeltaTime);
+      player.applyGravity(state.gravity * 60 * (state.speedScale || 1), playerDeltaTime);
     }
 
-    // Cap upward velocity — prevents infinite ascent on favorable terrain
-    // Rocket burst has its own height cap, so exclude it here
-    const maxUpwardVy = -1000 * (player.screenScale || 1);
+    // Upward drag — bird decelerates while rising to prevent indefinite climb
+    if (!state.rocketBurstActive && player.vy < 0 && !player.isStuck) {
+      player.vy *= (1 - 0.4 * playerDeltaTime);
+    }
+
+    // Cap upward velocity — hard limit for safety
+    const maxUpwardVy = -650 * (player.screenScale || 1);
     if (!state.rocketBurstActive && player.vy < maxUpwardVy) {
       player.vy = maxUpwardVy;
     }

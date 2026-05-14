@@ -146,8 +146,8 @@ class Player {
 
   // Mood -> Gameplay: launch power multiplier
   getLaunchPowerMultiplier() {
-    if (this.mood >= 76) return 1.15;
-    if (this.mood >= 51) return 1.08;
+    if (this.mood >= 88) return 1.12;
+    if (this.mood >= 55) return 1.05;
     if (this.mood <= 20) return 0.92;
     return 1.0;
   }
@@ -161,8 +161,8 @@ class Player {
 
   // Mood -> Gameplay: speed multiplier
   getSpeedMultiplier() {
-    if (this.mood >= 76) return 1.1;
-    if (this.mood >= 51) return 1.05;
+    if (this.mood >= 88) return 1.08;
+    if (this.mood >= 55) return 1.04;
     if (this.mood <= 20) return 0.95;
     return 1.0;
   }
@@ -184,7 +184,7 @@ class Player {
 
   // Register a near-miss (enemy passed within close range without hitting)
   registerNearMiss() {
-    this.addMood(5);
+    this.addMood(3);
   }
 
   // === MOMENTUM STREAK ===
@@ -193,11 +193,11 @@ class Player {
     if (quality === 'perfect') {
       this.momentumStreak += 2;
       this.streakFlash = 0.4;
-      this.addMood(4);
+      this.addMood(3);
     } else if (quality === 'good') {
       this.momentumStreak += 1;
       this.streakFlash = 0.2;
-      this.addMood(2);
+      this.addMood(1);
     } else {
       this.momentumStreak = Math.max(0, this.momentumStreak - 1);
     }
@@ -244,7 +244,7 @@ class Player {
     this.rocketBurstTimer = this.rocketBurstDuration;
     this.rocketBurstCooldown = 12.0;
     this.invincibleTimer = this.rocketBurstDuration;
-    this.addMood(12);
+    this.addMood(8);
   }
 
   updateRocketBurst(deltaTime) {
@@ -263,7 +263,7 @@ class Player {
     this.grazeTimer = 0.15;
     this.grazeFlash = 0.3;
     this.totalGrazes++;
-    this.addMood(3);
+    this.addMood(2);
   }
 
   updateGraze(deltaTime) {
@@ -356,10 +356,10 @@ class Player {
 
     // Mood naturally decays toward neutral (30) over time
     const moodTarget = 30;
-    // Gentle proportional decay: enough to prevent permanent max without constant play
+    // Proportional decay: prevents staying at max without sustained skillful play
     const excess = Math.max(0, this.mood - moodTarget);
     const decayRate = this.mood > moodTarget
-      ? 0.5 + (excess / 70) * 1.5   // scales from 0.5/sec at mood 31 to 2.0/sec at mood 100
+      ? 1.5 + (excess / 70) * 3.0   // scales from 1.5/sec at mood 31 to 4.5/sec at mood 100
       : 2; // faster recovery from low
     if (Math.abs(this.mood - moodTarget) > 0.5) {
       if (this.mood > moodTarget) {
