@@ -619,8 +619,7 @@ const Game = () => {
             am.startMenuMusic();
           }
         })();
-        // Consume this tap — don't let it hit menu buttons behind the overlay
-        return;
+        // Continue processing this touch — don't consume it
       }
       // Lightweight recovery: if AudioContext is interrupted/suspended (e.g. Control Center),
       // resume it within this user gesture so iOS allows playback.
@@ -5195,14 +5194,14 @@ const Game = () => {
       const comboMult = getComboMultiplier(state.combo);
       // Cap size to prevent edge clipping and guardian overlap
       const guardianActive = state.guardian && state.guardian.entered && !state.guardian.exiting;
-      const maxY = guardianActive ? Math.round(105 * ts) + safeTop : Math.round(height * 0.22);
-      const maxComboSize = guardianActive ? Math.min(22, height * 0.028) : Math.min(28, height * 0.035);
-      const comboSize = Math.min(20 + state.combo * 1.5, maxComboSize) * ts;
+      const maxComboSize = guardianActive ? Math.min(20, height * 0.025) : Math.min(24, height * 0.03);
+      const comboSize = Math.min(18 + state.combo * 1.2, maxComboSize) * ts;
       const comboScale = reducedMotionRef.current ? 1 : 1 + Math.sin(Date.now() / 80) * 0.06;
       const comboAlpha = Math.min(1, state.comboTimer);
       const comboColor = state.combo >= 15 ? '#ff2244' : state.combo >= 10 ? '#ff6600' : state.combo >= 5 ? '#ffaa00' : '#44ddff';
-      // Position combo below previous elements with guaranteed spacing
-      hudFlowY += Math.round(8 * ts);
+      // Position combo below mood effect text with guaranteed spacing
+      hudFlowY += Math.round(12 * ts);
+      const maxY = guardianActive ? Math.round(105 * ts) + safeTop : height;
       const comboY = Math.min(hudFlowY + Math.ceil(comboSize * 0.65), maxY);
       ctx.globalAlpha = comboAlpha;
 
