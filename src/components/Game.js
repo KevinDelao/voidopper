@@ -701,6 +701,9 @@ const Game = () => {
         return;
       }
 
+      // Block input during launch grace period (prevents PLAY tap from launching bird)
+      if (gameStateRef.current._launchGraceTimer > 0) return;
+
       touchStartTime = Date.now();
       touchStartPos = { x: touch.clientX, y: touch.clientY };
 
@@ -1979,6 +1982,7 @@ const Game = () => {
     state.feverActive = false;
     state.feverTimer = 0;
     state.feverCooldown = 0;
+    state._launchGraceTimer = 0.5;
     // Cache upgrade multipliers for this run
     const um = upgradeRef.current;
     state.upgrades = {
@@ -2198,6 +2202,11 @@ const Game = () => {
     if (!state.powerUps) state.powerUps = [];
     if (!state.backgroundStars) state.backgroundStars = [];
 
+
+    // Launch grace period — prevent accidental launch from PLAY button tap bleed
+    if (state._launchGraceTimer > 0) {
+      state._launchGraceTimer -= rawDeltaTime;
+    }
 
     // First-run hint: launch tutorial
     if (player.isStuck && state.runStats.wallBounces === 0 && state.runStats.distance === 0) {
