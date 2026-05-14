@@ -4829,8 +4829,9 @@ const Game = () => {
         const toastR = Math.round(14 * toastTs);
         const toastX = width / 2 - toastW / 2;
         const toastSafeTop = state.safeTop || 0;
-        // Position below the score pill and mood bar (approx 120*ts below safe top)
-        const toastY = toastSafeTop + Math.round(120 * toastTs);
+        // Position below score pill; push further down during guardian to avoid boss bar overlap
+        const guardianShowing = state.guardian && state.guardian.entered && !state.guardian.exiting;
+        const toastY = toastSafeTop + Math.round((guardianShowing ? 230 : 120) * toastTs);
 
         // Slide-in animation
         const slideProgress = state.achievementToastTimer > 2.5 ? (3.0 - state.achievementToastTimer) / 0.5 : 1;
@@ -5106,7 +5107,7 @@ const Game = () => {
 
       // Tier markers
       ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-      [0.2, 0.51, 0.76].forEach(mark => {
+      [0.2, 0.55, 0.88].forEach(mark => {
         ctx.fillRect(meterX + meterW * mark - 0.5, meterY, 1, meterH);
       });
       ctx.restore();
@@ -5154,8 +5155,9 @@ const Game = () => {
       ctx.restore();
     }
 
-    // "Approaching Best!" indicator when within 100m of high score
-    if (gameStartedRef.current && !isGameOverRef.current) {
+    // "Approaching Best!" indicator when within 100m of high score (hide during guardian)
+    const guardianHudActive = state.guardian && state.guardian.entered && !state.guardian.exiting;
+    if (gameStartedRef.current && !isGameOverRef.current && !guardianHudActive) {
       const diff = state.difficulty || 'medium';
       const best = highScoresRef.current[diff] || 0;
       if (best > 0 && state.currentScore >= best - 100 && state.currentScore < best) {
@@ -5310,9 +5312,9 @@ const Game = () => {
       ctx.restore();
     }
 
-    // Draw active power-up indicators (left side, below difficulty badge)
+    // Draw active power-up indicators (left side, below zone announce area)
     if (player && gameStartedRef.current && !isGameOverRef.current) {
-      let puY = Math.round(46 * ts) + safeTop;
+      let puY = Math.round(58 * ts) + safeTop;
       const puBoxW = Math.round(90 * ts);
       const puBoxH = Math.round(22 * ts);
       const puConfigs = [
