@@ -2400,10 +2400,6 @@ const Game = () => {
           });
         }
 
-        if (player.momentumStreak >= 8 && !player.rocketBurst && !state.rocketBurstActive && player.rocketBurstCooldown <= 0) {
-          triggerRocketBurst(state, player);
-        }
-
         if (state.runStats.wallBounces === 1) {
           showHint(state, 'wallBounce', t('hint.comboText'), t('hint.comboSub'));
         }
@@ -6680,12 +6676,17 @@ const Game = () => {
         if (settingsScrollRef.current < 0) settingsScrollRef.current = 0;
         const sScrollY = settingsScrollRef.current;
 
-        // Header
-        ctx.fillStyle = 'rgba(18, 14, 41, 0.98)';
-        ctx.fillRect(0, 0, width, sHeaderH);
+        // Header — glass panel style matching main menu
+        drawGlassPanel(ctx, 0, 0, width, sHeaderH, {
+          radius: 0, bg: 'rgba(15, 10, 30, 0.95)', border: 'rgba(124, 58, 237, 0.15)'
+        });
         ctx.font = `bold ${Math.round(22 * sTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#ffffff';
+        const settTitleGrad = ctx.createLinearGradient(width / 2 - 80, 0, width / 2 + 80, 0);
+        settTitleGrad.addColorStop(0, '#cc66ff');
+        settTitleGrad.addColorStop(0.5, '#ffffff');
+        settTitleGrad.addColorStop(1, '#cc66ff');
+        ctx.fillStyle = settTitleGrad;
         ctx.fillText(t('settings.title'), width / 2, sSafeTop + (sHeaderH - sSafeTop) / 2 + Math.round(8 * sTs));
 
         // Scrollable content area
@@ -6713,80 +6714,84 @@ const Game = () => {
           ctx.fillText(text, sStartX, y + Math.round(14 * sTs));
         };
 
-        // Helper: draw a volume bar
+        // Helper: draw a volume bar — glass panel style
         const drawVolBar = (label, value, y, boundsKey) => {
           drawLabel(label, y);
           const barX = sStartX + sLabelW;
           const barW = sMaxW - sLabelW - Math.round(50 * sTs);
           const barH = Math.max(sMinTouch, Math.round(24 * sTs));
           const barY = y + Math.round(15 * sTs) - barH / 2;
+          const barR = Math.round(barH / 2);
           // Background
-          ctx.fillStyle = 'rgba(40, 30, 60, 0.8)';
-          ctx.beginPath();
-          ctx.roundRect(barX, barY, barW, barH, Math.round(4 * sTs));
+          drawRoundRect(ctx, barX, barY, barW, barH, barR);
+          ctx.fillStyle = 'rgba(25, 18, 50, 0.85)';
           ctx.fill();
-          // Fill
-          const fillW = (value / 100) * barW;
-          ctx.fillStyle = '#9966cc';
-          ctx.beginPath();
-          ctx.roundRect(barX, barY, fillW, barH, Math.round(4 * sTs));
-          ctx.fill();
-          // Border
-          ctx.strokeStyle = '#666688';
+          ctx.strokeStyle = 'rgba(124, 58, 237, 0.2)';
           ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.roundRect(barX, barY, barW, barH, Math.round(4 * sTs));
           ctx.stroke();
+          // Fill with gradient
+          const fillW = Math.max(barR * 2, (value / 100) * barW);
+          if (value > 0) {
+            drawRoundRect(ctx, barX, barY, fillW, barH, barR);
+            const volGrad = ctx.createLinearGradient(barX, barY, barX + fillW, barY);
+            volGrad.addColorStop(0, 'rgba(124, 58, 237, 0.9)');
+            volGrad.addColorStop(1, 'rgba(167, 139, 250, 0.7)');
+            ctx.fillStyle = volGrad;
+            ctx.fill();
+          }
           // Value text
           ctx.font = `bold ${sBtnFs}px Orbitron, Arial`;
           ctx.textAlign = 'right';
-          ctx.fillStyle = '#ffffff';
+          ctx.fillStyle = '#f0f0ff';
           ctx.fillText(`${value}%`, sStartX + sMaxW, y + Math.round(18 * sTs));
           gameStateRef.current[boundsKey] = { x: barX, y: barY, w: barW, h: barH };
         };
 
-        // Helper: draw toggle row
+        // Helper: draw toggle row — pill-shaped with glow
         const drawToggle = (label, value, y, boundsKey) => {
           drawLabel(label, y);
           const btnW = Math.round((sIsWide ? 90 : 70) * sTs);
           const btnH = sMinTouch;
           const btnX = sStartX + sMaxW - btnW;
           const btnY = y + Math.round(15 * sTs) - btnH / 2;
-          ctx.fillStyle = value ? 'rgba(68, 204, 102, 0.8)' : 'rgba(60, 40, 80, 0.8)';
-          ctx.beginPath();
-          ctx.roundRect(btnX, btnY, btnW, btnH, Math.round(6 * sTs));
+          const btnR = btnH / 2;
+          drawRoundRect(ctx, btnX, btnY, btnW, btnH, btnR);
+          if (value) {
+            const toggleGrad = ctx.createLinearGradient(btnX, btnY, btnX + btnW, btnY + btnH);
+            toggleGrad.addColorStop(0, 'rgba(68, 204, 102, 0.85)');
+            toggleGrad.addColorStop(1, 'rgba(40, 160, 70, 0.85)');
+            ctx.fillStyle = toggleGrad;
+          } else {
+            ctx.fillStyle = 'rgba(25, 18, 50, 0.85)';
+          }
           ctx.fill();
-          ctx.strokeStyle = value ? '#44cc66' : '#555577';
+          ctx.strokeStyle = value ? 'rgba(100, 255, 130, 0.4)' : 'rgba(255, 255, 255, 0.08)';
           ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.roundRect(btnX, btnY, btnW, btnH, Math.round(6 * sTs));
           ctx.stroke();
           ctx.font = `bold ${sSmallFs}px Orbitron, Arial`;
           ctx.textAlign = 'center';
-          ctx.fillStyle = '#ffffff';
+          ctx.fillStyle = value ? '#ffffff' : 'rgba(200, 200, 240, 0.7)';
           ctx.fillText(value ? t('settings.on') : t('settings.off'), btnX + btnW / 2, btnY + btnH / 2 + Math.round(4 * sTs));
           gameStateRef.current[boundsKey] = { x: btnX, y: btnY, w: btnW, h: btnH };
         };
 
-        // Helper: draw cycle button row
+        // Helper: draw cycle button row — pill-shaped glass
         const drawCycle = (label, value, y, boundsKey) => {
           drawLabel(label, y);
           const btnW = Math.round((sIsWide ? 180 : 140) * sTs);
           const btnH = sMinTouch;
           const btnX = sStartX + sMaxW - btnW;
           const btnY = y + Math.round(15 * sTs) - btnH / 2;
-          ctx.fillStyle = 'rgba(40, 30, 60, 0.8)';
-          ctx.beginPath();
-          ctx.roundRect(btnX, btnY, btnW, btnH, Math.round(6 * sTs));
+          const btnR = btnH / 2;
+          drawRoundRect(ctx, btnX, btnY, btnW, btnH, btnR);
+          ctx.fillStyle = 'rgba(25, 18, 50, 0.85)';
           ctx.fill();
-          ctx.strokeStyle = '#88aacc';
+          ctx.strokeStyle = 'rgba(6, 182, 212, 0.3)';
           ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.roundRect(btnX, btnY, btnW, btnH, Math.round(6 * sTs));
           ctx.stroke();
           ctx.font = `bold ${sCycleFs}px Orbitron, Arial`;
           ctx.textAlign = 'center';
-          ctx.fillStyle = '#ffffff';
+          ctx.fillStyle = '#88ddff';
           ctx.fillText(value.toUpperCase(), btnX + btnW / 2, btnY + btnH / 2 + Math.round(4 * sTs));
           gameStateRef.current[boundsKey] = { x: btnX, y: btnY, w: btnW, h: btnH };
         };
@@ -6822,14 +6827,12 @@ const Game = () => {
         const gBtnH = sMinTouch;
         const gBtnX = sStartX + sMaxW - gBtnW;
         const gBtnY = sY + Math.round(15 * sTs) - gBtnH / 2;
-        ctx.fillStyle = 'rgba(40, 30, 60, 0.8)';
-        ctx.beginPath();
-        ctx.roundRect(gBtnX, gBtnY, gBtnW, gBtnH, Math.round(6 * sTs));
+        const gBtnR = gBtnH / 2;
+        drawRoundRect(ctx, gBtnX, gBtnY, gBtnW, gBtnH, gBtnR);
+        ctx.fillStyle = 'rgba(25, 18, 50, 0.85)';
         ctx.fill();
         ctx.strokeStyle = gfxColor;
         ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.roundRect(gBtnX, gBtnY, gBtnW, gBtnH, Math.round(6 * sTs));
         ctx.stroke();
         ctx.font = `bold ${sBtnFs}px Orbitron, Arial`;
         ctx.textAlign = 'center';
@@ -6857,26 +6860,29 @@ const Game = () => {
 
         ctx.restore(); // end clip
 
-        // Footer background
-        ctx.fillStyle = 'rgba(18, 14, 41, 0.95)';
-        ctx.fillRect(0, height - sFooterH, width, sFooterH);
+        // Footer background — glass panel style
+        drawGlassPanel(ctx, 0, height - sFooterH, width, sFooterH, {
+          radius: 0, bg: 'rgba(15, 10, 30, 0.95)', border: 'rgba(124, 58, 237, 0.15)'
+        });
 
-        // Back button
+        // Back button — pill-shaped matching main menu buttons
         ctx.save();
         const sBackW = Math.round((sIsWide ? 200 : 160) * sTs);
         const sBackH = Math.max(50, Math.round(50 * sTs));
+        const sBackR = sBackH / 2;
         const sBackY = height - sSafeBot - sAdPad - Math.round(68 * sTs);
-        ctx.fillStyle = 'rgba(60, 40, 100, 0.9)';
-        ctx.fillRect(width / 2 - sBackW / 2, sBackY, sBackW, sBackH);
-        ctx.strokeStyle = '#9966cc';
-        ctx.lineWidth = 2;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = '#9966cc';
-        ctx.strokeRect(width / 2 - sBackW / 2, sBackY, sBackW, sBackH);
-        ctx.shadowBlur = 0;
+        drawRoundRect(ctx, width / 2 - sBackW / 2, sBackY, sBackW, sBackH, sBackR);
+        const backGrad = ctx.createLinearGradient(width / 2 - sBackW / 2, sBackY, width / 2 + sBackW / 2, sBackY + sBackH);
+        backGrad.addColorStop(0, 'rgba(124, 58, 237, 0.85)');
+        backGrad.addColorStop(1, 'rgba(88, 28, 200, 0.85)');
+        ctx.fillStyle = backGrad;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(167, 139, 250, 0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
         ctx.font = `bold ${Math.round(18 * sTs)}px Orbitron, Arial`;
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = '#f0f0ff';
         ctx.fillText(t('menu.back'), width / 2, sBackY + Math.round(31 * sTs));
         ctx.restore();
         gameStateRef.current._settingsBackBtnBounds = { x: width / 2 - sBackW / 2, y: sBackY, w: sBackW, h: sBackH };

@@ -871,10 +871,11 @@ class Player {
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 5]);
 
-    // Calculate trajectory points
-    const launchMult = this.getLaunchPowerMultiplier();
-    const vx = Math.cos(this.aimAngle) * this.aimPower * launchMult;
-    const vy = Math.sin(this.aimAngle) * this.aimPower * launchMult;
+    // Calculate trajectory points — match actual launch() multipliers
+    const chargeMult = this.getChargePowerMultiplier();
+    const power = this.aimPower * this.getLaunchPowerMultiplier() * (this.skinLaunchMult || 1) * chargeMult * this.momentumMultiplier;
+    const vx = Math.cos(this.aimAngle) * power;
+    const vy = Math.sin(this.aimAngle) * power;
     const steps = 30;
     const dt = 0.05;
 
@@ -905,22 +906,6 @@ class Player {
     ctx.restore();
   }
 
-  applyHillBoost(normal) {
-    const boostMagnitude = 900 * (this.screenScale || 1);
-
-    // Calculate perpendicular direction to normal (along the slope)
-    const slopeDx = -normal.y;
-    const slopeDy = normal.x;
-
-    // Normalize
-    const length = Math.sqrt(slopeDx * slopeDx + slopeDy * slopeDy);
-    if (length < 0.001) return;
-    const normalizedDx = (slopeDx / length) * boostMagnitude;
-    const normalizedDy = Math.abs((slopeDy / length) * boostMagnitude);
-
-    const dt = this._lastDeltaTime || 0.016;
-    this.applyForce(normalizedDx * dt, normalizedDy * dt);
-  }
 
   getSkinColors() {
     const s = this.skin;
