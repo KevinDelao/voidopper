@@ -5247,7 +5247,7 @@ const Game = () => {
       ctx.restore();
     }
 
-    // Draw momentum streak indicator (right side, below buttons with guaranteed clearance)
+    // Draw momentum streak indicator (right side, below mood effect text)
     if (player && player.momentumStreak >= 2 && gameStartedRef.current && !isGameOverRef.current) {
       ctx.save();
       const streakTier = player.getMomentumTier();
@@ -5255,7 +5255,7 @@ const Game = () => {
         streakTier === 'hot' ? '#ff8800' : streakTier === 'warm' ? '#ffcc00' : '#66ccff';
       const streakSize = Math.round((14 + Math.min(player.momentumStreak, 12)) * ts);
       const streakX = width - Math.round(16 * ts);
-      const streakY = Math.round(80 * ts) + safeTop + Math.round(50 * ts);
+      const streakY = Math.round(150 * ts) + safeTop;
       ctx.font = `900 ${streakSize}px Orbitron, Arial`;
       ctx.textAlign = 'right';
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
